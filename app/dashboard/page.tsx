@@ -1,0 +1,126 @@
+"use client"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-provider"
+import { ProtectedRoute } from "@/components/protected-route"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { User, Database, LogOut, UserCircle, Calendar, ListTodo } from "lucide-react"
+import Link from "next/link"
+import { UserProfileTab } from "@/components/user-profile-tab"
+import { UserTablesTab } from "@/components/user-tables-tab"
+import { GanttChartWidget } from "@/components/gantt-chart-widget"
+import { AgendaWidget } from "@/components/agenda-widget"
+
+export default function DashboardPage() {
+  const { user, isAdmin, logout } = useAuth()
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState("agenda")
+  const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date())
+
+  useEffect(() => {
+    // Update time every second
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  return (
+    <ProtectedRoute>
+      <div className="container mx-auto p-2 sm:p-4 max-w-full lg:max-w-6xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold">Dashboard Utente</h1>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <Link href="/admin">
+                <Button variant="outline" size="sm" className="flex items-center gap-2 w-full sm:w-auto">
+                  <User className="h-4 w-4" />
+                  <span className="whitespace-nowrap">Dashboard Admin</span>
+                </Button>
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logout()}
+              className="flex items-center gap-2 w-full sm:w-auto"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          </div>
+        </div>
+
+        <Card className="mb-4 sm:mb-6 overflow-hidden">
+          <CardHeader className="p-3 sm:p-6 flex flex-row justify-between items-start">
+            <div>
+              <CardTitle>Benvenuto, {user?.nome || user?.username}!</CardTitle>
+              <CardDescription className="line-clamp-2 sm:line-clamp-none">
+                {isAdmin
+                  ? "Accesso effettuato come amministratore. Puoi accedere a tutte le funzionalità del sistema."
+                  : "Accesso effettuato come utente standard. Puoi esplorare le tue tabelle e visualizzare i tuoi dati."}
+              </CardDescription>
+            </div>
+            <div className="text-right">
+              <CardTitle className="text-sm sm:text-base flex flex-col items-end">
+                <span>{currentDateTime.toLocaleDateString("it-IT", { weekday: "long" })}</span>
+                <span>
+                  {currentDateTime.getDate()} {currentDateTime.toLocaleDateString("it-IT", { month: "long" })}{" "}
+                  {currentDateTime.getFullYear()}
+                </span>
+                <span>
+                  {currentDateTime.getHours().toString().padStart(2, "0")}:
+                  {currentDateTime.getMinutes().toString().padStart(2, "0")}:
+                  {currentDateTime.getSeconds().toString().padStart(2, "0")}
+                </span>
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-6">
+            <Tabs defaultValue="agenda" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid grid-cols-2 sm:grid-cols-4 mb-4 sm:mb-6 w-full">
+                <TabsTrigger value="agenda" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <ListTodo className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Agenda</span>
+                </TabsTrigger>
+                <TabsTrigger value="gantt" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Gantt</span>
+                </TabsTrigger>
+                <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <UserCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Profilo</span>
+                </TabsTrigger>
+                <TabsTrigger value="tables" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Database className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Tabelle</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="overflow-x-auto">
+                <TabsContent value="profile" className="space-y-4 min-w-full">
+                  <UserProfileTab user={user} />
+                </TabsContent>
+
+                <TabsContent value="tables" className="space-y-4 min-w-full">
+                  <UserTablesTab />
+                </TabsContent>
+
+                <TabsContent value="gantt" className="space-y-4 min-w-full">
+                  <GanttChartWidget />
+                </TabsContent>
+
+                <TabsContent value="agenda" className="space-y-4 min-w-full">
+                  <AgendaWidget />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </ProtectedRoute>
+  )
+}
