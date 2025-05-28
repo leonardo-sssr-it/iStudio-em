@@ -1,23 +1,25 @@
-import { type ClassValue, clsx } from "clsx"
+import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
-/**
- * Combines multiple class names using clsx and tailwind-merge
- * @param inputs Class names to combine
- * @returns Combined class name string
- */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 /**
- * Sanitizes an identifier for use in SQL queries to prevent SQL injection
- * @param str String to sanitize
- * @returns Sanitized string or empty string if not valid
+ * Sanitizes an identifier to make it safe for database operations
+ * @param identifier - The identifier to sanitize
+ * @returns A sanitized identifier
  */
-export function sanitizeIdentifier(str: string): string {
-  if (!str) return ""
+export function sanitizeIdentifier(identifier: string): string {
+  if (!identifier || typeof identifier !== "string") {
+    return ""
+  }
 
-  // Remove non-alphanumeric characters and underscores
-  return str.replace(/[^a-zA-Z0-9_]/g, "")
+  // Remove special characters and keep only alphanumeric, underscore, and hyphen
+  return identifier
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .replace(/^[0-9]/, "_$&") // Ensure it doesn't start with a number
+    .replace(/_+/g, "_") // Replace multiple underscores with single
+    .replace(/^_|_$/g, "") // Remove leading/trailing underscores
 }
