@@ -6,19 +6,18 @@ import { useAuth } from "@/lib/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Menu, X, LayoutDashboard, User, LogOut, Calendar } from "lucide-react"
 import { ThemeSelector } from "@/components/theme-selector"
-import { useCustomTheme } from "@/contexts/theme-context"
+// Rimosso useCustomTheme perché il padding è gestito dal wrapper
+// import { useCustomTheme } from "@/contexts/theme-context"
 
 export function Header() {
   const { user, isAdmin, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const { layout } = useCustomTheme()
+  // const { layout } = useCustomTheme() // Rimosso
   const [mounted, setMounted] = useState(false)
   const [currentDate, setCurrentDate] = useState("")
 
   useEffect(() => {
     setMounted(true)
-
-    // Aggiorna la data ogni minuto
     const updateDate = () => {
       const now = new Date()
       const options: Intl.DateTimeFormatOptions = {
@@ -31,17 +30,14 @@ export function Header() {
       }
       setCurrentDate(now.toLocaleDateString("it-IT", options))
     }
-
     updateDate()
-    const interval = setInterval(updateDate, 60000) // Aggiorna ogni minuto
-
+    const interval = setInterval(updateDate, 60000)
     return () => clearInterval(interval)
   }, [])
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
   const menuItems = [
-    //{ href: "/", label: "Home", icon: Home },
     ...(user
       ? [
           {
@@ -49,24 +45,21 @@ export function Header() {
             label: isAdmin ? "Admin Dashboard" : "Dashboard",
             icon: LayoutDashboard,
           },
-          // Rimuovi questa riga: { href: "/profile", label: "Profilo", icon: User },
         ]
       : []),
   ]
 
-  // Determiniamo la classe del container in base al layout
-  const containerClass =
-    layout === "fullWidth"
-      ? "w-full px-4"
-      : layout === "sidebar"
-        ? "container mx-auto px-4 lg:pl-72"
-        : "container mx-auto px-4"
+  // Rimosso containerClass, il padding è gestito dal LayoutWrapper
+  // const containerClass = ...
 
   if (!mounted) return null
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className={containerClass}>
+    <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Il div con containerClass è stato rimosso. Il padding è gestito dal LayoutWrapper */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        {" "}
+        {/* Aggiunto container standard */}
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
@@ -82,26 +75,9 @@ export function Header() {
             <span className="font-medium">{currentDate}</span>
           </div>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
-            {menuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center space-x-1 text-sm font-medium transition-colors hover:text-primary"
-              >
-                <item.icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
-            {/* Theme Selector */}
             <ThemeSelector />
-
-            {/* User menu */}
             {user && (
               <div className="hidden md:flex items-center space-x-2">
                 <Link href="/profile" className="text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -117,23 +93,17 @@ export function Header() {
                 </Button>
               </div>
             )}
-
-            {/* Mobile menu button */}
             <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleMenu}>
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
-
-        {/* Mobile Navigation */}
         {isMenuOpen && (
           <nav className="md:hidden py-4 border-t">
-            {/* Mobile Date */}
             <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground mb-4 pb-3 border-b">
               <Calendar className="h-4 w-4" />
               <span className="font-medium">{currentDate}</span>
             </div>
-
             <div className="flex flex-col space-y-3">
               {menuItems.map((item) => (
                 <Link

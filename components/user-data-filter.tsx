@@ -447,11 +447,13 @@ export function UserDataFilter({ defaultUserId }: UserDataFilterProps = {}) {
           <Button
             onClick={fetchFilteredData}
             disabled={isLoadingResults || !selectedUser || !selectedTable || !selectedUserIdField}
-            className="w-full"
+            variant="outline"
+            size="default"
+            className="w-full flex items-center justify-center gap-2"
           >
             {isLoadingResults ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Caricamento...
               </>
             ) : (

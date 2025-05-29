@@ -66,8 +66,11 @@ export function TableSidebar({ isOpen, onToggle }: TableSidebarProps) {
                 return (
                   <Button
                     key={tableName}
-                    variant={isActive(tableName) ? "secondary" : "ghost"}
-                    className="w-full justify-start"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start",
+                      isActive(tableName) && "bg-muted text-foreground border-primary",
+                    )}
                     size="sm"
                     onClick={() => handleTableClick(tableName)}
                   >

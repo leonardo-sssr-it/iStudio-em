@@ -79,6 +79,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--background", isDark ? "0 0% 7%" : "0 0% 100%")
     root.style.setProperty("--foreground", isDark ? "0 0% 98%" : "0 0% 3.9%")
 
+    // Colori di base per shadcn/ui (assicurati che questi siano coerenti)
+    root.style.setProperty("--card", isDark ? "0 0% 7%" : "0 0% 100%") // Esempio, adatta se necessario
+    root.style.setProperty("--popover", isDark ? "0 0% 7%" : "0 0% 100%") // Esempio, adatta se necessario
+
+    // Definisci o aggiorna --border
+    // Precedentemente per il tema scuro era 0 0% 14.9% (hsl(0, 0%, 14.9%))
+    // Lo rendiamo leggermente più scuro per un miglior contrasto delle linee
+    root.style.setProperty("--border", isDark ? "0 0% 20%" : "0 0% 89.8%") // NUOVA RIGA per --border (20% invece di 14.9% per dark)
+    root.style.setProperty("--input", isDark ? "0 0% 20%" : "0 0% 89.8%") // Anche --input spesso usa lo stesso colore di --border
+    root.style.setProperty("--ring", isDark ? "0 0% 83.1%" : "0 0% 63.9%") // Esempio per --ring
+
     // Applichiamo i colori del tema con controllo del contrasto
     root.style.setProperty("--primary", currentTheme.primary_color || (isDark ? "0 0% 98%" : "0 0% 9%"))
     root.style.setProperty("--secondary", currentTheme.secondary_color || (isDark ? "0 0% 14.9%" : "0 0% 96.1%"))

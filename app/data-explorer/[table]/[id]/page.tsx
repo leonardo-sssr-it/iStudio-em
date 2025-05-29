@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Trash2, Edit, Eye, Calendar } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Edit, Calendar, X } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 
 // Definizione delle tabelle disponibili
@@ -36,13 +36,14 @@ const AVAILABLE_TABLES = [
   { id: "todolist", label: "To-Do List", icon: "✓" },
   { id: "progetti", label: "Progetti", icon: "📊" },
   { id: "clienti", label: "Clienti", icon: "👥" },
+  { id: "pagine", label: "Pagine", icon: "📄" },
 ]
 
 // Definizione dei campi per ogni tabella
 const TABLE_FIELDS = {
   appuntamenti: {
     listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -54,19 +55,17 @@ const TABLE_FIELDS = {
       priorita: "number",
       note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita"],
-      "Date e orari": ["data_inizio", "data_fine"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
+      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
+      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli"],
     },
   },
   attivita: {
     listFields: ["id", "titolo", "data_inizio", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -78,19 +77,17 @@ const TABLE_FIELDS = {
       priorita: "number",
       note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita"],
-      "Date e orari": ["data_inizio", "data_fine"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
+      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
+      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
     },
   },
   scadenze: {
     listFields: ["id", "titolo", "data_scadenza", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
     defaultSort: "data_scadenza",
     types: {
       id: "number",
@@ -101,19 +98,18 @@ const TABLE_FIELDS = {
       priorita: "number",
       note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita"],
       Date: ["data_scadenza"],
       "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
   todolist: {
     listFields: ["id", "titolo", "completato", "priorita", "data_scadenza"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
     defaultSort: "priorita",
     types: {
       id: "number",
@@ -124,19 +120,18 @@ const TABLE_FIELDS = {
       data_scadenza: "datetime",
       note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "completato", "priorita"],
       Date: ["data_scadenza"],
       "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
   progetti: {
     listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -148,19 +143,27 @@ const TABLE_FIELDS = {
       budget: "number",
       note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
-      "Informazioni principali": ["nome", "descrizione", "stato", "budget"],
-      Date: ["data_inizio", "data_fine"],
+      "Informazioni principali": [
+        "nome",
+        "descrizione",
+        "stato",
+        "colore",
+        "gruppo",
+        "budget",
+        "data_inizio",
+        "data_fine",
+        "avanzamento",
+      ],
       "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
     },
   },
   clienti: {
     listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
     defaultSort: "cognome",
     types: {
       id: "number",
@@ -175,7 +178,6 @@ const TABLE_FIELDS = {
       codfisc: "string",
       note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
@@ -183,7 +185,29 @@ const TABLE_FIELDS = {
       Indirizzo: ["citta", "indirizzo", "cap"],
       "Informazioni fiscali": ["piva", "codfisc"],
       "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    },
+  },
+  pagine: {
+    listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
+    defaultSort: "data_creazione",
+    types: {
+      id: "number",
+      titolo: "string",
+      slug: "string",
+      contenuto: "text",
+      stato: "string",
+      meta_title: "string",
+      meta_description: "text",
+      id_utente: "number",
+      modifica: "datetime",
+    },
+    groups: {
+      "Informazioni principali": ["titolo", "slug", "stato"],
+      Contenuto: ["contenuto"],
+      SEO: ["meta_title", "meta_description"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
 }
@@ -225,7 +249,7 @@ export default function ItemDetailPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
-  const isEditMode = searchParams.get("edit") === "true" || params.id === "new"
+  const [isEditMode, setIsEditMode] = useState<boolean>(searchParams.get("edit") === "true" || params.id === "new")
   const isNewItem = params.id === "new"
 
   const [loading, setLoading] = useState<boolean>(true)
@@ -235,8 +259,19 @@ export default function ItemDetailPage() {
   const [editedItem, setEditedItem] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<string>("main")
 
-  const tableName = params.table as string
-  const itemId = params.id as string
+  // Estrai e valida i parametri
+  const tableName = Array.isArray(params.table) ? params.table[0] : params.table
+  const itemId = Array.isArray(params.id) ? params.id[0] : params.id
+
+  // Debug logging
+  console.log("Parametri URL:", { tableName, itemId, params })
+
+  // Verifica che la tabella sia valida
+  const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
+
+  if (!isValidTable && tableName) {
+    console.error(`Tabella non valida: ${tableName}`)
+  }
 
   // Ottieni la configurazione della tabella
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
@@ -246,7 +281,10 @@ export default function ItemDetailPage() {
 
   // Carica i dati dell'elemento
   const loadItem = useCallback(async () => {
-    if (!supabase || !tableName || !user?.id) return
+    if (!supabase || !tableName || !user?.id || !isValidTable) {
+      console.log("Condizioni non soddisfatte:", { supabase: !!supabase, tableName, userId: user?.id, isValidTable })
+      return
+    }
 
     setLoading(true)
     try {
@@ -261,6 +299,8 @@ export default function ItemDetailPage() {
         return
       }
 
+      console.log(`Caricamento elemento da tabella: ${tableName}, ID: ${itemId}`)
+
       // Carica l'elemento esistente
       const { data, error } = await supabase
         .from(tableName)
@@ -270,9 +310,11 @@ export default function ItemDetailPage() {
         .single()
 
       if (error) {
+        console.error("Errore query Supabase:", error)
         throw error
       }
 
+      console.log("Dati caricati:", data)
       setItem(data)
       setEditedItem(data)
     } catch (error: any) {
@@ -286,14 +328,14 @@ export default function ItemDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, tableName, itemId, user?.id, isNewItem, router])
+  }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable])
 
   // Carica i dati all'avvio
   useEffect(() => {
-    if (supabase && user?.id) {
+    if (supabase && user?.id && tableName && isValidTable) {
       loadItem()
     }
-  }, [supabase, user?.id, loadItem])
+  }, [supabase, user?.id, loadItem, tableName, isValidTable])
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
@@ -305,7 +347,7 @@ export default function ItemDetailPage() {
 
   // Salva le modifiche
   const handleSave = async () => {
-    if (!supabase || !tableName || !user?.id || !editedItem) return
+    if (!supabase || !tableName || !user?.id || !editedItem || !isValidTable) return
 
     setSaving(true)
     try {
@@ -321,6 +363,8 @@ export default function ItemDetailPage() {
         updateData.data_creazione = new Date().toISOString()
       }
 
+      console.log(`Salvataggio in tabella: ${tableName}`, updateData)
+
       // Salva i dati
       let result
       if (isNewItem) {
@@ -330,6 +374,7 @@ export default function ItemDetailPage() {
       }
 
       if (result.error) {
+        console.error("Errore salvataggio:", result.error)
         throw result.error
       }
 
@@ -341,6 +386,7 @@ export default function ItemDetailPage() {
       // Aggiorna i dati locali
       setItem(result.data[0])
       setEditedItem(result.data[0])
+      setIsEditMode(false)
 
       // Reindirizza alla pagina di dettaglio per i nuovi elementi
       if (isNewItem) {
@@ -358,15 +404,27 @@ export default function ItemDetailPage() {
     }
   }
 
+  // Annulla le modifiche
+  const handleCancelEdit = () => {
+    setEditedItem(item)
+    setIsEditMode(false)
+    if (isNewItem) {
+      router.push(`/data-explorer`)
+    }
+  }
+
   // Elimina l'elemento
   const handleDelete = async () => {
-    if (!supabase || !tableName || !itemId) return
+    if (!supabase || !tableName || !itemId || !isValidTable) return
 
     setDeleting(true)
     try {
+      console.log(`Eliminazione da tabella: ${tableName}, ID: ${itemId}`)
+
       const { error } = await supabase.from(tableName).delete().eq("id", itemId)
 
       if (error) {
+        console.error("Errore eliminazione:", error)
         throw error
       }
 
@@ -572,6 +630,25 @@ export default function ItemDetailPage() {
     }
   }, [fieldGroups])
 
+  // Se la tabella non è valida, mostra errore
+  if (tableName && !isValidTable) {
+    return (
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl text-red-600">Errore</CardTitle>
+            <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/data-explorer")}>
+              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   // Renderizza lo scheletro durante il caricamento
   if (loading) {
     return (
@@ -614,17 +691,20 @@ export default function ItemDetailPage() {
               </CardDescription>
             </div>
             <div className="flex space-x-2">
-              {!isNewItem && !isEditMode && (
-                <Button
-                  variant="outline"
-                  onClick={() => router.push(`/data-explorer/${tableName}/${itemId}?edit=true`)}
-                >
-                  <Edit size={16} className="mr-2" /> Modifica
-                </Button>
+              {isEditMode && (
+                <>
+                  <Button onClick={handleSave} disabled={saving} className="min-w-[150px]">
+                    {saving ? "Salvataggio..." : "Salva modifiche"}
+                    {!saving && <Save size={16} className="ml-2" />}
+                  </Button>
+                  <Button variant="outline" onClick={handleCancelEdit}>
+                    <X size={16} className="mr-2" /> Annulla modifica
+                  </Button>
+                </>
               )}
-              {!isNewItem && isEditMode && (
-                <Button variant="outline" onClick={() => router.push(`/data-explorer/${tableName}/${itemId}`)}>
-                  <Eye size={16} className="mr-2" /> Visualizza
+              {!isNewItem && !isEditMode && (
+                <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                  <Edit size={16} className="mr-2" /> Modifica
                 </Button>
               )}
               {!isNewItem && (
@@ -654,18 +734,6 @@ export default function ItemDetailPage() {
           </div>
         </CardHeader>
         <CardContent>{editedItem && renderFieldGroups()}</CardContent>
-        {isEditMode && (
-          <CardFooter className="flex justify-end border-t bg-white pt-6">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
-            >
-              {saving ? "Salvataggio..." : "Salva modifiche"}
-              {!saving && <Save size={16} className="ml-2" />}
-            </Button>
-          </CardFooter>
-        )}
       </Card>
     </div>
   )

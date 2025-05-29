@@ -26,6 +26,8 @@ const pathPermissions: Record<string, Permission> = {
   "/admin": "admin",
   "/profile": "read",
   "/dashboard": "read",
+  "/dashboard-u": "read", // Aggiungi autorizzazione per dashboard-u
+  "/dashboard-mobile": "read", // Aggiungi autorizzazione per dashboard-mobile
   // Aggiungi altri percorsi secondo necessità
 }
 
@@ -65,11 +67,29 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
 
     // Funzione per gestire l'autorizzazione
     const checkAuthorization = async () => {
+      console.log("ProtectedRoute: Inizio verifica autorizzazione", { isLoading, user: !!user })
+
       // Se stiamo ancora caricando, non facciamo nulla
-      if (isLoading) return
+      if (isLoading) {
+        console.log("ProtectedRoute: Ancora in caricamento, aspetto...")
+        return
+      }
 
       // Verifichiamo se l'utente è autenticato
       if (!user) {
+        // Prima di reindirizzare, proviamo a verificare la sessione una volta
+        console.log("ProtectedRoute: Utente non trovato, verifico la sessione...")
+
+        try {
+          const sessionValid = await checkSession()
+          if (sessionValid) {
+            console.log("ProtectedRoute: Sessione valida trovata, aspetto aggiornamento utente...")
+            return // Aspetta che l'utente venga aggiornato
+          }
+        } catch (error) {
+          console.error("ProtectedRoute: Errore nella verifica della sessione:", error)
+        }
+
         // L'utente non è autenticato, reindirizza al login
         console.log("ProtectedRoute: Utente non autenticato, reindirizzamento al login")
         if (!redirectingRef.current) {
@@ -120,7 +140,26 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
     return () => {
       redirectingRef.current = false
     }
-  }, [user, isLoading, isAdmin, router, adminOnly, pathname, requiredPermission])
+  }, [user, isLoading, isAdmin, router, adminOnly, pathname, requiredPermission, checkSession])
+
+  // Aggiungi questo useEffect dopo quello esistente
+  useEffect(() => {
+    // Timeout di sicurezza per evitare attese infinite
+    const timeoutId = setTimeout(() => {
+      if (isLoading && !authCheckCompletedRef.current) {
+        console.log("ProtectedRoute: Timeout raggiunto, forzo il controllo dell'autorizzazione")
+        if (!user && !redirectingRef.current) {
+          console.log("ProtectedRoute: Timeout - utente non trovato, reindirizzamento al login")
+          redirectingRef.current = true
+          router.push("/login")
+        }
+      }
+    }, 10000) // 10 secondi di timeout
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [isLoading, user, router])
 
   // Verifica periodica della sessione
   useEffect(() => {

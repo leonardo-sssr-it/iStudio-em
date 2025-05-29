@@ -5,6 +5,7 @@ import { SupabaseProvider } from "@/lib/supabase-provider"
 import { AuthProvider } from "@/lib/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { SidebarProvider } from "@/contexts/sidebar-context"
+import { SidebarStateProvider } from "@/contexts/sidebar-state-context"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { LayoutWrapper } from "@/components/layout/layout-wrapper"
 
@@ -16,10 +17,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SupabaseProvider>
             <AuthProvider>
               <SidebarProvider>
-                <ThemeProvider>
-                  <LayoutWrapper>{children}</LayoutWrapper>
-                  <Toaster />
-                </ThemeProvider>
+                <SidebarStateProvider>
+                  <ThemeProvider>
+                    <LayoutWrapper>{children}</LayoutWrapper>
+                    <Toaster />
+                  </ThemeProvider>
+                </SidebarStateProvider>
               </SidebarProvider>
             </AuthProvider>
           </SupabaseProvider>
@@ -30,5 +33,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 
 export const metadata = {
-      generator: 'v0.dev'
-    };
+  generator: "v0.dev",
+}

@@ -179,15 +179,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const saveSessionToCookie = useCallback((userId: string, expiresInDays = SESSION_DURATION_DAYS) => {
     try {
       const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-      const session = { user_id: userId, expires_at: expiresAt }
+      // Aggiungiamo un token casuale per aumentare la sicurezza
+      const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("")
+
+      const session = {
+        user_id: userId,
+        expires_at: expiresAt,
+        token: randomToken, // Token casuale per evitare attacchi di replay
+      }
 
       // Utilizziamo encodeURIComponent per gestire correttamente i caratteri speciali
       const cookieValue = encodeURIComponent(JSON.stringify(session))
 
-      // Impostiamo il cookie con SameSite=Lax
+      // Impostiamo il cookie con SameSite=Lax e Secure se in HTTPS
+      const isSecure = window.location.protocol === "https:"
       document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${
         expiresInDays * 24 * 60 * 60
-      }; SameSite=Lax`
+      }; SameSite=Lax${isSecure ? "; Secure" : ""}`
     } catch (error) {
       console.error("Errore nel salvataggio del cookie di sessione:", error)
     }
@@ -197,12 +207,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkSession = useCallback(async (): Promise<boolean> => {
     // Evita chiamate multiple contemporanee
     if (isCheckingSessionRef.current) {
+      console.log("AuthProvider: Verifica sessione già in corso")
       return !!user // Ritorna lo stato corrente dell'utente
     }
 
     isCheckingSessionRef.current = true
 
+    // Non impostiamo isLoading qui per evitare flickering durante i check automatici
+    // setIsLoading(true) - Rimuoviamo questa riga
+
     if (!supabase) {
+      console.log("AuthProvider: Client Supabase non disponibile")
       isCheckingSessionRef.current = false
       return false
     }
@@ -212,7 +227,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = getSessionFromCookie()
 
       if (!session || !session.user_id) {
-        setUser(null)
+        // Non cambiamo lo stato se l'utente è già null
+        if (user !== null) {
+          setUser(null)
+        }
         isCheckingSessionRef.current = false
         return false
       }
@@ -220,9 +238,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Verifica se la sessione è scaduta
       if (new Date(session.expires_at) <= new Date()) {
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        setUser(null)
+        if (user !== null) {
+          setUser(null)
+        }
         isCheckingSessionRef.current = false
         return false
+      }
+
+      // Se l'utente è già caricato con lo stesso ID, evitiamo di ricaricarlo
+      if (user && user.id === session.user_id) {
+        // Rinnova solo la sessione
+        saveSessionToCookie(user.id)
+        isCheckingSessionRef.current = false
+        return true
       }
 
       // Recupera i dati dell'utente
@@ -230,7 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!userData) {
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        setUser(null)
+        if (user !== null) {
+          setUser(null)
+        }
         isCheckingSessionRef.current = false
         return false
       }
@@ -238,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Aggiorna l'ultimo accesso
       await updateLastAccess(userData.id)
 
-      // Imposta i dati utente
+      // Imposta i dati utente in un'unica operazione
       setUser(userData)
       setIsAdmin(userData.ruolo === "admin")
 
@@ -248,8 +278,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isCheckingSessionRef.current = false
       return true
     } catch (error) {
-      console.error("Errore nella verifica della sessione:", error)
-      setUser(null)
+      console.error("AuthProvider: Errore nella verifica della sessione:", error)
+      if (user !== null) {
+        setUser(null)
+      }
       isCheckingSessionRef.current = false
       return false
     }
@@ -334,10 +366,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Salva la sessione nei cookie
         saveSessionToCookie(data.id)
 
-        // Imposta i dati utente
+        // Imposta i dati utente - Importante: facciamo questo in un'unica operazione
+        // per evitare re-render multipli
         setUser(data)
         setIsAdmin(data.ruolo === "admin")
 
+        // Imposta il flag di reindirizzamento prima del toast per evitare flickering
+        redirectingRef.current = true
+
+        // Mostriamo il toast solo dopo aver impostato tutti gli stati
         toast({
           title: "Login effettuato",
           description: `Benvenuto, ${data.nome || data.username}!`,
@@ -345,9 +382,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Reindirizza l'utente in base al ruolo
         const destination = data.ruolo === "admin" ? "/admin" : "/dashboard"
-
-        // Imposta il flag di reindirizzamento
-        redirectingRef.current = true
         router.push(destination)
 
         return true
@@ -369,9 +403,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return false
       } finally {
-        setIsLoading(false)
+        // Impostiamo isLoading a false solo se non stiamo reindirizzando
+        // per evitare flickering durante il cambio di pagina
+        if (!redirectingRef.current) {
+          setIsLoading(false)
+        }
         isCheckingSessionRef.current = false
-        // Il flag redirectingRef verrà resettato al cambio di pagina
       }
     },
     [supabase, router, verifyPassword, updatePasswordToHashed, updateLastAccess, saveSessionToCookie],
@@ -425,26 +462,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Verifica la sessione all'avvio
   useEffect(() => {
+    let isMounted = true
+
     const checkSessionOnLoad = async () => {
-      if (sessionChecked || isCheckingSessionRef.current) return
+      if (sessionChecked || isCheckingSessionRef.current) {
+        return
+      }
 
       setIsLoading(true)
 
       try {
         await checkSession()
       } catch (error) {
-        console.error("Errore nella verifica della sessione:", error)
+        console.error("AuthProvider: Errore nella verifica della sessione:", error)
       } finally {
-        setIsLoading(false)
-        setSessionChecked(true)
+        // Verifichiamo che il componente sia ancora montato
+        if (isMounted) {
+          setIsLoading(false)
+          setSessionChecked(true)
+        }
       }
     }
 
     if (supabase) {
       checkSessionOnLoad()
     } else {
-      // Se non c'è un client Supabase, imposta isLoading a false
       setIsLoading(false)
+    }
+
+    // Cleanup function
+    return () => {
+      isMounted = false
     }
   }, [supabase, checkSession, sessionChecked])
 

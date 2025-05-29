@@ -157,97 +157,52 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* Classi personalizzate per pulsanti con contrasto garantito - VERSIONE SEMPLIFICATA */
 @layer components {
+  /* Classi personalizzate per pulsanti con contrasto garantito - VERSIONE CORRETTA */
   .btn-contrast-primary {
     @apply border-2 font-semibold transition-all duration-200 relative;
-    border-color: #1f2937 !important;
-    color: #1f2937 !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary)) !important;
     background-color: transparent !important;
   }
 
   .btn-contrast-primary:hover {
-    background-color: rgba(31, 41, 55, 0.1) !important;
-    border-color: #111827 !important;
-    color: #111827 !important;
+    background-color: hsl(var(--primary) / 0.1) !important;
+    border-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary)) !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .btn-contrast-primary:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  .dark .btn-contrast-primary {
-    border-color: #e5e7eb !important;
-    color: #e5e7eb !important;
-    background-color: transparent !important;
-  }
-
-  .dark .btn-contrast-primary:hover {
-    background-color: rgba(229, 231, 235, 0.1) !important;
-    border-color: #f3f4f6 !important;
-    color: #f3f4f6 !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 8px hsl(var(--primary) / 0.1);
   }
 
   .btn-contrast-secondary {
     @apply border font-medium transition-all duration-200;
-    border-color: #6b7280 !important;
-    color: #6b7280 !important;
+    border-color: hsl(var(--muted-foreground)) !important;
+    color: hsl(var(--muted-foreground)) !important;
     background-color: transparent !important;
   }
 
   .btn-contrast-secondary:hover {
-    background-color: rgba(107, 114, 128, 0.1) !important;
-    border-color: #4b5563 !important;
-    color: #4b5563 !important;
-    transform: translateY(-1px);
-  }
-
-  .dark .btn-contrast-secondary {
-    border-color: #9ca3af !important;
-    color: #9ca3af !important;
-    background-color: transparent !important;
-  }
-
-  .dark .btn-contrast-secondary:hover {
-    background-color: rgba(156, 163, 175, 0.1) !important;
-    border-color: #d1d5db !important;
-    color: #d1d5db !important;
+    background-color: hsl(var(--muted) / 0.5) !important;
+    border-color: hsl(var(--foreground)) !important;
+    color: hsl(var(--foreground)) !important;
     transform: translateY(-1px);
   }
 
   .btn-contrast-destructive {
     @apply border font-medium transition-all duration-200;
-    border-color: #dc2626 !important;
-    color: #dc2626 !important;
+    border-color: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive)) !important;
     background-color: transparent !important;
   }
 
   .btn-contrast-destructive:hover {
-    background-color: rgba(220, 38, 38, 0.1) !important;
-    border-color: #b91c1c !important;
-    color: #b91c1c !important;
+    background-color: hsl(var(--destructive) / 0.1) !important;
+    border-color: hsl(var(--destructive)) !important;
+    color: hsl(var(--destructive)) !important;
     transform: translateY(-1px);
   }
 
-  .dark .btn-contrast-destructive {
-    border-color: #f87171 !important;
-    color: #f87171 !important;
-    background-color: transparent !important;
-  }
-
-  .dark .btn-contrast-destructive:hover {
-    background-color: rgba(248, 113, 113, 0.1) !important;
-    border-color: #fca5a5 !important;
-    color: #fca5a5 !important;
-    transform: translateY(-1px);
-  }
-
-  /* Assicura che i colori non vengano sovrascritti */
+  /* Assicura che queste classi si applichino SOLO quando specificate esplicitamente */
   .btn-contrast-primary *,
   .btn-contrast-secondary *,
   .btn-contrast-destructive * {

@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "@/lib/auth-provider"
+import { useSidebarState } from "@/contexts/sidebar-state-context"
 import { cn } from "@/lib/utils"
 import {
-  Home,
   LayoutDashboard,
   User,
   Settings,
@@ -22,9 +23,12 @@ import {
   ListTodo,
   Briefcase,
   FolderKanban,
+  Smartphone,
+  LayoutGrid,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface SidebarProps {
   className?: string
@@ -34,24 +38,12 @@ export function Sidebar({ className }: SidebarProps) {
   const { user, isAdmin } = useAuth()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [collapsed, setCollapsed] = useState(false)
+  const { isCollapsed, toggleCollapsed, isMobile } = useSidebarState()
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
-
-    // Recupera lo stato della sidebar dal localStorage
-    const savedState = localStorage.getItem("sidebarCollapsed")
-    if (savedState) {
-      setCollapsed(savedState === "true")
-    }
   }, [])
-
-  const toggleCollapsed = () => {
-    const newState = !collapsed
-    setCollapsed(newState)
-    localStorage.setItem("sidebarCollapsed", String(newState))
-  }
 
   // Funzione per verificare se un link è attivo
   const isLinkActive = (href: string) => {
@@ -65,13 +57,22 @@ export function Sidebar({ className }: SidebarProps) {
 
   // Menu items basati sul ruolo dell'utente
   const menuItems = [
-    { href: "/", label: "Home", icon: Home },
     ...(user
       ? [
           {
             href: "/dashboard",
             label: "Dashboard",
             icon: LayoutDashboard,
+          },
+          {
+            href: "/dashboard-u",
+            label: "Dashboard Utente",
+            icon: LayoutGrid,
+          },
+          {
+            href: "/dashboard-mobile",
+            label: "Dashboard Mobile",
+            icon: Smartphone,
           },
           { href: "/profile", label: "Profilo", icon: User },
           { href: "/calendar", label: "Calendario", icon: Calendar },
@@ -89,6 +90,7 @@ export function Sidebar({ className }: SidebarProps) {
         { href: "/data-explorer?table=todolist", label: "To-Do List", icon: ListTodo },
         { href: "/data-explorer?table=progetti", label: "Progetti", icon: Briefcase },
         { href: "/data-explorer?table=clienti", label: "Clienti", icon: Users },
+        { href: "/data-explorer?table=pagine", label: "Pagine", icon: FileText },
       ]
     : []
 
@@ -102,132 +104,206 @@ export function Sidebar({ className }: SidebarProps) {
       ]
     : []
 
+  // Componente per renderizzare un link con tooltip se collassato
+  const SidebarLink = ({ item, active }: { item: any; active: boolean }) => {
+    const linkContent = (
+      <Link
+        href={item.href}
+        className={cn(
+          "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
+          active
+            ? "bg-primary text-foreground outline outline-2 outline-offset-1 outline-border [&>svg]:text-foreground shadow-md"
+            : "hover:bg-accent hover:text-accent-foreground hover:scale-105",
+          isCollapsed ? "justify-center" : "space-x-3",
+        )}
+        aria-current={active ? "page" : undefined}
+      >
+        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          <item.icon className={cn("h-5 w-5", isCollapsed ? "mx-auto" : "")} />
+        </motion.div>
+        <AnimatePresence>
+          {!isCollapsed && (
+            <motion.span
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: "auto" }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden whitespace-nowrap"
+            >
+              {item.label}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </Link>
+    )
+
+    if (isCollapsed) {
+      return (
+        <TooltipProvider>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+            <TooltipContent side="right" className="ml-2">
+              <p>{item.label}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    }
+
+    return linkContent
+  }
+
   if (!isMounted) return null
 
   return (
-    <div
+    <motion.div
+      animate={{ width: isCollapsed ? 64 : 256 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen border-r bg-background transition-all duration-300",
-        collapsed ? "w-16" : "w-64",
+        "h-screen border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0 relative",
         className,
       )}
     >
+      {/* Indicatore visivo dello stato */}
+      <div
+        className={cn(
+          "absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-primary to-primary/50 transition-all duration-300",
+          isCollapsed ? "opacity-50" : "opacity-100",
+        )}
+      />
+
       <div className="flex h-16 items-center justify-between border-b px-4">
         <Link href="/" className="flex items-center space-x-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+          <motion.div
+            className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center"
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileTap={{ scale: 0.95 }}
+          >
             <span className="text-primary-foreground font-bold text-lg">i</span>
-          </div>
-          {!collapsed && <span className="font-bold text-xl">iStudio</span>}
+          </motion.div>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.span
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="font-bold text-xl"
+              >
+                Studio
+              </motion.span>
+            )}
+          </AnimatePresence>
         </Link>
-        <Button variant="ghost" size="icon" onClick={toggleCollapsed} className="h-8 w-8">
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+
+        <Button variant="ghost" size="icon" onClick={toggleCollapsed} className="h-8 w-8 hover:bg-accent/50">
+          <motion.div animate={{ rotate: isCollapsed ? 180 : 0 }} transition={{ duration: 0.3 }}>
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </motion.div>
         </Button>
       </div>
 
       <ScrollArea className="h-[calc(100vh-4rem)]">
-        <div className="px-3 py-4">
+        <motion.div className="px-3 py-4" layout transition={{ duration: 0.3 }}>
           <nav className="space-y-4">
             {/* Menu principale */}
-            <div className="space-y-1">
-              {menuItems.map((item) => {
+            <motion.div className="space-y-1" layout>
+              {menuItems.map((item, index) => {
                 const active = isLinkActive(item.href)
                 return (
-                  <Link
+                  <motion.div
                     key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "bg-primary text-primary-foreground dark:text-white"
-                        : "hover:bg-accent hover:text-accent-foreground",
-                      collapsed ? "justify-center" : "space-x-3",
-                    )}
-                    aria-current={active ? "page" : undefined}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
                   >
-                    <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "")} />
-                    {!collapsed && <span>{item.label}</span>}
-                  </Link>
+                    <SidebarLink item={item} active={active} />
+                  </motion.div>
                 )
               })}
-            </div>
+            </motion.div>
 
             {/* Sezione Dati */}
             {dataItems.length > 0 && (
-              <div className="pt-2">
-                {!collapsed && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">Dati</h3>}
+              <motion.div className="pt-2" layout>
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.h3
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="mb-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
+                      Dati
+                    </motion.h3>
+                  )}
+                </AnimatePresence>
+
                 <div className="space-y-1">
                   {/* Link all'esploratore dati generale */}
-                  <Link
-                    href="/data-explorer"
-                    className={cn(
-                      "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                      pathname === "/data-explorer" && !searchParams.get("table")
-                        ? "bg-primary text-primary-foreground dark:text-white"
-                        : "hover:bg-accent hover:text-accent-foreground",
-                      collapsed ? "justify-center" : "space-x-3",
-                    )}
-                    aria-current={pathname === "/data-explorer" && !searchParams.get("table") ? "page" : undefined}
-                  >
-                    <FolderKanban className={cn("h-5 w-5", collapsed ? "mx-auto" : "")} />
-                    {!collapsed && <span>Tutti i Dati</span>}
-                  </Link>
+                  <SidebarLink
+                    item={{
+                      href: "/data-explorer",
+                      label: "Tutti i Dati",
+                      icon: FolderKanban,
+                    }}
+                    active={pathname === "/data-explorer" && !searchParams.get("table")}
+                  />
 
                   {/* Link alle tabelle specifiche */}
-                  {dataItems.map((item) => {
+                  {dataItems.map((item, index) => {
                     const active = isLinkActive(item.href)
                     return (
-                      <Link
+                      <motion.div
                         key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                          active
-                            ? "bg-primary text-primary-foreground dark:text-white"
-                            : "hover:bg-accent hover:text-accent-foreground",
-                          collapsed ? "justify-center" : "space-x-3",
-                        )}
-                        aria-current={active ? "page" : undefined}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: (menuItems.length + index) * 0.1 }}
                       >
-                        <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "")} />
-                        {!collapsed && <span>{item.label}</span>}
-                      </Link>
+                        <SidebarLink item={item} active={active} />
+                      </motion.div>
                     )
                   })}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Sezione Admin */}
             {adminItems.length > 0 && (
-              <div className="pt-2">
-                {!collapsed && <h3 className="mb-2 px-3 text-xs font-semibold text-muted-foreground">Admin</h3>}
+              <motion.div className="pt-2" layout>
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.h3
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="mb-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                    >
+                      Admin
+                    </motion.h3>
+                  )}
+                </AnimatePresence>
+
                 <div className="space-y-1">
-                  {adminItems.map((item) => {
+                  {adminItems.map((item, index) => {
                     const active = isLinkActive(item.href)
                     return (
-                      <Link
+                      <motion.div
                         key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                          active
-                            ? "bg-primary text-primary-foreground dark:text-white"
-                            : "hover:bg-accent hover:text-accent-foreground",
-                          collapsed ? "justify-center" : "space-x-3",
-                        )}
-                        aria-current={active ? "page" : undefined}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: (menuItems.length + dataItems.length + index) * 0.1 }}
                       >
-                        <item.icon className={cn("h-5 w-5", collapsed ? "mx-auto" : "")} />
-                        {!collapsed && <span>{item.label}</span>}
-                      </Link>
+                        <SidebarLink item={item} active={active} />
+                      </motion.div>
                     )
                   })}
                 </div>
-              </div>
+              </motion.div>
             )}
           </nav>
-        </div>
+        </motion.div>
       </ScrollArea>
-    </div>
+    </motion.div>
   )
 }

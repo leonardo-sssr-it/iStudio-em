@@ -12,11 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Search,
-  Filter,
   SortAsc,
   SortDesc,
-  Edit,
-  Eye,
   Plus,
   RefreshCw,
   Calendar,
@@ -26,11 +23,14 @@ import {
   Briefcase,
   Users,
   FolderKanban,
+  FilePlus,
+  FileText,
+  Grid3X3,
+  List,
 } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -40,117 +40,165 @@ const AVAILABLE_TABLES = [
   { id: "todolist", label: "To-Do List", icon: ListTodo },
   { id: "progetti", label: "Progetti", icon: Briefcase },
   { id: "clienti", label: "Clienti", icon: Users },
+  { id: "pagine", label: "Pagine", icon: FileText },
 ]
 
-// Definizione dei campi per ogni tabella
+// Definizione dei campi per ogni tabella (CORRETTA in base alla struttura reale del DB)
 const TABLE_FIELDS = {
   appuntamenti: {
-    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "luogo"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
+      modifica: "datetime",
+      attivo: "boolean",
+      id_utente: "number",
       titolo: "string",
       descrizione: "text",
+      note: "text",
+      luogo: "string",
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "string",
-      priorita: "number",
-      note: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
+      id_pro: "number",
+      id_att: "number",
+      id_cli: "number",
+      tags: "json",
+      notifica: "array",
     },
   },
   attivita: {
-    listFields: ["id", "titolo", "data_inizio", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
+      modifica: "datetime",
+      attivo: "boolean",
+      id_utente: "number",
       titolo: "string",
       descrizione: "text",
+      note: "text",
+      luogo: "string",
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "string",
-      priorita: "number",
-      note: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
+      id_pro: "number",
+      id_app: "number",
+      id_cli: "number",
+      tags: "json",
+      priorita: "string",
+      notifica: "datetime",
     },
   },
   scadenze: {
-    listFields: ["id", "titolo", "scadenza", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    listFields: ["id", "titolo", "scadenza", "stato", "id_pro"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "scadenza",
     types: {
       id: "number",
+      modifica: "datetime",
+      attivo: "boolean",
+      id_utente: "number",
+      id_pro: "number",
+      scadenza: "date",
       titolo: "string",
       descrizione: "text",
-      scadenza: "datetime",
-      stato: "string",
-      priorita: "number",
+      tag: "array",
       note: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
+      stato: "string",
+      privato: "boolean",
+      notifica: "datetime",
     },
   },
   todolist: {
-    listFields: ["id", "titolo", "completato", "priorita", "data_scadenza"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultSort: "priorita",
+    listFields: ["id", "titolo", "descrizione", "scadenza", "priorita"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
+    defaultSort: "scadenza",
     types: {
       id: "number",
-      titolo: "string",
-      descrizione: "text",
-      completato: "boolean",
-      priorita: "number",
-      data_scadenza: "datetime",
-      note: "text",
       id_utente: "number",
-      data_creazione: "datetime",
+      descrizione: "text",
       modifica: "datetime",
+      tag: "json",
+      scadenza: "date",
+      priorita: "string",
+      notifica: "time",
+      titolo: "string",
     },
   },
   progetti: {
-    listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    listFields: ["id", "titolo", "stato", "data_inizio", "data_fine", "avanzamento"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
-      nome: "string",
-      descrizione: "text",
+      modifica: "datetime",
+      attivo: "boolean",
+      id_utente: "number",
+      id_cli: "array",
+      id_att: "array",
+      id_app: "array",
+      id_sca: "array",
       stato: "string",
+      avanzamento: "number",
+      titolo: "string",
+      descrizione: "text",
+      note: "text",
       data_inizio: "datetime",
       data_fine: "datetime",
-      budget: "number",
-      note: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
+      tag: "array",
+      gruppo: "string",
+      colore: "string",
+      notifica: "datetime",
+      priorita: "string",
+      allegati: "json",
     },
   },
   clienti: {
-    listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
+    listFields: ["id", "nome", "cognome", "email", "citta", "societa"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "cognome",
     types: {
       id: "number",
+      id_utente: "number",
+      modifica: "datetime",
       nome: "string",
       cognome: "string",
-      email: "string",
-      telefono: "string",
-      citta: "string",
       indirizzo: "string",
+      citta: "string",
       cap: "string",
-      piva: "string",
-      codfisc: "string",
+      email: "string",
+      rappresentante: "boolean",
+      societa: "string",
+      indirizzosocieta: "string",
+      cittasocieta: "string",
+      codicefiscale: "string",
+      partitaiva: "string",
+      recapiti: "text",
       note: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
+      attivo: "boolean",
+      qr: "string",
+    },
+  },
+  pagine: {
+    listFields: ["id", "titolo", "categoria", "pubblicato", "attivo"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
+    defaultSort: "pubblicato",
+    types: {
+      id: "number",
       modifica: "datetime",
+      id_utente: "number",
+      attivo: "boolean",
+      titolo: "string",
+      estratto: "text",
+      contenuto: "text",
+      categoria: "string",
+      tag: "json",
+      immagine: "string",
+      pubblicato: "datetime",
+      privato: "boolean",
     },
   },
 }
@@ -167,6 +215,22 @@ function formatDateIT(date: string | null | undefined): string {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+    })
+  } catch (e) {
+    return ""
+  }
+}
+
+// Funzione per formattare solo la data
+function formatDateOnly(date: string | null | undefined): string {
+  if (!date) return ""
+  try {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return ""
+    return d.toLocaleDateString("it-IT", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     })
   } catch (e) {
     return ""
@@ -328,14 +392,15 @@ export default function DataExplorerPage() {
           {fields.map((field) => (
             <TableHead key={field} className="cursor-pointer" onClick={() => handleSort(field)}>
               <div className="flex items-center space-x-1">
-                <span>{field.charAt(0).toUpperCase() + field.slice(1).replace("_", " ")}</span>
+                <span className="text-xs sm:text-sm font-medium">
+                  {field.charAt(0).toUpperCase() + field.slice(1).replace("_", " ")}
+                </span>
                 {sortField === field && (
-                  <span>{sortDirection === "asc" ? <SortAsc size={14} /> : <SortDesc size={14} />}</span>
+                  <span>{sortDirection === "asc" ? <SortAsc size={12} /> : <SortDesc size={12} />}</span>
                 )}
               </div>
             </TableHead>
           ))}
-          <TableHead className="text-right">Azioni</TableHead>
         </TableRow>
       </TableHeader>
     )
@@ -350,14 +415,11 @@ export default function DataExplorerPage() {
             <TableRow key={index}>
               {[...Array(TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0)].map(
                 (_, cellIndex) => (
-                  <TableCell key={cellIndex}>
+                  <TableCell key={cellIndex} className="p-2">
                     <Skeleton className="h-4 w-full" />
                   </TableCell>
                 ),
               )}
-              <TableCell>
-                <Skeleton className="h-4 w-20" />
-              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -369,10 +431,15 @@ export default function DataExplorerPage() {
         <TableBody>
           <TableRow>
             <TableCell
-              colSpan={(TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0) + 1}
+              colSpan={TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0}
               className="text-center h-32"
             >
-              {searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <p className="text-gray-500">{searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}</p>
+                <Button variant="outline" onClick={handleCreateNew} size="sm">
+                  <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
+                </Button>
+              </div>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -386,50 +453,16 @@ export default function DataExplorerPage() {
     return (
       <TableBody>
         {filteredData.map((item) => (
-          <TableRow key={item.id} className="cursor-pointer hover:bg-gray-100">
+          <TableRow
+            key={item.id}
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            onClick={() => handleRowClick(item.id)}
+          >
             {fields.map((field) => (
-              <TableCell key={field} onClick={() => handleRowClick(item.id)}>
+              <TableCell key={field} className="p-2 text-xs sm:text-sm">
                 {renderCellValue(item[field], types[field as keyof typeof types])}
               </TableCell>
             ))}
-            <TableCell className="text-right">
-              <div className="flex justify-end space-x-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleRowClick(item.id)
-                        }}
-                      >
-                        <Eye size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Visualizza</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/data-explorer/${selectedTable}/${item.id}?edit=true`)
-                        }}
-                      >
-                        <Edit size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Modifica</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -442,15 +475,29 @@ export default function DataExplorerPage() {
 
     switch (type) {
       case "datetime":
-        return formatDateIT(value)
+        return <span className="text-xs">{formatDateIT(value)}</span>
+      case "date":
+        return <span className="text-xs">{formatDateOnly(value)}</span>
       case "boolean":
-        return value ? "✓" : "✗"
+        return <span className={value ? "text-green-600" : "text-red-600"}>{value ? "✓" : "✗"}</span>
       case "number":
-        return typeof value === "number" ? value.toLocaleString("it-IT") : value
+        return (
+          <span className="font-mono text-xs">{typeof value === "number" ? value.toLocaleString("it-IT") : value}</span>
+        )
       case "text":
-        return value.length > 50 ? value.substring(0, 50) + "..." : value
+        return <span className="text-xs">{value.length > 30 ? value.substring(0, 30) + "..." : value}</span>
+      case "json":
+        return (
+          <span className="text-xs text-blue-600">{Array.isArray(value) ? `${value.length} elementi` : "JSON"}</span>
+        )
+      case "array":
+        return (
+          <span className="text-xs text-purple-600">{Array.isArray(value) ? `${value.length} elementi` : "-"}</span>
+        )
+      case "time":
+        return <span className="text-xs font-mono">{value ? String(value).substring(0, 8) : "-"}</span>
       default:
-        return formatValue(value)
+        return <span className="text-xs">{formatValue(value)}</span>
     }
   }
 
@@ -458,8 +505,8 @@ export default function DataExplorerPage() {
   const renderGridView = () => {
     if (loading) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, index) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, index) => (
             <Card key={index} className="h-48">
               <CardContent className="p-4 flex flex-col space-y-2">
                 <Skeleton className="h-6 w-3/4" />
@@ -475,8 +522,13 @@ export default function DataExplorerPage() {
 
     if (filteredData.length === 0) {
       return (
-        <div className="flex justify-center items-center h-32">
-          <p className="text-gray-500">{searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}</p>
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <p className="text-gray-500 text-center">
+            {searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}
+          </p>
+          <Button variant="outline" onClick={handleCreateNew}>
+            <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
+          </Button>
         </div>
       )
     }
@@ -486,29 +538,38 @@ export default function DataExplorerPage() {
     const types = tableConfig?.types || {}
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredData.map((item) => (
           <Card
             key={item.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
+            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group"
             onClick={() => handleRowClick(item.id)}
           >
             <CardContent className="p-4">
-              <h3 className="font-bold text-lg mb-2">{item.titolo || item.nome || `ID: ${item.id}`}</h3>
-              <div className="space-y-1">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-semibold text-sm line-clamp-2 flex-1">
+                  {item.titolo || item.nome || item.descrizione || `ID: ${item.id}`}
+                </h3>
+              </div>
+
+              <div className="space-y-2">
                 {fields.slice(1, 4).map((field) => (
-                  <div key={field} className="flex justify-between">
-                    <span className="text-sm text-gray-500">
+                  <div key={field} className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground font-medium min-w-0 flex-shrink-0 mr-2">
                       {field.charAt(0).toUpperCase() + field.slice(1).replace("_", " ")}:
                     </span>
-                    <span className="text-sm">{renderCellValue(item[field], types[field as keyof typeof types])}</span>
+                    <span className="text-right min-w-0 flex-1 truncate">
+                      {renderCellValue(item[field], types[field as keyof typeof types])}
+                    </span>
                   </div>
                 ))}
               </div>
-              <div className="flex justify-end mt-4">
-                <Button variant="ghost" size="sm" className="mr-2">
-                  <Eye size={16} className="mr-1" /> Visualizza
-                </Button>
+
+              <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/50">
+                <span className="text-xs text-muted-foreground">ID: {item.id}</span>
+                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                  Clicca per dettagli →
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -527,26 +588,29 @@ export default function DataExplorerPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-2">
+    <div className="w-full max-w-none space-y-6">
+      <Card className="border-border/50">
+        <CardHeader className="pb-4">
+          <div className="flex items-center space-x-3">
             {selectedTable && getTableIcon(selectedTable)}
-            <div>
-              <CardTitle>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-lg sm:text-xl">
                 {selectedTable
                   ? AVAILABLE_TABLES.find((t) => t.id === selectedTable)?.label || "Esploratore Dati"
                   : "Esploratore Dati"}
               </CardTitle>
-              <CardDescription>Visualizza e gestisci i tuoi dati personali</CardDescription>
+              <CardDescription className="text-sm">Visualizza e gestisci i tuoi dati personali</CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="w-full md:w-1/3">
+
+        <CardContent className="space-y-6">
+          {/* Controlli superiori */}
+          <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-4">
+            {/* Selezione tabella */}
+            <div className="w-full lg:w-1/3">
               <Select value={selectedTable} onValueChange={setSelectedTable}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleziona una tabella" />
                 </SelectTrigger>
                 <SelectContent>
@@ -561,67 +625,100 @@ export default function DataExplorerPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-full md:w-2/3 flex gap-2">
-              <div className="relative flex-grow">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+
+            {/* Controlli azioni */}
+            <div className="w-full lg:w-2/3 flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Cerca..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="pl-10"
                 />
               </div>
-              <Button variant="outline" size="icon" onClick={() => setView(view === "list" ? "grid" : "list")}>
-                <Filter className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={loadTableData}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button onClick={handleCreateNew} disabled={!selectedTable}>
-                <Plus className="h-4 w-4 mr-2" /> Nuovo
-              </Button>
+
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setView(view === "list" ? "grid" : "list")}
+                  className="shrink-0"
+                >
+                  {view === "list" ? <Grid3X3 className="h-4 w-4" /> : <List className="h-4 w-4" />}
+                </Button>
+                <Button variant="outline" size="icon" onClick={loadTableData} className="shrink-0">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" onClick={handleCreateNew} disabled={!selectedTable} className="shrink-0">
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Nuovo</span>
+                </Button>
+              </div>
             </div>
           </div>
 
+          {/* Contenuto principale */}
           {selectedTable ? (
-            <Tabs value={view} onValueChange={(v) => setView(v as "list" | "grid")}>
-              <TabsList className="mb-4">
-                <TabsTrigger value="list">Lista</TabsTrigger>
-                <TabsTrigger value="grid">Griglia</TabsTrigger>
-              </TabsList>
-              <TabsContent value="list">
-                <div className="rounded-md border">
-                  <Table>
-                    {renderTableHeader()}
-                    {renderTableBody()}
-                  </Table>
-                </div>
-              </TabsContent>
-              <TabsContent value="grid">{renderGridView()}</TabsContent>
-            </Tabs>
+            <div className="space-y-4">
+              <Tabs value={view} onValueChange={(v) => setView(v as "list" | "grid")} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:grid-cols-2">
+                  <TabsTrigger value="list" className="flex items-center space-x-2">
+                    <List className="h-4 w-4" />
+                    <span>Lista</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="grid" className="flex items-center space-x-2">
+                    <Grid3X3 className="h-4 w-4" />
+                    <span>Griglia</span>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="list" className="mt-4">
+                  <div className="rounded-lg border border-border/50 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        {renderTableHeader()}
+                        {renderTableBody()}
+                      </Table>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="grid" className="mt-4">
+                  {renderGridView()}
+                </TabsContent>
+              </Tabs>
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <h3 className="text-xl font-medium mb-2">Seleziona una tabella</h3>
-              <p className="text-gray-500 mb-4">Scegli una tabella per visualizzare e gestire i tuoi dati</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-xl font-semibold">Seleziona una tabella</h3>
+                <p className="text-muted-foreground">Scegli una tabella per visualizzare e gestire i tuoi dati</p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 w-full max-w-2xl">
                 {AVAILABLE_TABLES.map((table) => (
                   <Button
                     key={table.id}
                     variant="outline"
-                    className="h-24 flex flex-col items-center justify-center"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors"
                     onClick={() => setSelectedTable(table.id)}
                   >
-                    <table.icon className="h-6 w-6 mb-2" />
-                    <span>{table.label}</span>
+                    <table.icon className="h-6 w-6" />
+                    <span className="text-xs font-medium">{table.label}</span>
                   </Button>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Statistiche */}
           {selectedTable && filteredData.length > 0 && (
-            <div className="mt-4 text-sm text-gray-500">
-              Visualizzazione di {filteredData.length} elementi su {data.length} totali
+            <div className="flex justify-between items-center pt-4 border-t border-border/50 text-sm text-muted-foreground">
+              <span>
+                Visualizzazione di {filteredData.length} elementi su {data.length} totali
+              </span>
+              {searchTerm && <span>Filtrato per: "{searchTerm}"</span>}
             </div>
           )}
         </CardContent>
