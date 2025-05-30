@@ -13,11 +13,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, X, Calendar, AlertCircle } from "lucide-react"
+import { ArrowLeft, X, AlertCircle, CheckCircle2, FileText, Calendar, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
+import { TagInput } from "@/components/ui/tag-input"
+import { parseISO, formatISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -37,10 +39,26 @@ const TABLE_FIELDS = {
     autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
     defaultValues: {
       stato: "pianificato",
-      priorita: 3,
       attivo: true,
     },
-    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "luogo", "note", "tags"],
+    fieldGroups: {
+      // Aggiunto per il layout a Card
+      principale: {
+        title: "Informazioni Principali",
+        icon: FileText, // Assicurati che FileText sia importato da lucide-react
+        fields: ["titolo", "descrizione", "stato"],
+      },
+      date: {
+        title: "Date e Orari",
+        icon: Calendar, // Assicurati che Calendar sia importato da lucide-react
+        fields: ["data_inizio", "data_fine"],
+      },
+      dettagli: {
+        title: "Dettagli Aggiuntivi",
+        icon: Settings, // Assicurati che Settings sia importato da lucide-react
+        fields: ["luogo", "note", "tags"],
+      },
+    },
     types: {
       id: "number",
       titolo: "string",
@@ -48,10 +66,9 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "number",
       note: "text",
       luogo: "string",
-      tags: "json",
+      tags: "tags",
       attivo: "boolean",
       id_utente: "number",
       data_creazione: "datetime",
@@ -67,7 +84,6 @@ const TABLE_FIELDS = {
     },
     validation: {
       titolo: { minLength: 3, maxLength: 100 },
-      priorita: { min: 1, max: 5 },
     },
   },
   attivita: {
@@ -310,40 +326,6 @@ const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: str
   )
 }
 
-// Componente per l'editor JSON
-const JsonEditor = ({ value, onChange }: { value: any; onChange: (value: any) => void }) => {
-  const [jsonString, setJsonString] = useState(JSON.stringify(value || [], null, 2))
-  const [error, setError] = useState<string | null>(null)
-
-  const handleChange = (newValue: string) => {
-    setJsonString(newValue)
-    try {
-      const parsed = JSON.parse(newValue)
-      onChange(parsed)
-      setError(null)
-    } catch (e) {
-      setError("JSON non valido")
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <Textarea
-        value={jsonString}
-        onChange={(e) => handleChange(e.target.value)}
-        className={cn("font-mono text-xs sm:text-sm", error && "border-red-500")}
-        rows={4}
-      />
-      {error && (
-        <div className="flex items-center text-sm text-red-500">
-          <AlertCircle size={16} className="mr-1 flex-shrink-0" />
-          {error}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // Componente principale
 export default function NewItemPage() {
   const { supabase } = useSupabase()
@@ -354,7 +336,6 @@ export default function NewItemPage() {
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [activeTab, setActiveTab] = useState("principale")
 
   // Estrai il nome della tabella
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -367,7 +348,7 @@ export default function NewItemPage() {
   const requiredFields = tableConfig?.requiredFields || []
   const autoFields = tableConfig?.autoFields || []
   const defaultValues = tableConfig?.defaultValues || {}
-  const fieldOrder = tableConfig?.fieldOrder || []
+  const fieldGroups = tableConfig?.fieldGroups || {} // Modificato da fieldOrder
   const fieldTypes = tableConfig?.types || {}
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
@@ -385,15 +366,29 @@ export default function NewItemPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      [field]: value,
-    }))
+    setFormData((prev: any) => {
+      const newData = { ...prev, [field]: value }
+
+      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
+      if (field === "data_inizio" && value) {
+        try {
+          const startDate = parseISO(value) // parseISO gestisce stringhe ISO
+          if (!newData.data_fine) {
+            // Solo se data_fine non è già impostata
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Aggiungi 1 ora
+            newData.data_fine = formatISO(endDate) // formatISO per coerenza
+          }
+        } catch (e) {
+          console.warn("Data inizio non valida per calcolare data fine:", value)
+        }
+      }
+      return newData
+    })
 
     // Rimuovi l'errore quando il campo viene modificato
     if (errors[field]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
+      setErrors((prevErrors) => {
+        const newErrors = { ...prevErrors }
         delete newErrors[field]
         return newErrors
       })
@@ -535,8 +530,14 @@ export default function NewItemPage() {
       }
 
       toast({
-        title: "Elemento creato",
-        description: "Il nuovo elemento è stato creato con successo",
+        title: "Elemento creato con successo!",
+        description: "Il nuovo elemento è stato salvato nel database",
+        action: (
+          <div className="flex items-center">
+            <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+            <span>Creato</span>
+          </div>
+        ),
       })
 
       // Reindirizza alla pagina di dettaglio
@@ -544,7 +545,7 @@ export default function NewItemPage() {
     } catch (error: any) {
       console.error(`Errore nell'inserimento:`, error)
       toast({
-        title: "Errore",
+        title: "Errore durante il salvataggio",
         description: `Impossibile creare l'elemento: ${error.message}`,
         variant: "destructive",
       })
@@ -609,25 +610,13 @@ export default function NewItemPage() {
 
       case "datetime":
         return fieldWrapper(
-          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-            <Input
-              id={field}
-              type="datetime-local"
-              value={value ? new Date(value).toISOString().slice(0, 16) : ""}
-              onChange={(e) => handleFieldChange(field, e.target.value)}
-              className={cn("w-full sm:flex-1", error && "border-red-500")}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => handleFieldChange(field, new Date().toISOString())}
-              className="w-full sm:w-auto"
-            >
-              <Calendar size={16} />
-              <span className="ml-2 sm:hidden">Ora</span>
-            </Button>
-          </div>,
+          <EnhancedDatePicker
+            id={field}
+            value={value || ""}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Seleziona ${label.toLowerCase()}`}
+            className={cn(error && "border-red-500")}
+          />,
         )
 
       case "number":
@@ -665,8 +654,15 @@ export default function NewItemPage() {
       case "color":
         return fieldWrapper(<ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />)
 
-      case "json":
-        return fieldWrapper(<JsonEditor value={value} onChange={(val) => handleFieldChange(field, val)} />)
+      case "tags":
+        return fieldWrapper(
+          <TagInput
+            id={field}
+            value={value || []}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Aggiungi ${label.toLowerCase()}`}
+          />,
+        )
 
       case "email":
         return fieldWrapper(
@@ -712,35 +708,34 @@ export default function NewItemPage() {
     return table ? table.label : "Nuovo elemento"
   }
 
-  // Organizza i campi in gruppi per i tab
-  const organizeFieldsInGroups = () => {
-    const groups: Record<string, string[]> = {
-      principale: [],
-      dettagli: [],
-      avanzate: [],
+  // Renderizza i campi di data, mettendo data_inizio e data_fine sulla stessa linea
+  const renderDateFields = (fields: string[]) => {
+    const dateFields = fields.filter((field) => fieldTypes[field] === "datetime")
+
+    if (dateFields.length === 0) return null
+
+    // Se c'è un solo campo data nel gruppo, rendilo normalmente
+    if (dateFields.length === 1 && fields.length === 1) {
+      return <div className="space-y-4">{renderField(dateFields[0], fieldTypes[dateFields[0]])}</div>
     }
 
-    // Distribuisci i campi nei gruppi
-    fieldOrder.forEach((field, index) => {
-      if (autoFields.includes(field)) return
-
-      if (index < 4) {
-        groups.principale.push(field)
-      } else if (index < 8) {
-        groups.dettagli.push(field)
-      } else {
-        groups.avanzate.push(field)
-      }
-    })
-
-    // Rimuovi gruppi vuoti
-    Object.keys(groups).forEach((key) => {
-      if (groups[key].length === 0) {
-        delete groups[key]
-      }
-    })
-
-    return groups
+    // Se ci sono 2 campi data (es. data_inizio e data_fine), mettili sulla stessa linea
+    // e gli altri campi del gruppo sotto.
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {dateFields.map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
+        </div>
+        {/* Renderizza altri campi non-data del gruppo, se presenti */}
+        {fields
+          .filter((field) => fieldTypes[field] !== "datetime")
+          .map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
+      </div>
+    )
   }
 
   // Se la tabella non è valida, mostra errore
@@ -762,9 +757,6 @@ export default function NewItemPage() {
     )
   }
 
-  const fieldGroups = organizeFieldsInGroups()
-  const hasMultipleGroups = Object.keys(fieldGroups).length > 1
-
   return (
     <div className="container mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
       <Card>
@@ -783,11 +775,25 @@ export default function NewItemPage() {
               </CardDescription>
             </div>
 
-            {/* Pulsanti di azione - stack su mobile, inline su desktop */}
+            {/* Pulsanti di azione - migliorati con background azzurro */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 sm:justify-end">
-              <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto order-1 sm:order-1">
-                {saving ? "Salvataggio..." : "Crea elemento"}
-                {!saving && <Save size={16} className="ml-2" />}
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full sm:w-auto order-1 sm:order-1 bg-blue-600 hover:bg-blue-700 text-white"
+                size="lg"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvataggio...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} className="mr-2" />
+                    Crea e Salva
+                  </>
+                )}
               </Button>
               <Button
                 variant="outline"
@@ -801,75 +807,97 @@ export default function NewItemPage() {
         </CardHeader>
 
         <CardContent>
-          {hasMultipleGroups ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="mb-6 w-full flex-col sm:flex-row h-auto sm:h-10">
-                {Object.keys(fieldGroups).map((group) => (
-                  <TabsTrigger key={group} value={group} className="capitalize w-full sm:w-auto">
-                    {group}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {Object.entries(fieldGroups).map(([groupKey, group]: [string, any]) => {
+              const IconComponent = group.icon // Assumendo che group.icon sia un componente React
+              const hasDateFields = group.fields.some((field: string) => fieldTypes[field] === "datetime")
 
-              {Object.entries(fieldGroups).map(([group, fields]) => (
-                <TabsContent key={group} value={group} className="space-y-4 sm:space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    {fields.map((field) => (
-                      <div
-                        key={field}
-                        className={cn(
-                          fieldTypes[field] === "text" ||
-                            fieldTypes[field] === "richtext" ||
-                            fieldTypes[field] === "json"
-                            ? "lg:col-span-2"
-                            : "lg:col-span-1",
-                        )}
-                      >
-                        {renderField(field, fieldTypes[field] || "string")}
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              {fieldOrder.map((field) => (
-                <div
-                  key={field}
+              return (
+                <Card
+                  key={groupKey}
                   className={cn(
-                    fieldTypes[field] === "text" || fieldTypes[field] === "richtext" || fieldTypes[field] === "json"
-                      ? "lg:col-span-2"
-                      : "lg:col-span-1",
+                    "h-fit", // Per far sì che le card si adattino al contenuto
+                    // Se il gruppo è 'date' o contiene più di un campo data, fallo più largo
+                    (groupKey === "date" || (hasDateFields && group.fields.length > 1)) &&
+                      "lg:col-span-2 xl:col-span-2",
                   )}
                 >
-                  {renderField(field, fieldTypes[field] || "string")}
-                </div>
-              ))}
-            </div>
-          )}
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      {IconComponent && <IconComponent size={20} className="text-blue-600" />}
+                      {group.title}
+                    </CardTitle>
+                    <CardDescription>
+                      {/* Potresti aggiungere descrizioni specifiche per gruppo qui se necessario */}
+                      {groupKey === "principale" && "Informazioni essenziali dell'elemento"}
+                      {groupKey === "date" && "Date e orari di riferimento"}
+                      {groupKey === "dettagli" && "Informazioni aggiuntive e note"}
+                      {/* Aggiungi altre descrizioni per altri gruppi se li definisci */}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {groupKey === "date" ? ( // Logica specifica per il gruppo 'date'
+                      renderDateFields(group.fields)
+                    ) : (
+                      <div className="space-y-4">
+                        {group.fields.map((field: string) => (
+                          <div
+                            key={field}
+                            // Rendi i campi di testo lunghi e i tag input full-width all'interno del loro contenitore
+                            className={cn(
+                              (fieldTypes[field] === "text" ||
+                                fieldTypes[field] === "richtext" ||
+                                fieldTypes[field] === "tags") &&
+                                "col-span-full",
+                            )}
+                          >
+                            {renderField(field, fieldTypes[field] || "string")}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
 
           {/* Mostra informazioni sui campi auto-compilati */}
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Campi compilati automaticamente:</h4>
-            <div className="flex flex-wrap gap-2">
-              {autoFields.map((field) => (
-                <Badge key={field} variant="secondary">
-                  {field}
-                </Badge>
-              ))}
-            </div>
-          </div>
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Campi compilati automaticamente:
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {autoFields.map((field) => (
+                      <Badge key={field} variant="secondary">
+                        {field}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+                  <span>
+                    I campi con <span className="text-red-500 mx-1">*</span> sono obbligatori
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </CardContent>
 
         <CardFooter className="border-t bg-gray-50 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center text-sm text-gray-600 space-y-2 sm:space-y-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full text-sm text-gray-600 space-y-2 sm:space-y-0">
             <div className="flex items-center">
               <AlertCircle size={16} className="mr-2 flex-shrink-0" />
               <span>
                 I campi contrassegnati con <span className="text-red-500 mx-1">*</span> sono obbligatori
               </span>
             </div>
+            <div className="text-xs text-muted-foreground">iStudio v0.4 - Sistema di gestione dati</div>
           </div>
         </CardFooter>
       </Card>
