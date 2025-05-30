@@ -6,7 +6,7 @@ import { AuthProvider } from "@/lib/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { SidebarProvider } from "@/contexts/sidebar-context"
 import { SidebarStateProvider } from "@/contexts/sidebar-state-context"
-import { ThemeProvider } from "@/contexts/theme-context"
+import { ThemeProvider } from "@/contexts/theme-context" // This is the custom one
 import { LayoutWrapper } from "@/components/layout/layout-wrapper"
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <SidebarProvider>
                 <SidebarStateProvider>
-                  <ThemeProvider>
+                  <ThemeProvider> {/* Custom ThemeProvider */}
                     <LayoutWrapper>{children}</LayoutWrapper>
                     <Toaster />
                   </ThemeProvider>

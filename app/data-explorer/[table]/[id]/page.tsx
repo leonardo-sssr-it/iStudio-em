@@ -25,8 +25,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Trash2, Edit, Calendar, X } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Edit, X } from "lucide-react" // Rinominato Calendar per evitare conflitti
 import { formatValue } from "@/lib/utils-db"
+import { cn } from "@/lib/utils"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker" // Assicurati sia importato
+import { TagInput } from "@/components/ui/tag-input" // Importa TagInput
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -39,11 +42,33 @@ const AVAILABLE_TABLES = [
   { id: "pagine", label: "Pagine", icon: "📄" },
 ]
 
+// Componente ColorPicker (copiato da new/page.tsx per consistenza)
+const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+      <Input
+        type="color"
+        value={value || "#000000"}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full sm:w-20 h-10 p-1 cursor-pointer"
+      />
+      <Input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#000000"
+        className="w-full sm:flex-1"
+        pattern="^#[0-9A-Fa-f]{6}$"
+      />
+    </div>
+  )
+}
+
 // Definizione dei campi per ogni tabella
 const TABLE_FIELDS = {
   appuntamenti: {
-    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli"],
+    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato"], // Rimosso priorita
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -51,21 +76,42 @@ const TABLE_FIELDS = {
       descrizione: "text",
       data_inizio: "datetime",
       data_fine: "datetime",
-      stato: "string",
-      priorita: "number",
+      stato: "string", // Cambiato in string per visualizzazione, ma potrebbe essere select in modifica
       note: "text",
+      luogo: "string",
+      tags: "tags", // Aggiunto tipo tags
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli"],
+      "Informazioni principali": ["titolo", "descrizione", "stato", "data_inizio", "data_fine"], // Rimosso priorita
+      "Note e dettagli": ["luogo", "note", "tags"], // Aggiunto tags
+      "Informazioni di sistema": [
+        "id",
+        "id_utente",
+        "data_creazione",
+        "modifica",
+        "attivo",
+        "id_pro",
+        "id_att",
+        "id_cli",
+      ],
+    },
+    selectOptions: {
+      // Aggiunto per coerenza con la pagina 'new' se si vuole usare Select in modifica
+      stato: [
+        { value: "pianificato", label: "Pianificato" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "annullato", label: "Annullato" },
+      ],
     },
   },
   attivita: {
     listFields: ["id", "titolo", "data_inizio", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli", "data_creazione"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -76,18 +122,30 @@ const TABLE_FIELDS = {
       stato: "string",
       priorita: "number",
       note: "text",
+      tags: "tags",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+      "Note e dettagli": ["note", "luogo", "tags"],
+      "Informazioni di sistema": [
+        "id",
+        "id_utente",
+        "data_creazione",
+        "modifica",
+        "attivo",
+        "id_pro",
+        "id_app",
+        "id_cli",
+      ],
     },
   },
   scadenze: {
     listFields: ["id", "titolo", "data_scadenza", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
     defaultSort: "data_scadenza",
     types: {
       id: "number",
@@ -97,19 +155,21 @@ const TABLE_FIELDS = {
       stato: "string",
       priorita: "number",
       note: "text",
+      tags: "tags",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita"],
       Date: ["data_scadenza"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+      "Note e dettagli": ["note", "tags"],
+      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
     },
   },
   todolist: {
     listFields: ["id", "titolo", "completato", "priorita", "data_scadenza"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
     defaultSort: "priorita",
     types: {
       id: "number",
@@ -119,30 +179,38 @@ const TABLE_FIELDS = {
       priorita: "number",
       data_scadenza: "datetime",
       note: "text",
+      tags: "tags",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "completato", "priorita"],
       Date: ["data_scadenza"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+      "Note e dettagli": ["note", "tags"],
+      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
     },
   },
   progetti: {
     listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca", "data_creazione"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
       nome: "string",
       descrizione: "text",
       stato: "string",
+      colore: "color", // Aggiunto tipo color
+      gruppo: "string",
+      budget: "number",
       data_inizio: "datetime",
       data_fine: "datetime",
-      budget: "number",
+      avanzamento: "number",
       note: "text",
+      tags: "tags",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
@@ -157,57 +225,72 @@ const TABLE_FIELDS = {
         "data_fine",
         "avanzamento",
       ],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+      "Note e dettagli": ["note", "tags"],
+      "Informazioni di sistema": [
+        "id",
+        "id_utente",
+        "data_creazione",
+        "modifica",
+        "attivo",
+        "id_att",
+        "id_app",
+        "id_cli",
+        "id_sca",
+      ],
     },
   },
   clienti: {
     listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
     defaultSort: "cognome",
     types: {
       id: "number",
       nome: "string",
       cognome: "string",
-      email: "string",
-      telefono: "string",
+      email: "email", // Usare 'email' per validazione input
+      telefono: "tel", // Usare 'tel' per validazione input
       citta: "string",
       indirizzo: "string",
       cap: "string",
       piva: "string",
       codfisc: "string",
       note: "text",
+      tags: "tags",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni personali": ["nome", "cognome", "email", "telefono"],
       Indirizzo: ["citta", "indirizzo", "cap"],
       "Informazioni fiscali": ["piva", "codfisc"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+      "Note e dettagli": ["note", "tags"],
+      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
     },
   },
   pagine: {
     listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
     defaultSort: "data_creazione",
     types: {
       id: "number",
       titolo: "string",
       slug: "string",
-      contenuto: "text",
+      contenuto: "richtext", // Potrebbe richiedere un editor specifico
       stato: "string",
       meta_title: "string",
       meta_description: "text",
+      tags: "tags",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     groups: {
       "Informazioni principali": ["titolo", "slug", "stato"],
       Contenuto: ["contenuto"],
       SEO: ["meta_title", "meta_description"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+      "Note e dettagli": ["tags"],
+      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
     },
   },
 }
@@ -225,18 +308,6 @@ function formatDateIT(date: string | null | undefined): string {
       hour: "2-digit",
       minute: "2-digit",
     })
-  } catch (e) {
-    return ""
-  }
-}
-
-// Funzione per formattare le date per input datetime-local
-function formatDateForInput(date: string | null | undefined): string {
-  if (!date) return ""
-  try {
-    const d = new Date(date)
-    if (isNaN(d.getTime())) return ""
-    return d.toISOString().slice(0, 16) // formato YYYY-MM-DDThh:mm
   } catch (e) {
     return ""
   }
@@ -263,45 +334,34 @@ export default function ItemDetailPage() {
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
   const itemId = Array.isArray(params.id) ? params.id[0] : params.id
 
-  // Debug logging
-  console.log("Parametri URL:", { tableName, itemId, params })
-
-  // Verifica che la tabella sia valida
   const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
 
-  if (!isValidTable && tableName) {
-    console.error(`Tabella non valida: ${tableName}`)
-  }
-
-  // Ottieni la configurazione della tabella
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
   const readOnlyFields = tableConfig?.readOnlyFields || []
   const fieldTypes = tableConfig?.types || {}
   const fieldGroups = tableConfig?.groups || {}
+  const selectOptions = tableConfig?.selectOptions || {} // Aggiunto per Select in modifica
 
-  // Carica i dati dell'elemento
   const loadItem = useCallback(async () => {
     if (!supabase || !tableName || !user?.id || !isValidTable) {
-      console.log("Condizioni non soddisfatte:", { supabase: !!supabase, tableName, userId: user?.id, isValidTable })
       return
     }
 
     setLoading(true)
     try {
       if (isNewItem) {
-        // Crea un nuovo elemento vuoto
-        const newItem: any = {
-          id_utente: user.id,
+        const newItemData: any = { id_utente: user.id }
+        // Inizializza i campi con i defaultValues dalla configurazione della pagina 'new'
+        const currentTableConfigForNew = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
+        if (currentTableConfigForNew && currentTableConfigForNew.defaultValues) {
+          Object.assign(newItemData, currentTableConfigForNew.defaultValues)
         }
-        setItem(newItem)
-        setEditedItem(newItem)
+        setItem(newItemData)
+        setEditedItem(newItemData)
         setLoading(false)
         return
       }
 
-      console.log(`Caricamento elemento da tabella: ${tableName}, ID: ${itemId}`)
-
-      // Carica l'elemento esistente
       const { data, error } = await supabase
         .from(tableName)
         .select("*")
@@ -309,16 +369,10 @@ export default function ItemDetailPage() {
         .eq("id_utente", user.id)
         .single()
 
-      if (error) {
-        console.error("Errore query Supabase:", error)
-        throw error
-      }
-
-      console.log("Dati caricati:", data)
+      if (error) throw error
       setItem(data)
       setEditedItem(data)
     } catch (error: any) {
-      console.error(`Errore nel caricamento dell'elemento:`, error)
       toast({
         title: "Errore",
         description: `Impossibile caricare i dati: ${error.message}`,
@@ -330,14 +384,12 @@ export default function ItemDetailPage() {
     }
   }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable])
 
-  // Carica i dati all'avvio
   useEffect(() => {
     if (supabase && user?.id && tableName && isValidTable) {
       loadItem()
     }
   }, [supabase, user?.id, loadItem, tableName, isValidTable])
 
-  // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
     setEditedItem((prev: any) => ({
       ...prev,
@@ -345,55 +397,59 @@ export default function ItemDetailPage() {
     }))
   }
 
-  // Salva le modifiche
   const handleSave = async () => {
     if (!supabase || !tableName || !user?.id || !editedItem || !isValidTable) return
 
     setSaving(true)
     try {
-      // Prepara i dati da salvare
       const updateData = { ...editedItem }
-
-      // Aggiorna il campo modifica
       updateData.modifica = new Date().toISOString()
 
-      // Imposta l'id_utente per i nuovi elementi
       if (isNewItem) {
         updateData.id_utente = user.id
-        updateData.data_creazione = new Date().toISOString()
+        if (!updateData.data_creazione) {
+          // Assicura che data_creazione sia impostata per i nuovi item
+          updateData.data_creazione = new Date().toISOString()
+        }
       }
 
-      console.log(`Salvataggio in tabella: ${tableName}`, updateData)
+      // Rimuovi i campi read-only che non dovrebbero essere inviati (eccetto id per l'update)
+      const dataToSend = { ...updateData }
+      if (!isNewItem) {
+        // Per gli update, non inviare id_utente o data_creazione se sono read-only
+        readOnlyFields.forEach((field) => {
+          if (field !== "id" && field !== "modifica") {
+            // 'id' e 'modifica' sono gestiti
+            delete dataToSend[field]
+          }
+        })
+      }
 
-      // Salva i dati
       let result
       if (isNewItem) {
-        result = await supabase.from(tableName).insert(updateData).select()
+        // Rimuovi l'id se presente, sarà auto-generato
+        const { id, ...insertData } = dataToSend
+        result = await supabase.from(tableName).insert(insertData).select()
       } else {
-        result = await supabase.from(tableName).update(updateData).eq("id", itemId).select()
+        const { id, ...updatePayload } = dataToSend // L'ID è usato nell'eq, non nel payload
+        result = await supabase.from(tableName).update(updatePayload).eq("id", itemId).select()
       }
 
-      if (result.error) {
-        console.error("Errore salvataggio:", result.error)
-        throw result.error
-      }
+      if (result.error) throw result.error
 
       toast({
         title: "Salvato",
         description: "I dati sono stati salvati con successo",
       })
 
-      // Aggiorna i dati locali
       setItem(result.data[0])
       setEditedItem(result.data[0])
       setIsEditMode(false)
 
-      // Reindirizza alla pagina di dettaglio per i nuovi elementi
       if (isNewItem) {
         router.push(`/data-explorer/${tableName}/${result.data[0].id}`)
       }
     } catch (error: any) {
-      console.error(`Errore nel salvataggio dei dati:`, error)
       toast({
         title: "Errore",
         description: `Impossibile salvare i dati: ${error.message}`,
@@ -404,7 +460,6 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Annulla le modifiche
   const handleCancelEdit = () => {
     setEditedItem(item)
     setIsEditMode(false)
@@ -413,30 +468,19 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Elimina l'elemento
   const handleDelete = async () => {
     if (!supabase || !tableName || !itemId || !isValidTable) return
 
     setDeleting(true)
     try {
-      console.log(`Eliminazione da tabella: ${tableName}, ID: ${itemId}`)
-
       const { error } = await supabase.from(tableName).delete().eq("id", itemId)
-
-      if (error) {
-        console.error("Errore eliminazione:", error)
-        throw error
-      }
-
+      if (error) throw error
       toast({
         title: "Eliminato",
         description: "L'elemento è stato eliminato con successo",
       })
-
-      // Torna alla lista
       router.push(`/data-explorer`)
     } catch (error: any) {
-      console.error(`Errore nell'eliminazione dell'elemento:`, error)
       toast({
         title: "Errore",
         description: `Impossibile eliminare l'elemento: ${error.message}`,
@@ -447,24 +491,25 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Renderizza un campo in base al tipo
-  const renderField = (field: string, value: any, type: string, readOnly = false) => {
-    // Ottieni il label del campo
+  const renderField = (field: string, value: any, type: string, readOnlyField = false) => {
     const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+    const isActuallyReadOnly = readOnlyField || readOnlyFields.includes(field)
 
-    // Se è in modalità visualizzazione, mostra solo il valore
-    if (!isEditMode || readOnly) {
+    if (!isEditMode || isActuallyReadOnly) {
       return (
         <div className="mb-4" key={field}>
           <Label className="text-sm font-medium">{label}</Label>
-          <div className={`mt-1 p-2 rounded-md ${readOnly ? "bg-gray-100" : ""}`}>{renderFieldValue(value, type)}</div>
+          <div className={`mt-1 p-2 rounded-md ${isActuallyReadOnly ? "bg-gray-100 dark:bg-gray-800" : ""}`}>
+            {renderFieldValue(value, type)}
+          </div>
         </div>
       )
     }
 
-    // Altrimenti, mostra il campo di input appropriato
+    // Logica per la modalità modifica
     switch (type) {
       case "text":
+      case "richtext": // richtext potrebbe necessitare di un editor specifico
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field}>{label}</Label>
@@ -473,18 +518,14 @@ export default function ItemDetailPage() {
               value={value || ""}
               onChange={(e) => handleFieldChange(field, e.target.value)}
               className="mt-1"
-              rows={4}
+              rows={type === "richtext" ? 6 : 3}
             />
           </div>
         )
       case "boolean":
         return (
           <div className="flex items-center space-x-2 mb-4" key={field}>
-            <Switch
-              id={field}
-              checked={value || false}
-              onCheckedChange={(checked) => handleFieldChange(field, checked)}
-            />
+            <Switch id={field} checked={!!value} onCheckedChange={(checked) => handleFieldChange(field, checked)} />
             <Label htmlFor={field}>{label}</Label>
           </div>
         )
@@ -492,24 +533,12 @@ export default function ItemDetailPage() {
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field}>{label}</Label>
-            <div className="flex items-center mt-1">
-              <Input
-                id={field}
-                type="datetime-local"
-                value={formatDateForInput(value)}
-                onChange={(e) => handleFieldChange(field, e.target.value)}
-                className="flex-grow"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                onClick={() => handleFieldChange(field, new Date().toISOString())}
-                className="ml-2"
-              >
-                <Calendar size={16} />
-              </Button>
-            </div>
+            <EnhancedDatePicker
+              id={field}
+              value={value || ""}
+              onChange={(val) => handleFieldChange(field, val)}
+              className="mt-1 w-full"
+            />
           </div>
         )
       case "number":
@@ -520,12 +549,83 @@ export default function ItemDetailPage() {
               id={field}
               type="number"
               value={value || ""}
-              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value))}
+              onChange={(e) =>
+                handleFieldChange(field, e.target.value === "" ? null : Number.parseFloat(e.target.value))
+              }
               className="mt-1"
             />
           </div>
         )
-      default:
+      case "tags":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <TagInput
+              id={field}
+              value={Array.isArray(value) ? value : value ? String(value).split(",") : []}
+              onChange={(tags) => handleFieldChange(field, tags)}
+              className="mt-1"
+              placeholder={`Aggiungi ${label.toLowerCase()}`}
+            />
+          </div>
+        )
+      case "color":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />
+          </div>
+        )
+      case "select": // Aggiunto per gestire i select in modifica
+        const options =
+          selectOptions && selectOptions[field as keyof typeof selectOptions]
+            ? selectOptions[field as keyof typeof selectOptions]
+            : []
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <select
+              id={field}
+              value={value || ""}
+              onChange={(e) => handleFieldChange(field, e.target.value)}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="">Seleziona...</option>
+              {options.map((option: any) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )
+      case "email":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <Input
+              id={field}
+              type="email"
+              value={value || ""}
+              onChange={(e) => handleFieldChange(field, e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        )
+      case "tel":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <Input
+              id={field}
+              type="tel"
+              value={value || ""}
+              onChange={(e) => handleFieldChange(field, e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        )
+      default: // string e altri non specificati
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field}>{label}</Label>
@@ -541,78 +641,104 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Renderizza il valore di un campo in base al tipo
   const renderFieldValue = (value: any, type: string) => {
-    if (value === null || value === undefined) return "-"
+    if (value === null || value === undefined || value === "") return "-"
 
     switch (type) {
       case "datetime":
         return formatDateIT(value)
       case "boolean":
-        return value ? "✓" : "✗"
+        return value ? "Sì" : "No"
       case "number":
         return typeof value === "number" ? value.toLocaleString("it-IT") : value
       case "text":
+      case "richtext":
         return <div className="whitespace-pre-wrap">{value}</div>
+      case "tags":
+        if (Array.isArray(value)) {
+          return value.map((tag) => (
+            <Badge key={tag} variant="secondary" className="mr-1 mb-1">
+              {tag}
+            </Badge>
+          ))
+        }
+        return String(value)
+          .split(",")
+          .map((tag) => (
+            <Badge key={tag} variant="secondary" className="mr-1 mb-1">
+              {tag.trim()}
+            </Badge>
+          ))
+      case "color":
+        return (
+          <div className="flex items-center space-x-2">
+            <div style={{ backgroundColor: value }} className="w-6 h-6 rounded border"></div>
+            <span>{value}</span>
+          </div>
+        )
       default:
         return formatValue(value)
     }
   }
 
-  // Ottieni il titolo della tabella
   const getTableTitle = () => {
     const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
     return table ? table.label : "Dettaglio"
   }
 
-  // Ottieni il titolo dell'elemento
   const getItemTitle = () => {
     if (isNewItem) return "Nuovo elemento"
     if (!item) return "Caricamento..."
-
-    // Usa il campo più appropriato come titolo
     if (item.titolo) return item.titolo
-    if (item.nome) {
-      if (item.cognome) return `${item.nome} ${item.cognome}`
-      return item.nome
-    }
+    if (item.nome) return item.cognome ? `${item.nome} ${item.cognome}` : item.nome
     return `ID: ${item.id}`
   }
 
-  // Renderizza i gruppi di campi
   const renderFieldGroups = () => {
     if (!editedItem) return null
-
-    // Ottieni tutti i campi dell'elemento
-    const allFields = Object.keys(editedItem)
-
-    // Crea tabs per i gruppi
-    const tabs = Object.keys(fieldGroups)
+    const allFieldsInItem = Object.keys(editedItem)
+    const tabsToRender = Object.keys(fieldGroups).filter((groupName) =>
+      fieldGroups[groupName as keyof typeof fieldGroups].some((field) => allFieldsInItem.includes(field)),
+    )
 
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4">
-          {tabs.map((group) => (
-            <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
+        <TabsList className="mb-4 grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-none lg:flex">
+          {tabsToRender.map((group) => (
+            <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")} className="capitalize">
               {group}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {tabs.map((group) => {
+        {tabsToRender.map((group) => {
           const groupFields = fieldGroups[group as keyof typeof fieldGroups] || []
-
           return (
             <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
-              <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 {groupFields.map((field) => {
-                  if (!allFields.includes(field)) return null
-                  const isReadOnly = readOnlyFields.includes(field)
-                  return renderField(
-                    field,
-                    editedItem[field],
-                    fieldTypes[field as keyof typeof fieldTypes] || "string",
-                    isReadOnly,
+                  if (!allFieldsInItem.includes(field) && !isNewItem) return null // Non renderizzare se il campo non è nei dati (per item esistenti)
+                  // Per i nuovi item, renderizza tutti i campi definiti nel gruppo, anche se non ancora in editedItem
+                  const fieldType = fieldTypes[field as keyof typeof fieldTypes] || "string"
+                  const fieldValue = editedItem[field]
+
+                  // Per i nuovi item, se il campo non è in editedItem ma ha un default value, usalo
+                  const valueToRender =
+                    isNewItem &&
+                    fieldValue === undefined &&
+                    tableConfig?.defaultValues?.[field as keyof typeof tableConfig.defaultValues] !== undefined
+                      ? tableConfig.defaultValues[field as keyof typeof tableConfig.defaultValues]
+                      : fieldValue
+
+                  return (
+                    <div
+                      key={field}
+                      className={cn(
+                        (fieldType === "text" || fieldType === "richtext" || fieldType === "tags") && "md:col-span-2",
+                      )}
+                    >
+                      {renderField(field, valueToRender, fieldType, readOnlyFields.includes(field))}
+                    </div>
                   )
                 })}
               </div>
@@ -623,21 +749,22 @@ export default function ItemDetailPage() {
     )
   }
 
-  // Imposta i tab iniziali
   useEffect(() => {
     if (fieldGroups && Object.keys(fieldGroups).length > 0) {
-      setActiveTab(Object.keys(fieldGroups)[0].toLowerCase().replace(/\s+/g, "-"))
+      const firstGroupKey = Object.keys(fieldGroups)[0]
+      if (firstGroupKey) {
+        setActiveTab(firstGroupKey.toLowerCase().replace(/\s+/g, "-"))
+      }
     }
   }, [fieldGroups])
 
-  // Se la tabella non è valida, mostra errore
   if (tableName && !isValidTable) {
     return (
       <div className="container mx-auto py-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl text-red-600">Errore</CardTitle>
-            <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
+            <CardDescription>La tabella "{tableName}" non è disponibile.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => router.push("/data-explorer")}>
@@ -649,22 +776,21 @@ export default function ItemDetailPage() {
     )
   }
 
-  // Renderizza lo scheletro durante il caricamento
   if (loading) {
     return (
       <div className="container mx-auto py-6">
         <Card>
           <CardHeader>
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="mt-2 h-4 w-1/2" />
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
+          <CardContent className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-10 w-full" /> <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-20 w-full md:col-span-2" />
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
@@ -675,51 +801,59 @@ export default function ItemDetailPage() {
     <div className="container mx-auto py-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <Button variant="ghost" onClick={() => router.push("/data-explorer")} className="mb-2">
+              <Button variant="ghost" onClick={() => router.push("/data-explorer")} className="mb-2 -ml-4 sm:ml-0">
                 <ArrowLeft size={16} className="mr-2" /> Torna alla lista
               </Button>
               <CardTitle className="text-2xl">{getItemTitle()}</CardTitle>
               <CardDescription>
                 {getTableTitle()}{" "}
-                {!isNewItem && (
+                {!isNewItem && item?.id && (
                   <Badge variant="outline" className="ml-2">
-                    ID: {itemId}
+                    ID: {item.id}
                   </Badge>
                 )}
               </CardDescription>
             </div>
-            <div className="flex space-x-2">
-              {isEditMode && (
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {isEditMode ? (
                 <>
-                  <Button onClick={handleSave} disabled={saving} className="min-w-[150px]">
-                    {saving ? "Salvataggio..." : "Salva modifiche"}
-                    {!saving && <Save size={16} className="ml-2" />}
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {saving ? (
+                      "Salvataggio..."
+                    ) : (
+                      <>
+                        <Save size={16} className="mr-2" /> Salva modifiche
+                      </>
+                    )}
                   </Button>
-                  <Button variant="outline" onClick={handleCancelEdit}>
-                    <X size={16} className="mr-2" /> Annulla modifica
+                  <Button variant="outline" onClick={handleCancelEdit} className="w-full sm:w-auto">
+                    <X size={16} className="mr-2" /> Annulla
                   </Button>
                 </>
-              )}
-              {!isNewItem && !isEditMode && (
-                <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                  <Edit size={16} className="mr-2" /> Modifica
-                </Button>
+              ) : (
+                !isNewItem && (
+                  <Button variant="outline" onClick={() => setIsEditMode(true)} className="w-full sm:w-auto">
+                    <Edit size={16} className="mr-2" /> Modifica
+                  </Button>
+                )
               )}
               {!isNewItem && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
+                    <Button variant="destructive" className="w-full sm:w-auto">
                       <Trash2 size={16} className="mr-2" /> Elimina
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.
-                      </AlertDialogDescription>
+                      <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annulla</AlertDialogCancel>
