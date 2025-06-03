@@ -213,9 +213,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     isCheckingSessionRef.current = true
 
-    // Non impostiamo isLoading qui per evitare flickering durante i check automatici
-    // setIsLoading(true) - Rimuoviamo questa riga
-
     if (!supabase) {
       console.log("AuthProvider: Client Supabase non disponibile")
       isCheckingSessionRef.current = false
@@ -223,69 +220,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Recupera la sessione dai cookie
       const session = getSessionFromCookie()
 
       if (!session || !session.user_id) {
-        // Non cambiamo lo stato se l'utente è già null
-        if (user !== null) {
-          setUser(null)
-        }
+        if (user !== null) setUser(null)
         isCheckingSessionRef.current = false
         return false
       }
 
-      // Verifica se la sessione è scaduta
       if (new Date(session.expires_at) <= new Date()) {
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        if (user !== null) {
-          setUser(null)
-        }
+        if (user !== null) setUser(null)
         isCheckingSessionRef.current = false
         return false
       }
 
-      // Se l'utente è già caricato con lo stesso ID, evitiamo di ricaricarlo
       if (user && user.id === session.user_id) {
-        // Rinnova solo la sessione
         saveSessionToCookie(user.id)
         isCheckingSessionRef.current = false
         return true
       }
 
-      // Recupera i dati dell'utente
       const userData = await fetchUserData(session.user_id)
 
       if (!userData) {
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        if (user !== null) {
-          setUser(null)
-        }
+        if (user !== null) setUser(null)
         isCheckingSessionRef.current = false
         return false
       }
 
-      // Aggiorna l'ultimo accesso
       await updateLastAccess(userData.id)
-
-      // Imposta i dati utente in un'unica operazione
       setUser(userData)
       setIsAdmin(userData.ruolo === "admin")
-
-      // Rinnova la sessione
       saveSessionToCookie(userData.id)
 
       isCheckingSessionRef.current = false
       return true
     } catch (error) {
       console.error("AuthProvider: Errore nella verifica della sessione:", error)
-      if (user !== null) {
-        setUser(null)
-      }
+      if (user !== null) setUser(null)
       isCheckingSessionRef.current = false
       return false
     }
-  }, [supabase, user, getSessionFromCookie, fetchUserData, updateLastAccess, saveSessionToCookie])
+  }, [supabase, user, getSessionFromCookie, fetchUserData, updateLastAccess, saveSessionToCookie, setUser, setIsAdmin])
 
   // Funzione di login
   const login = useCallback(
@@ -299,146 +277,135 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false
       }
 
-      // Evita login multipli
       if (isCheckingSessionRef.current || redirectingRef.current) {
+        console.log("AuthProvider: Login attempt ignored, already checking session or redirecting.")
         return false
       }
 
       setIsLoading(true)
-      isCheckingSessionRef.current = true
+      isCheckingSessionRef.current = true // Mark that a check/login process is starting
 
       try {
-        // Verifica se l'input è un'email o un username
         const isEmail = usernameOrEmail.includes("@")
-
-        // Query per trovare l'utente
         let query = supabase.from("utenti").select("*")
-
-        if (isEmail) {
-          query = query.eq("email", usernameOrEmail)
-        } else {
-          query = query.eq("username", usernameOrEmail)
-        }
-
-        // Utilizziamo .maybeSingle() invece di .single() per evitare errori quando non viene trovato alcun utente
+        query = isEmail ? query.eq("email", usernameOrEmail) : query.eq("username", usernameOrEmail)
         const { data, error } = await query.maybeSingle()
 
-        // Se c'è un errore che non è relativo a "nessun risultato trovato"
         if (error && !error.message.includes("multiple (or no) rows returned")) {
           toast({
             title: "Errore di sistema",
-            description: "Si è verificato un errore durante il recupero dei dati utente",
+            description: "Errore durante il recupero dei dati utente.",
             variant: "destructive",
           })
+          setIsLoading(false)
+          isCheckingSessionRef.current = false
           return false
         }
 
-        // Se non è stato trovato alcun utente
         if (!data) {
           toast({
             title: "Credenziali non valide",
-            description: "Username/email o password non corretti",
+            description: "Username/email o password non corretti.",
             variant: "destructive",
           })
+          setIsLoading(false)
+          isCheckingSessionRef.current = false
           return false
         }
 
-        // Verifica la password (supporta sia password in chiaro che hashate)
         const isPasswordValid = await verifyPassword(password, data.password)
-
         if (!isPasswordValid) {
           toast({
             title: "Credenziali non valide",
-            description: "Username/email o password non corretti",
+            description: "Username/email o password non corretti.",
             variant: "destructive",
           })
+          setIsLoading(false)
+          isCheckingSessionRef.current = false
           return false
         }
 
-        // Se la password è valida ma non è hashata, aggiorniamola alla versione hashata
         if (data.password === password) {
+          // If plain text password matched, hash it
           await updatePasswordToHashed(data.id, password)
         }
 
-        // Aggiorna l'ultimo accesso
         await updateLastAccess(data.id)
-
-        // Salva la sessione nei cookie
         saveSessionToCookie(data.id)
 
-        // Imposta i dati utente - Importante: facciamo questo in un'unica operazione
-        // per evitare re-render multipli
+        // Set user state *before* navigation
         setUser(data)
         setIsAdmin(data.ruolo === "admin")
 
-        // Imposta il flag di reindirizzamento prima del toast per evitare flickering
-        redirectingRef.current = true
+        redirectingRef.current = true // Mark that we are about to redirect
 
-        // Mostriamo il toast solo dopo aver impostato tutti gli stati
+        const destination = data.ruolo === "admin" ? "/admin" : "/dashboard"
+        console.log(`AuthProvider: Login successful. Attempting to redirect to: ${destination}`)
+        router.push(destination) // Initiate navigation FIRST
+
+        // Display toast AFTER initiating navigation
         toast({
           title: "Login effettuato",
           description: `Benvenuto, ${data.nome || data.username}!`,
         })
 
-        // Reindirizza l'utente in base al ruolo
-        const destination = data.ruolo === "admin" ? "/admin" : "/dashboard"
-        router.push(destination)
+        // isLoading will be naturally handled by the new page's loading cycle
+        // or reset by redirectingRef becoming false via pathname change.
+        // isCheckingSessionRef will be reset in finally.
 
         return true
       } catch (error: any) {
-        // Gestiamo l'errore "multiple (or no) rows returned" come un avviso
+        console.error("Errore durante il login:", error)
         if (error.message && error.message.includes("multiple (or no) rows returned")) {
           toast({
             title: "Credenziali non valide",
-            description: "Username/email o password non corretti",
+            description: "Username/email o password non corretti.",
             variant: "destructive",
           })
         } else {
-          console.error("Errore durante il login:", error)
-          toast({
-            title: "Errore",
-            description: "Si è verificato un errore durante il login",
-            variant: "destructive",
-          })
+          toast({ title: "Errore", description: "Si è verificato un errore durante il login.", variant: "destructive" })
         }
+        setIsLoading(false) // Ensure loading is reset on error
+        isCheckingSessionRef.current = false
         return false
       } finally {
-        // Impostiamo isLoading a false solo se non stiamo reindirizzando
-        // per evitare flickering durante il cambio di pagina
-        if (!redirectingRef.current) {
-          setIsLoading(false)
-        }
+        // isCheckingSessionRef should be reset regardless of success/failure of the try block,
+        // as the login/check attempt is now concluded.
         isCheckingSessionRef.current = false
+        // If not redirecting (e.g. error before router.push), ensure isLoading is false.
+        // If redirecting, the new page will handle its loading state.
+        // The `useEffect` on `pathname` will set `redirectingRef.current = false` after navigation.
+        // If an error occurred before `redirectingRef.current` was set to true, or before `router.push`,
+        // `setIsLoading(false)` in the catch block handles it.
       }
     },
-    [supabase, router, verifyPassword, updatePasswordToHashed, updateLastAccess, saveSessionToCookie],
+    [
+      supabase,
+      router,
+      verifyPassword,
+      updatePasswordToHashed,
+      updateLastAccess,
+      saveSessionToCookie,
+      setUser,
+      setIsAdmin,
+    ],
   )
 
   // Funzione di logout
   const logout = useCallback(async (): Promise<void> => {
-    // Evita logout multipli
     if (redirectingRef.current) {
       return
     }
-
     redirectingRef.current = true
 
-    // Rimuovi il cookie di sessione
     document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-
-    // Resetta lo stato
     setUser(null)
     setIsAdmin(false)
-    setSessionChecked(false)
+    setSessionChecked(false) // Reset sessionChecked flag on logout
 
-    // Reindirizza alla pagina di login
     router.push("/login")
-
-    toast({
-      title: "Logout effettuato",
-      description: "Hai effettuato il logout con successo",
-    })
-  }, [router])
+    toast({ title: "Logout effettuato", description: "Hai effettuato il logout con successo." })
+  }, [router, setUser, setIsAdmin])
 
   // Funzione per aggiornare i dati dell'utente
   const refreshUser = useCallback(async (): Promise<void> => {
@@ -453,11 +420,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Errore nell'aggiornamento dei dati utente:", error)
     }
-  }, [user, supabase, fetchUserData])
+  }, [user, supabase, fetchUserData, setUser, setIsAdmin])
 
   // Resetta il flag di reindirizzamento quando cambia il pathname
   useEffect(() => {
-    redirectingRef.current = false
+    if (redirectingRef.current) {
+      console.log("AuthProvider: Pathname changed, resetting redirectingRef.current to false. New pathname:", pathname)
+      redirectingRef.current = false
+      // Potentially set isLoading to false here if a redirect just completed,
+      // as the new page should now be taking over.
+      // However, the new page's ProtectedRoute and its own loading states should manage this.
+      // For now, let's keep it simple.
+    }
   }, [pathname])
 
   // Verifica la sessione all'avvio
@@ -469,17 +443,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      console.log("AuthProvider: Initial session check started.")
       setIsLoading(true)
 
       try {
         await checkSession()
       } catch (error) {
-        console.error("AuthProvider: Errore nella verifica della sessione:", error)
+        console.error("AuthProvider: Errore nella verifica della sessione iniziale:", error)
       } finally {
-        // Verifichiamo che il componente sia ancora montato
         if (isMounted) {
           setIsLoading(false)
           setSessionChecked(true)
+          console.log("AuthProvider: Initial session check completed.")
         }
       }
     }
@@ -487,14 +462,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (supabase) {
       checkSessionOnLoad()
     } else {
-      setIsLoading(false)
+      setIsLoading(false) // No Supabase client, so not loading auth.
     }
 
-    // Cleanup function
     return () => {
       isMounted = false
     }
-  }, [supabase, checkSession, sessionChecked])
+  }, [supabase, checkSession, sessionChecked]) // Removed `user` from deps as checkSession handles user state
 
   // Valore del contesto
   const contextValue: AuthContextType = {

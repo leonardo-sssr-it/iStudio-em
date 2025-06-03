@@ -62,36 +62,33 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
 
   // Utilizziamo un effetto per verificare l'autorizzazione una sola volta
   useEffect(() => {
-    // Evita verifiche multiple
-    if (authCheckCompletedRef.current) return
+    const checkAuthorizationLogic = async () => {
+      console.log("ProtectedRoute: Evaluating authorization...", { pathname, isLoading, user: !!user, isAdmin })
 
-    // Funzione per gestire l'autorizzazione
-    const checkAuthorization = async () => {
-      console.log("ProtectedRoute: Inizio verifica autorizzazione", { isLoading, user: !!user })
-
-      // Se stiamo ancora caricando, non facciamo nulla
       if (isLoading) {
-        console.log("ProtectedRoute: Ancora in caricamento, aspetto...")
+        console.log("ProtectedRoute: Auth state is loading. Current isAuthorized:", isAuthorized)
+        // Potentially set isAuthorized to false here if you want to ensure no stale authorized state during load
+        // setIsAuthorized(false); // Or let it retain its value until loading is complete
         return
       }
 
-      // Verifichiamo se l'utente è autenticato
+      // Scenario 1: No user object
       if (!user) {
-        // Prima di reindirizzare, proviamo a verificare la sessione una volta
-        console.log("ProtectedRoute: Utente non trovato, verifico la sessione...")
-
+        setIsAuthorized(false)
+        console.log("ProtectedRoute: No user. Attempting session recovery or redirecting to login.")
         try {
-          const sessionValid = await checkSession()
-          if (sessionValid) {
-            console.log("ProtectedRoute: Sessione valida trovata, aspetto aggiornamento utente...")
-            return // Aspetta che l'utente venga aggiornato
+          const sessionIsValid = await checkSession() // checkSession from useAuth
+          if (sessionIsValid) {
+            // AuthProvider will update user, this effect will re-run.
+            console.log("ProtectedRoute: Session recovery successful, awaiting user state update.")
+            return // Wait for re-run with user object
           }
         } catch (error) {
-          console.error("ProtectedRoute: Errore nella verifica della sessione:", error)
+          console.error("ProtectedRoute: Error during session recovery:", error)
+          // Fall through to redirect if session recovery fails
         }
 
-        // L'utente non è autenticato, reindirizza al login
-        console.log("ProtectedRoute: Utente non autenticato, reindirizzamento al login")
+        console.log("ProtectedRoute: No user and no valid session. Redirecting to /login.")
         if (!redirectingRef.current) {
           redirectingRef.current = true
           router.push("/login")
@@ -99,9 +96,10 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
         return
       }
 
-      // Se adminOnly è true, verifichiamo se l'utente è admin
+      // Scenario 2: User object exists, check permissions
       if (adminOnly && !isAdmin) {
-        console.log("ProtectedRoute: Accesso riservato agli admin, reindirizzamento alla dashboard")
+        setIsAuthorized(false)
+        console.log("ProtectedRoute: Admin access required, user is not admin. Redirecting to /dashboard.")
         if (!redirectingRef.current) {
           redirectingRef.current = true
           router.push("/dashboard")
@@ -109,17 +107,12 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
         return
       }
 
-      // Se è specificato un permesso richiesto, verifichiamo se l'utente lo ha
+      // Check for specific permission if adminOnly is not the primary guard
       if (requiredPermission) {
-        const userHasPermission = hasPermission(user.ruolo, requiredPermission)
-        console.log(
-          `ProtectedRoute: Verifica permesso ${requiredPermission} per ruolo ${user.ruolo}: ${userHasPermission}`,
-        )
-
-        if (!userHasPermission) {
-          console.log(
-            `ProtectedRoute: Utente non autorizzato per ${requiredPermission}, reindirizzamento alla dashboard`,
-          )
+        const userHasRequiredPermission = hasPermission(user.ruolo, requiredPermission)
+        if (!userHasRequiredPermission) {
+          setIsAuthorized(false)
+          console.log(`ProtectedRoute: Permission '${requiredPermission}' denied for user. Redirecting to /dashboard.`)
           if (!redirectingRef.current) {
             redirectingRef.current = true
             router.push("/dashboard")
@@ -128,19 +121,25 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
         }
       }
 
-      // L'utente è autorizzato
-      console.log(`ProtectedRoute: Utente autorizzato per ${pathname}`)
+      // All checks passed: User is authorized for this route
+      console.log(`ProtectedRoute: User '${user.id}' is authorized for ${pathname}.`)
       setIsAuthorized(true)
-      authCheckCompletedRef.current = true
+      // authCheckCompletedRef.current = true; // If you re-introduce this, ensure it's reset if user becomes null.
+      // For simplicity, relying on the effect re-running is often cleaner.
     }
 
-    checkAuthorization()
+    checkAuthorizationLogic()
 
-    // Pulizia quando il componente viene smontato
-    return () => {
-      redirectingRef.current = false
-    }
-  }, [user, isLoading, isAdmin, router, adminOnly, pathname, requiredPermission, checkSession])
+    // Ensure all dependencies that could affect the logic are included.
+    // `hasPermission` should be stable or memoized if passed as a prop, or defined within/imported.
+    // If `hasPermission` is defined inside ProtectedRoute, it doesn't need to be a dep unless it itself uses state/props.
+  }, [user, isLoading, isAdmin, adminOnly, requiredPermission, pathname, router, checkSession])
+
+  // Add or ensure this effect is present to reset redirectingRef on path changes
+  useEffect(() => {
+    console.log("ProtectedRoute: Pathname changed, resetting redirectingRef.", pathname)
+    redirectingRef.current = false
+  }, [pathname])
 
   // Aggiungi questo useEffect dopo quello esistente
   useEffect(() => {
