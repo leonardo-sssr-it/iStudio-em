@@ -171,21 +171,30 @@ const TABLE_FIELDS = {
       modifica: "datetime",
     },
     groups: {
-      "Informazioni principali": ["titolo", "descrizione", "completato", "priorita", "scadenza", "note", "notifica", "tags"],
+      "Informazioni principali": [
+        "titolo",
+        "descrizione",
+        "completato",
+        "priorita",
+        "scadenza",
+        "note",
+        "notifica",
+        "tags",
+      ],
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
   progetti: {
-    listFields: ["id", "titolo", "stato", "data_inizio", "data_fine", "budget"],
+    listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
     readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
-    requiredFields: ["titolo"],
+    requiredFields: ["nome"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
-      titolo: "string",
+      nome: "string",
       descrizione: "text",
       stato: "select",
-      priorita: "text".
+      priorita: "priority_select",
       data_inizio: "datetime",
       data_fine: "datetime",
       budget: "number",
@@ -193,6 +202,8 @@ const TABLE_FIELDS = {
       id_utente: "number",
       modifica: "datetime",
       colore: "color",
+      gruppo: "group_select",
+      avanzamento: "number",
       tags: "json",
       allegati: "json",
       notifica: "datetime",
@@ -208,11 +219,11 @@ const TABLE_FIELDS = {
     },
     groups: {
       "Informazioni principali": [
-        "titolo",
+        "nome",
         "descrizione",
         "stato",
-        "priorita",
         "colore",
+        "priorita",
         "gruppo",
         "budget",
         "data_inizio",
@@ -224,31 +235,38 @@ const TABLE_FIELDS = {
     },
   },
   clienti: {
-    listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
+    listFields: ["id", "nome", "cognome", "email", "societa", "citta"],
     readOnlyFields: ["id", "id_utente", "modifica"],
-    requiredFields: ["nome", "cognome"],
+    requiredFields: ["nome", "cognome", "email"],
     defaultSort: "cognome",
     types: {
       id: "number",
       nome: "string",
       cognome: "string",
       email: "string",
-      telefono: "string",
-      citta: "string",
       indirizzo: "string",
+      citta: "string",
       cap: "string",
-      piva: "string",
-      codfisc: "string",
+      codicefiscale: "string",
+      rappresentante: "boolean",
+      societa: "string",
+      indirizzosocieta: "string",
+      cittasocieta: "string",
+      partitaiva: "string",
+      recapiti: "text",
       note: "text",
+      attivo: "boolean",
+      qr: "string",
       id_utente: "number",
       modifica: "datetime",
     },
     groups: {
-      "Informazioni personali": ["nome", "cognome", "email", "telefono"],
-      Indirizzo: ["citta", "indirizzo", "cap"],
-      "Informazioni fiscali": ["piva", "codfisc"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+      "Dati personali": ["nome", "cognome", "email", "codicefiscale", "rappresentante"],
+      "Indirizzo personale": ["indirizzo", "citta", "cap"],
+      "Dati azienda": ["societa", "partitaiva"],
+      "Indirizzo azienda": ["indirizzosocieta", "cittasocieta"],
+      "Contatti e note": ["recapiti", "note", "qr"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo"],
     },
   },
   pagine: {
@@ -353,6 +371,7 @@ export default function ItemDetailPage() {
   const [activeTab, setActiveTab] = useState<string>("main")
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [priorityOptions, setPriorityOptions] = useState<any[]>([])
+  const [groupOptions, setGroupOptions] = useState<any[]>([])
 
   // Estrai e valida i parametri
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -396,7 +415,7 @@ export default function ItemDetailPage() {
         throw new Error(`Errore nel caricamento delle priorità: ${error.message}`)
       }
 
-      console.log("Dati configurazione caricati:", data)
+      console.log("Dati configurazione priorità caricati:", data)
 
       // La struttura è: {"priorita": {"priorità": [array di priorità]}}
       let priorityArray = null
@@ -447,12 +466,80 @@ export default function ItemDetailPage() {
     }
   }, [supabase])
 
-  // Carica le opzioni di priorità all'avvio
+  // Carica le opzioni di gruppo dal database
+  const loadGroupOptions = useCallback(async () => {
+    if (!supabase) return
+
+    try {
+      console.log("Caricamento opzioni gruppi dal database...")
+
+      // Query per caricare il campo "gruppi" dalla tabella configurazione
+      const { data, error } = await supabase.from("configurazione").select("gruppi").single()
+
+      if (error) {
+        console.error("Errore nel caricamento dei gruppi:", error)
+        toast({
+          title: "Errore di configurazione",
+          description: `Impossibile caricare i gruppi dalla configurazione. Errore: ${error.message}`,
+          variant: "destructive",
+        })
+        throw new Error(`Errore nel caricamento dei gruppi: ${error.message}`)
+      }
+
+      console.log("Dati configurazione gruppi caricati:", data)
+
+      // La struttura è: {"gruppi": {"gruppi": [array di gruppi]}}
+      let groupArray = null
+
+      if (data?.gruppi) {
+        // Controlla se gruppi contiene direttamente un array
+        if (Array.isArray(data.gruppi)) {
+          groupArray = data.gruppi
+        }
+        // Controlla se gruppi contiene un oggetto con il campo "gruppi"
+        else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) {
+          groupArray = data.gruppi.gruppi
+        }
+      }
+
+      if (!groupArray || groupArray.length === 0) {
+        console.error("Configurazione gruppi non valida o vuota:", data)
+        toast({
+          title: "Configurazione incompleta",
+          description:
+            "La configurazione dei gruppi non è valida o è vuota. Verificare il campo 'gruppi' nella tabella 'configurazione'.",
+          variant: "destructive",
+        })
+        throw new Error("Configurazione gruppi non valida o vuota")
+      }
+
+      // Mappa i dati per assicurarsi che abbiano la struttura corretta
+      const mappedGroups = groupArray.map((item: any) => ({
+        value: item.id || item.value,
+        nome: item.gruppo || item.nome || item.label || `Gruppo ${item.id || item.value}`,
+        descrizione: item.descrizione || item.description || "",
+      }))
+
+      console.log("Opzioni gruppi caricate:", mappedGroups)
+      setGroupOptions(mappedGroups)
+    } catch (error: any) {
+      console.error("Errore nel caricamento dei gruppi:", error)
+      setGroupOptions([]) // Imposta un array vuoto invece di valori di default
+      toast({
+        title: "Errore",
+        description: `Impossibile caricare i gruppi: ${error.message}`,
+        variant: "destructive",
+      })
+    }
+  }, [supabase])
+
+  // Carica le opzioni di priorità e gruppi all'avvio
   useEffect(() => {
     if (supabase) {
       loadPriorityOptions()
+      loadGroupOptions()
     }
-  }, [supabase, loadPriorityOptions])
+  }, [supabase, loadPriorityOptions, loadGroupOptions])
 
   // Funzione di validazione
   const validateForm = (): string[] => {
@@ -499,6 +586,11 @@ export default function ItemDetailPage() {
           newItem.descrizione = "" // Inizializza come stringa vuota
           newItem.completato = false
           newItem.priorita = 1
+        }
+
+        if (tableName === "clienti") {
+          newItem.attivo = true
+          newItem.rappresentante = false
         }
 
         console.log("Nuovo elemento creato:", newItem)
@@ -818,6 +910,38 @@ export default function ItemDetailPage() {
             )}
           </div>
         )
+      case "group_select":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            {groupOptions.length > 0 ? (
+              <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, val)}>
+                <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
+                  <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {groupOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Impossibile caricare le opzioni di gruppo. Verificare la configurazione.</span>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2" onClick={loadGroupOptions}>
+                  Riprova caricamento
+                </Button>
+              </div>
+            )}
+          </div>
+        )
       case "select":
         const options = selectOptions[field] || []
         return (
@@ -919,6 +1043,12 @@ export default function ItemDetailPage() {
         }
         const priorityOption = priorityOptions.find((option) => option.value === value)
         return priorityOption ? priorityOption.nome : value
+      case "group_select":
+        if (groupOptions.length === 0) {
+          return <span className="text-red-500">Errore configurazione</span>
+        }
+        const groupOption = groupOptions.find((option) => option.value === value)
+        return groupOption ? groupOption.nome : value
       case "text":
         return <div className="whitespace-pre-wrap">{value}</div>
       case "json":
@@ -1070,6 +1200,23 @@ export default function ItemDetailPage() {
                       )
                     }
 
+                    // Gestione speciale per stato e colore sulla stessa riga
+                    if (field === "stato" && groupFields.includes("colore") && allFields.includes("colore")) {
+                      return (
+                        <div key="status-color" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>{renderField("stato", editedItem.stato, fieldTypes.stato || "select", isReadOnly)}</div>
+                          <div>
+                            {renderField(
+                              "colore",
+                              editedItem.colore,
+                              fieldTypes.colore || "color",
+                              readOnlyFields.includes("colore"),
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+
                     // Salta data_fine se è già stata renderizzata con data_inizio
                     if (
                       field === "data_fine" &&
@@ -1081,6 +1228,11 @@ export default function ItemDetailPage() {
 
                     // Salta scadenza se è già stata renderizzata con priorita
                     if (field === "scadenza" && groupFields.includes("priorita") && allFields.includes("priorita")) {
+                      return null
+                    }
+
+                    // Salta colore se è già stato renderizzato con stato
+                    if (field === "colore" && groupFields.includes("stato") && allFields.includes("stato")) {
                       return null
                     }
 
