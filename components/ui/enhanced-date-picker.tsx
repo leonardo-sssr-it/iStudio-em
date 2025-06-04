@@ -18,6 +18,7 @@ interface EnhancedDatePickerProps {
   disabled?: boolean
   className?: string
   id?: string
+  showCurrentTime?: boolean // Nuova prop per mostrare l'ora corrente
 }
 
 export function EnhancedDatePicker({
@@ -27,6 +28,7 @@ export function EnhancedDatePicker({
   disabled = false,
   className,
   id,
+  showCurrentTime = false,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
   // Stato per il valore confermato
@@ -67,15 +69,25 @@ export function EnhancedDatePicker({
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      const currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
-      const currentMinutes = tempDate ? tempDate.getMinutes() : new Date().getMinutes()
+      // Se showCurrentTime è true e non c'è un valore esistente, usa l'ora corrente
+      let currentHours, currentMinutes
+      if (showCurrentTime && !value) {
+        const now = new Date()
+        currentHours = now.getHours()
+        currentMinutes = now.getMinutes()
+      } else {
+        currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
+        currentMinutes = tempDate ? tempDate.getMinutes() : new Date().getMinutes()
+      }
+
       date.setHours(currentHours)
       date.setMinutes(currentMinutes)
       date.setSeconds(0)
       date.setMilliseconds(0)
       setTempDate(date)
+
       // Aggiorna tempTime se la data è selezionata e tempTime è vuoto
-      if (!tempTime) {
+      if (!tempTime || (showCurrentTime && !value)) {
         const hours = date.getHours().toString().padStart(2, "0")
         const minutes = date.getMinutes().toString().padStart(2, "0")
         setTempTime(`${hours}:${minutes}`)
@@ -195,6 +207,13 @@ export function EnhancedDatePicker({
       setOpen(!open)
     }
   }
+
+  // Inizializza con data/ora corrente se showCurrentTime è true e non c'è valore
+  React.useEffect(() => {
+    if (showCurrentTime && !value && open && !tempDate) {
+      setCurrentDateTime()
+    }
+  }, [showCurrentTime, value, open, tempDate])
 
   return (
     <div className={cn("flex flex-col sm:flex-row gap-2", className)}>

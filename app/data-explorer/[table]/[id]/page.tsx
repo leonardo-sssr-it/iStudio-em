@@ -185,6 +185,7 @@ const TABLE_FIELDS = {
       note: "text",
       id_utente: "number",
       modifica: "datetime",
+      colore: "color",
     },
     selectOptions: {
       stato: [
@@ -369,15 +370,9 @@ export default function ItemDetailPage() {
     try {
       if (isNewItem) {
         // Crea un nuovo elemento vuoto
-        const now = new Date()
-        const currentDateTime = now.toISOString()
-
         const newItem: any = {
           id_utente: user.id,
         }
-
-        // NON aggiungere automaticamente data/ora attuale per i campi datetime
-        // Verranno aggiunti solo quando l'utente interagisce con il form
 
         setItem(newItem)
         setEditedItem(newItem)
@@ -595,6 +590,7 @@ export default function ItemDetailPage() {
               onChange={(newValue) => handleFieldChange(field, newValue)}
               placeholder={`Seleziona ${label.toLowerCase()}`}
               className="mt-1"
+              showCurrentTime={!value} // Mostra l'ora corrente solo se il campo non è valorizzato
             />
           </div>
         )
@@ -630,6 +626,15 @@ export default function ItemDetailPage() {
             </Select>
           </div>
         )
+      case "color":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <div className="mt-1">
+              <ColorPicker value={value || "#000000"} onChange={(val) => handleFieldChange(field, val)} />
+            </div>
+          </div>
+        )
       case "json":
         if (field === "tags") {
           return (
@@ -663,13 +668,6 @@ export default function ItemDetailPage() {
               rows={4}
               placeholder="JSON valido..."
             />
-          </div>
-        )
-      case "color":
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <ColorPicker value={value || "#000000"} onChange={(val) => handleFieldChange(field, val)} />
           </div>
         )
       default:
@@ -788,6 +786,7 @@ export default function ItemDetailPage() {
                             onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
                             placeholder="Seleziona data inizio"
                             className="mt-1"
+                            showCurrentTime={!editedItem.data_inizio}
                           />
                         </div>
                         <div>
@@ -798,6 +797,7 @@ export default function ItemDetailPage() {
                             onChange={(newValue) => handleFieldChange("data_fine", newValue)}
                             placeholder="Seleziona data fine"
                             className="mt-1"
+                            showCurrentTime={!editedItem.data_fine}
                           />
                         </div>
                       </div>
