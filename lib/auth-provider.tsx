@@ -407,7 +407,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAdmin(false)
     setSessionChecked(false) // Reset sessionChecked flag on logout
 
-    router.push("/login")
+    router.push("/")
     toast({ title: "Logout effettuato", description: "Hai effettuato il logout con successo." })
   }, [router, setUser, setIsAdmin])
 
