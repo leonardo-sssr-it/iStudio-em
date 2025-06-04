@@ -374,20 +374,25 @@ export default function ItemDetailPage() {
     if (!supabase) return
 
     try {
+      console.log("Caricamento opzioni priorità dal database...")
+
+      // Query per caricare il campo "priorita" (senza accento) dalla tabella configurazione
       const { data, error } = await supabase.from("configurazione").select("priorita").single()
 
       if (error) {
         console.error("Errore nel caricamento delle priorità:", error)
         toast({
           title: "Errore di configurazione",
-          description: "Impossibile caricare le priorità dalla configurazione. Verificare la tabella 'configurazione'.",
+          description: `Impossibile caricare le priorità dalla configurazione. Errore: ${error.message}`,
           variant: "destructive",
         })
         throw new Error(`Errore nel caricamento delle priorità: ${error.message}`)
       }
 
+      console.log("Dati configurazione caricati:", data)
+
       if (!data?.priorita || !Array.isArray(data.priorita) || data.priorita.length === 0) {
-        console.error("Configurazione priorità non valida o vuota")
+        console.error("Configurazione priorità non valida o vuota:", data)
         toast({
           title: "Configurazione incompleta",
           description:
@@ -397,6 +402,7 @@ export default function ItemDetailPage() {
         throw new Error("Configurazione priorità non valida o vuota")
       }
 
+      console.log("Opzioni priorità caricate:", data.priorita)
       setPriorityOptions(data.priorita)
     } catch (error: any) {
       console.error("Errore nel caricamento delle priorità:", error)
@@ -407,7 +413,7 @@ export default function ItemDetailPage() {
         variant: "destructive",
       })
     }
-  }, [supabase, toast])
+  }, [supabase])
 
   // Carica le opzioni di priorità all'avvio
   useEffect(() => {
@@ -463,6 +469,7 @@ export default function ItemDetailPage() {
           newItem.priorita = 1
         }
 
+        console.log("Nuovo elemento creato:", newItem)
         setItem(newItem)
         setEditedItem(newItem)
         setLoading(false)
@@ -509,6 +516,7 @@ export default function ItemDetailPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
+    console.log(`Cambio campo ${field}:`, value)
     setEditedItem((prev: any) => {
       const updated = {
         ...prev,
@@ -522,6 +530,7 @@ export default function ItemDetailPage() {
         updated.data_fine = endDate.toISOString()
       }
 
+      console.log("Elemento aggiornato:", updated)
       return updated
     })
 
@@ -766,7 +775,13 @@ export default function ItemDetailPage() {
               </Select>
             ) : (
               <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
-                Impossibile caricare le opzioni di priorità. Verificare la configurazione.
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2" onClick={loadPriorityOptions}>
+                  Riprova caricamento
+                </Button>
               </div>
             )}
           </div>
@@ -999,7 +1014,7 @@ export default function ItemDetailPage() {
                       )
                     }
 
-                    // Gestione speciale per priorità e scadenza sulla stessa riga
+                    // Gestione speciale per priorita e scadenza sulla stessa riga
                     if (field === "priorita" && groupFields.includes("scadenza") && allFields.includes("scadenza")) {
                       return (
                         <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
