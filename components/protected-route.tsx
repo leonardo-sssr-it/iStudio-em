@@ -100,10 +100,10 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
           // Fall through to redirect if session recovery fails
         }
 
-        console.log("ProtectedRoute: No user and no valid session. Redirecting to /login.")
+        console.log("ProtectedRoute: No user and no valid session. Redirecting to /.")
         if (!redirectingRef.current) {
           redirectingRef.current = true
-          router.push("/login")
+          router.push("/")
         }
         return
       }
