@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, isToday, isSameDay } from "date-fns"
 import { it } from "date-fns/locale"
 import { CalendarIcon, Clock, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -67,6 +67,11 @@ export function EnhancedDatePicker({
     }
   }, [selectedDate])
 
+  // Funzione per arrotondare i minuti ai multipli di 5
+  const roundToNearestFiveMinutes = (minutes: number): number => {
+    return Math.round(minutes / 5) * 5
+  }
+
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       // Se showCurrentTime è true e non c'è un valore esistente, usa l'ora corrente
@@ -74,10 +79,12 @@ export function EnhancedDatePicker({
       if (showCurrentTime && !value) {
         const now = new Date()
         currentHours = now.getHours()
-        currentMinutes = now.getMinutes()
+        currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
       } else {
         currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
-        currentMinutes = tempDate ? tempDate.getMinutes() : new Date().getMinutes()
+        currentMinutes = tempDate
+          ? roundToNearestFiveMinutes(tempDate.getMinutes())
+          : roundToNearestFiveMinutes(new Date().getMinutes())
       }
 
       date.setHours(currentHours)
@@ -98,8 +105,15 @@ export function EnhancedDatePicker({
   }
 
   const handleTimeChange = (timeString: string) => {
-    setTempTime(timeString) // Aggiorna solo lo stato temporaneo
-    // Non chiamare onChange qui
+    // Arrotonda i minuti ai multipli di 5
+    if (timeString && timeString.includes(":")) {
+      const [hours, minutes] = timeString.split(":").map(Number)
+      const roundedMinutes = roundToNearestFiveMinutes(minutes)
+      const adjustedTimeString = `${hours.toString().padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`
+      setTempTime(adjustedTimeString)
+    } else {
+      setTempTime(timeString)
+    }
   }
 
   const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -144,7 +158,7 @@ export function EnhancedDatePicker({
 
   const setCurrentDateTime = () => {
     const now = new Date()
-    const minutes = Math.round(now.getMinutes() / 5) * 5
+    const minutes = roundToNearestFiveMinutes(now.getMinutes())
     now.setMinutes(minutes)
     now.setSeconds(0)
     now.setMilliseconds(0)
@@ -215,6 +229,31 @@ export function EnhancedDatePicker({
     }
   }, [showCurrentTime, value, open, tempDate])
 
+  // Funzione per personalizzare lo stile dei giorni nel calendario
+  const modifiers = React.useMemo(() => {
+    const today = new Date()
+    return {
+      today: (date: Date) => isToday(date),
+      selected: (date: Date) => (tempDate ? isSameDay(date, tempDate) : false),
+    }
+  }, [tempDate])
+
+  const modifiersStyles = React.useMemo(
+    () => ({
+      today: {
+        backgroundColor: "#dcfce7", // verde pastello per oggi
+        color: "#166534",
+        fontWeight: "bold",
+      },
+      selected: {
+        backgroundColor: "#22c55e", // verde normale per il giorno selezionato
+        color: "white",
+        fontWeight: "bold",
+      },
+    }),
+    [],
+  )
+
   return (
     <div className={cn("flex flex-col sm:flex-row gap-2", className)}>
       <Popover open={open} onOpenChange={setOpen}>
@@ -246,6 +285,9 @@ export function EnhancedDatePicker({
             disabled={disabled}
             initialFocus
             locale={it}
+            modifiers={modifiers}
+            modifiersStyles={modifiersStyles}
+            className="rounded-md border"
           />
           <div className="p-3 border-t space-y-3">
             {/* Selezione ora */}
