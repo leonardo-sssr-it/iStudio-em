@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import type { LucideIcon } from "lucide-react"
 
 const SummaryCard = ({ type, label, count, icon: Icon, color, textColor }: SummaryCount) => (
   <Card className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color}`}>
@@ -56,7 +57,7 @@ const UpcomingItemsList = ({
           {items.map((item) => (
             <li key={`${item.tabella_origine}-${item.id_origine}`} className="text-sm border-b pb-1 last:border-b-0">
               <Link
-                href={`/data-explorer/${item.tabella_origine}/${item.id_origine}`}
+                href={`/data-explorer?table=${item.tabella_origine}&id=${item.id_origine}`}
                 className="hover:underline group"
               >
                 <div className="flex justify-between items-center">
