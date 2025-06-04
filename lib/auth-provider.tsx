@@ -43,7 +43,7 @@ const HASH_PREFIX = "hashed_"
 
 // Provider di autenticazione
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { supabase } = useSupabase()
+  const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing } = useSupabase()
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -213,8 +213,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     isCheckingSessionRef.current = true
 
-    if (!supabase) {
-      console.log("AuthProvider: Client Supabase non disponibile")
+    // Verifica che Supabase sia connesso
+    if (!supabase || supabaseInitializing) {
+      console.log("AuthProvider: Client Supabase non disponibile o in inizializzazione")
       isCheckingSessionRef.current = false
       return false
     }
@@ -263,12 +264,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isCheckingSessionRef.current = false
       return false
     }
-  }, [supabase, user, getSessionFromCookie, fetchUserData, updateLastAccess, saveSessionToCookie, setUser, setIsAdmin])
+  }, [
+    supabase,
+    supabaseInitializing,
+    user,
+    getSessionFromCookie,
+    fetchUserData,
+    updateLastAccess,
+    saveSessionToCookie,
+    setUser,
+    setIsAdmin,
+  ])
 
   // Funzione di login
   const login = useCallback(
     async (usernameOrEmail: string, password: string): Promise<boolean> => {
-      if (!supabase) {
+      if (!supabase || supabaseInitializing) {
         toast({
           title: "Errore di connessione",
           description: "Impossibile connettersi al database",
@@ -336,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set user state *before* navigation
         setUser(data)
         setIsAdmin(data.ruolo === "admin")
+        setIsLoading(false) // Importante: imposta isLoading a false prima del redirect
 
         redirectingRef.current = true // Mark that we are about to redirect
 
@@ -348,10 +360,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           title: "Login effettuato",
           description: `Benvenuto, ${data.nome || data.username}!`,
         })
-
-        // isLoading will be naturally handled by the new page's loading cycle
-        // or reset by redirectingRef becoming false via pathname change.
-        // isCheckingSessionRef will be reset in finally.
 
         return true
       } catch (error: any) {
@@ -372,15 +380,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // isCheckingSessionRef should be reset regardless of success/failure of the try block,
         // as the login/check attempt is now concluded.
         isCheckingSessionRef.current = false
-        // If not redirecting (e.g. error before router.push), ensure isLoading is false.
-        // If redirecting, the new page will handle its loading state.
-        // The `useEffect` on `pathname` will set `redirectingRef.current = false` after navigation.
-        // If an error occurred before `redirectingRef.current` was set to true, or before `router.push`,
-        // `setIsLoading(false)` in the catch block handles it.
       }
     },
     [
       supabase,
+      supabaseInitializing,
       router,
       verifyPassword,
       updatePasswordToHashed,
@@ -427,10 +431,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (redirectingRef.current) {
       console.log("AuthProvider: Pathname changed, resetting redirectingRef.current to false. New pathname:", pathname)
       redirectingRef.current = false
-      // Potentially set isLoading to false here if a redirect just completed,
-      // as the new page should now be taking over.
-      // However, the new page's ProtectedRoute and its own loading states should manage this.
-      // For now, let's keep it simple.
     }
   }, [pathname])
 
@@ -439,7 +439,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let isMounted = true
 
     const checkSessionOnLoad = async () => {
-      if (sessionChecked || isCheckingSessionRef.current) {
+      if (sessionChecked || isCheckingSessionRef.current || supabaseInitializing) {
         return
       }
 
@@ -459,21 +459,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    if (supabase) {
+    if (supabase && supabaseConnected) {
       checkSessionOnLoad()
-    } else {
+    } else if (!supabaseInitializing) {
       setIsLoading(false) // No Supabase client, so not loading auth.
     }
 
     return () => {
       isMounted = false
     }
-  }, [supabase, checkSession, sessionChecked]) // Removed `user` from deps as checkSession handles user state
+  }, [supabase, supabaseConnected, supabaseInitializing, checkSession, sessionChecked])
 
   // Valore del contesto
   const contextValue: AuthContextType = {
     user,
-    isLoading,
+    isLoading: isLoading || supabaseInitializing, // Considera anche lo stato di inizializzazione di Supabase
     isAdmin,
     login,
     logout,
