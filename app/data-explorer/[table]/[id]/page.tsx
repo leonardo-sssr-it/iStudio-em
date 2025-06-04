@@ -396,7 +396,7 @@ export default function ItemDetailPage() {
         description: `Impossibile caricare i dati: ${error.message}`,
         variant: "destructive",
       })
-      router.push(`/data-explorer/${tableName}`)
+      router.push(`/data-explorer?table=${tableName}`)
     } finally {
       setLoading(false)
     }
@@ -492,7 +492,7 @@ export default function ItemDetailPage() {
     setEditedItem(item)
     setIsEditMode(false)
     if (isNewItem) {
-      router.push(`/data-explorer/${tableName}`)
+      router.push(`/data-explorer?table=${tableName}`)
     }
   }
 
@@ -517,7 +517,7 @@ export default function ItemDetailPage() {
       })
 
       // Torna alla lista della tabella
-      router.push(`/data-explorer/${tableName}`)
+      router.push(`/data-explorer?table=${tableName}`)
     } catch (error: any) {
       console.error(`Errore nell'eliminazione dell'elemento:`, error)
       toast({
@@ -817,7 +817,7 @@ export default function ItemDetailPage() {
             <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/data-explorer")}>
+            <Button onClick={() => router.push("/data-explorer?table=" + tableName)}>
               <ArrowLeft size={16} className="mr-2" /> Torna alla lista
             </Button>
           </CardContent>
@@ -854,7 +854,7 @@ export default function ItemDetailPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <Button variant="ghost" onClick={() => router.push(`/data-explorer/${tableName}`)} className="mb-2">
+              <Button variant="ghost" onClick={() => router.push(`/data-explorer?table=${tableName}`)} className="mb-2">
                 <ArrowLeft size={16} className="mr-2" /> Torna alla lista
               </Button>
               <CardTitle className="text-2xl">{getItemTitle()}</CardTitle>
