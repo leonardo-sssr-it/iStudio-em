@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-provider"
+import { useSupabase } from "@/lib/supabase-provider"
 import { Loader2 } from "lucide-react"
 
 // Definizione dei ruoli e delle autorizzazioni
@@ -39,6 +40,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, adminOnly = false, requiredPermission }: ProtectedRouteProps) {
   const { user, isLoading, isAdmin, checkSession } = useAuth()
+  const { isInitializing: supabaseInitializing } = useSupabase()
   const router = useRouter()
   const pathname = usePathname()
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -63,12 +65,22 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
   // Utilizziamo un effetto per verificare l'autorizzazione una sola volta
   useEffect(() => {
     const checkAuthorizationLogic = async () => {
-      console.log("ProtectedRoute: Evaluating authorization...", { pathname, isLoading, user: !!user, isAdmin })
+      console.log("ProtectedRoute: Evaluating authorization...", {
+        pathname,
+        isLoading,
+        supabaseInitializing,
+        user: !!user,
+        isAdmin,
+      })
+
+      // Aspetta che Supabase sia inizializzato
+      if (supabaseInitializing) {
+        console.log("ProtectedRoute: Supabase is initializing, waiting...")
+        return
+      }
 
       if (isLoading) {
         console.log("ProtectedRoute: Auth state is loading. Current isAuthorized:", isAuthorized)
-        // Potentially set isAuthorized to false here if you want to ensure no stale authorized state during load
-        // setIsAuthorized(false); // Or let it retain its value until loading is complete
         return
       }
 
@@ -124,16 +136,10 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
       // All checks passed: User is authorized for this route
       console.log(`ProtectedRoute: User '${user.id}' is authorized for ${pathname}.`)
       setIsAuthorized(true)
-      // authCheckCompletedRef.current = true; // If you re-introduce this, ensure it's reset if user becomes null.
-      // For simplicity, relying on the effect re-running is often cleaner.
     }
 
     checkAuthorizationLogic()
-
-    // Ensure all dependencies that could affect the logic are included.
-    // `hasPermission` should be stable or memoized if passed as a prop, or defined within/imported.
-    // If `hasPermission` is defined inside ProtectedRoute, it doesn't need to be a dep unless it itself uses state/props.
-  }, [user, isLoading, isAdmin, adminOnly, requiredPermission, pathname, router, checkSession])
+  }, [user, isLoading, isAdmin, adminOnly, requiredPermission, pathname, router, checkSession, supabaseInitializing])
 
   // Add or ensure this effect is present to reset redirectingRef on path changes
   useEffect(() => {
@@ -145,7 +151,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
   useEffect(() => {
     // Timeout di sicurezza per evitare attese infinite
     const timeoutId = setTimeout(() => {
-      if (isLoading && !authCheckCompletedRef.current) {
+      if ((isLoading || supabaseInitializing) && !authCheckCompletedRef.current) {
         console.log("ProtectedRoute: Timeout raggiunto, forzo il controllo dell'autorizzazione")
         if (!user && !redirectingRef.current) {
           console.log("ProtectedRoute: Timeout - utente non trovato, reindirizzamento al login")
@@ -158,7 +164,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
     return () => {
       clearTimeout(timeoutId)
     }
-  }, [isLoading, user, router])
+  }, [isLoading, supabaseInitializing, user, router])
 
   // Verifica periodica della sessione
   useEffect(() => {
@@ -192,7 +198,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
     }
   }, [isAuthorized, checkSession, router])
 
-  if (isLoading) {
+  if (isLoading || supabaseInitializing) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
