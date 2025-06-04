@@ -1,4 +1,4 @@
-import { type ClassValue, clsx } from "clsx"
+import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
@@ -6,18 +6,17 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Sanitizes a string for use as an identifier or URL slug
- * @param input The string to sanitize
- * @returns A sanitized string safe for use in URLs and IDs
+ * Sanitizes a string to be used as a safe identifier
+ * Removes special characters and ensures it's a valid identifier
  */
-export function sanitizeIdentifier(input: string): string {
-  if (!input) return ""
+export function sanitizeIdentifier(str: string): string {
+  if (!str || typeof str !== "string") return ""
 
-  return input
+  return str
     .toLowerCase()
-    .replace(/[^\w\s-]/g, "") // Remove special characters
-    .replace(/\s+/g, "_") // Replace spaces with underscores
-    .replace(/_{2,}/g, "_") // Replace multiple consecutive underscores with a single one
-    .replace(/-{2,}/g, "-") // Replace multiple consecutive hyphens with a single one
-    .replace(/^[_-]+|[_-]+$/g, "") // Remove leading and trailing underscores/hyphens
+    .replace(/[^a-z0-9_]/g, "_") // Replace non-alphanumeric chars with underscore
+    .replace(/^[0-9]/, "_$&") // Prefix with underscore if starts with number
+    .replace(/_+/g, "_") // Replace multiple underscores with single
+    .replace(/^_|_$/g, "") // Remove leading/trailing underscores
+    .substring(0, 50) // Limit length
 }
