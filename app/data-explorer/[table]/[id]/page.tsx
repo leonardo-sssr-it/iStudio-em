@@ -391,7 +391,25 @@ export default function ItemDetailPage() {
 
       console.log("Dati configurazione caricati:", data)
 
-      if (!data?.priorita || !Array.isArray(data.priorita) || data.priorita.length === 0) {
+      // La struttura è: {"priorita": {"priorità": [array di priorità]}}
+      let priorityArray = null
+
+      if (data?.priorita) {
+        // Controlla se priorita contiene direttamente un array
+        if (Array.isArray(data.priorita)) {
+          priorityArray = data.priorita
+        }
+        // Controlla se priorita contiene un oggetto con il campo "priorità" (con accento)
+        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) {
+          priorityArray = data.priorita.priorità
+        }
+        // Controlla se priorita contiene un oggetto con il campo "priorita" (senza accento)
+        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) {
+          priorityArray = data.priorita.priorita
+        }
+      }
+
+      if (!priorityArray || priorityArray.length === 0) {
         console.error("Configurazione priorità non valida o vuota:", data)
         toast({
           title: "Configurazione incompleta",
@@ -402,8 +420,15 @@ export default function ItemDetailPage() {
         throw new Error("Configurazione priorità non valida o vuota")
       }
 
-      console.log("Opzioni priorità caricate:", data.priorita)
-      setPriorityOptions(data.priorita)
+      // Mappa i dati per assicurarsi che abbiano la struttura corretta
+      const mappedPriorities = priorityArray.map((item: any) => ({
+        value: item.livello || item.value,
+        nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
+        descrizione: item.descrizione || item.description || "",
+      }))
+
+      console.log("Opzioni priorità caricate:", mappedPriorities)
+      setPriorityOptions(mappedPriorities)
     } catch (error: any) {
       console.error("Errore nel caricamento delle priorità:", error)
       setPriorityOptions([]) // Imposta un array vuoto invece di valori di default
