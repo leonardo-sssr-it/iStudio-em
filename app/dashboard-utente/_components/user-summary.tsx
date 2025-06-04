@@ -11,16 +11,20 @@ import { Badge } from "@/components/ui/badge"
 import type { LucideIcon } from "lucide-react"
 
 const SummaryCard = ({ type, label, count, icon: Icon, color, textColor }: SummaryCount) => (
-  <Card className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color}`}>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className={`text-sm font-medium ${textColor}`}>{label}</CardTitle>
-      <Icon className={`h-5 w-5 ${textColor} opacity-80`} />
-    </CardHeader>
-    <CardContent>
-      <div className={`text-3xl font-bold ${textColor}`}>{count}</div>
-      <p className={`text-xs ${textColor} opacity-70 mt-1`}>Elementi totali</p>
-    </CardContent>
-  </Card>
+  <Link href={`/data-explorer?table=${type}`} className="block">
+    <Card
+      className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color} cursor-pointer transform hover:scale-105 transition-transform`}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className={`text-sm font-medium ${textColor}`}>{label}</CardTitle>
+        <Icon className={`h-5 w-5 ${textColor} opacity-80`} />
+      </CardHeader>
+      <CardContent>
+        <div className={`text-3xl font-bold ${textColor}`}>{count}</div>
+        <p className={`text-xs ${textColor} opacity-70 mt-1`}>Elementi totali</p>
+      </CardContent>
+    </Card>
+  </Link>
 )
 
 const UpcomingItemsList = ({
@@ -57,7 +61,7 @@ const UpcomingItemsList = ({
           {items.map((item) => (
             <li key={`${item.tabella_origine}-${item.id_origine}`} className="text-sm border-b pb-1 last:border-b-0">
               <Link
-                href={`/data-explorer?table=${item.tabella_origine}&id=${item.id_origine}`}
+                href={`/data-explorer/${item.tabella_origine}/${item.id_origine}`}
                 className="hover:underline group"
               >
                 <div className="flex justify-between items-center">
