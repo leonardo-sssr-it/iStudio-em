@@ -24,7 +24,7 @@ const AVAILABLE_WIDGETS = [
 
 export default function UserDashboardPage() {
   const { user } = useAuth()
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("agenda")
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("kanban")
   const [key, setKey] = useState(0) // Chiave per forzare il re-render del widget
 
   // Trova il widget selezionato
