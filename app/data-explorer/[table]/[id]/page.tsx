@@ -203,7 +203,7 @@ const TABLE_FIELDS = {
       modifica: "datetime",
       colore: "color",
       gruppo: "group_select",
-      avanzamento: "number",
+      avanzamento: "progress",
       tags: "json",
       allegati: "json",
       notifica: "datetime",
@@ -349,6 +349,102 @@ const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: str
         className="w-full sm:flex-1"
         pattern="^#[0-9A-Fa-f]{6}$"
       />
+    </div>
+  )
+}
+
+// Aggiungi questo nuovo componente dopo il componente ColorPicker e prima del componente principale
+
+// Componente per la barra di avanzamento
+const ProgressBar = ({
+  value,
+  color,
+  onChange,
+  readOnly = false,
+}: {
+  value: number
+  color: string
+  onChange?: (value: number) => void
+  readOnly?: boolean
+}) => {
+  const [localValue, setLocalValue] = useState(value || 0)
+
+  useEffect(() => {
+    setLocalValue(value || 0)
+  }, [value])
+
+  const handleSliderChange = (newValue: number[]) => {
+    const val = newValue[0]
+    setLocalValue(val)
+    if (onChange) {
+      onChange(val)
+    }
+  }
+
+  const progressColor = color || "#3b82f6"
+  const percentage = Math.min(Math.max(localValue, 0), 100)
+  const textInColoredPart = percentage > 50
+
+  if (readOnly) {
+    return (
+      <div className="w-full">
+        <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
+          <div
+            className="h-full transition-all duration-300 ease-in-out"
+            style={{
+              width: `${percentage}%`,
+              backgroundColor: progressColor,
+            }}
+          />
+          <div
+            className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
+              textInColoredPart ? "text-white" : "text-gray-700"
+            }`}
+          >
+            {percentage}%
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full space-y-3">
+      <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
+        <div
+          className="h-full transition-all duration-300 ease-in-out"
+          style={{
+            width: `${percentage}%`,
+            backgroundColor: progressColor,
+          }}
+        />
+        <div
+          className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
+            textInColoredPart ? "text-white" : "text-gray-700"
+          }`}
+        >
+          {percentage}%
+        </div>
+      </div>
+      <div className="px-2">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={localValue}
+          onChange={(e) => handleSliderChange([Number.parseInt(e.target.value)])}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+          style={{
+            background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`,
+          }}
+        />
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>0%</span>
+          <span>50%</span>
+          <span>100%</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1007,6 +1103,23 @@ export default function ItemDetailPage() {
             />
           </div>
         )
+      // Nel metodo renderField, aggiungi questo case per il tipo "progress":
+      case "progress":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <div className="mt-1">
+              <ProgressBar
+                value={value || 0}
+                color={editedItem.colore || "#3b82f6"}
+                onChange={readOnly ? undefined : (val) => handleFieldChange(field, val)}
+                readOnly={readOnly || !isEditMode}
+              />
+            </div>
+          </div>
+        )
       default:
         return (
           <div className="mb-4" key={field}>
@@ -1071,6 +1184,8 @@ export default function ItemDetailPage() {
             <span>{value || "-"}</span>
           </div>
         )
+      case "progress":
+        return <ProgressBar value={value} color={editedItem.colore || "#3b82f6"} readOnly />
       default:
         return formatValue(value)
     }

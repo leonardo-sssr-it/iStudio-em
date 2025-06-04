@@ -49,11 +49,11 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
   .dark {
-    --background: 0 0% 7%;
+    --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 9%;
+    --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 9%;
+    --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
@@ -93,119 +93,42 @@ body {
   }
 }
 
-/* Animazioni */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Stili per il slider personalizzato */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-in-out;
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes slideInRight {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.slider::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #3b82f6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
 }
 
-.animate-slide-in-right {
-  animation: slideInRight 0.5s ease-out;
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Miglioramenti per l'accessibilità */
-.focus-visible:focus-visible {
-  @apply outline-none ring-2 ring-primary ring-offset-2;
-}
-
-/* Miglioramenti per il testo */
-.text-shadow {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dark .text-shadow {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-/* Classi di utilità aggiuntive */
-.vertical-text {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  white-space: nowrap;
-}
-
-/* Miglioramenti per il contrasto in modalità scura */
-.dark .text-muted-foreground {
-  color: hsl(0 0% 70%); /* Aumenta il contrasto del testo muted in modalità scura */
-}
-
-.dark .bg-muted {
-  background-color: hsl(0 0% 12%); /* Aumenta il contrasto dello sfondo muted in modalità scura */
-}
-
-/* Transizioni fluide per i cambi di tema */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
-@layer components {
-  /* Classi personalizzate per pulsanti con contrasto garantito - VERSIONE CORRETTA */
-  .btn-contrast-primary {
-    @apply border-2 font-semibold transition-all duration-200 relative;
-    border-color: hsl(var(--primary)) !important;
-    color: hsl(var(--primary)) !important;
-    background-color: transparent !important;
-  }
-
-  .btn-contrast-primary:hover {
-    background-color: hsl(var(--primary) / 0.1) !important;
-    border-color: hsl(var(--primary)) !important;
-    color: hsl(var(--primary)) !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px hsl(var(--primary) / 0.1);
-  }
-
-  .btn-contrast-secondary {
-    @apply border font-medium transition-all duration-200;
-    border-color: hsl(var(--muted-foreground)) !important;
-    color: hsl(var(--muted-foreground)) !important;
-    background-color: transparent !important;
-  }
-
-  .btn-contrast-secondary:hover {
-    background-color: hsl(var(--muted) / 0.5) !important;
-    border-color: hsl(var(--foreground)) !important;
-    color: hsl(var(--foreground)) !important;
-    transform: translateY(-1px);
-  }
-
-  .btn-contrast-destructive {
-    @apply border font-medium transition-all duration-200;
-    border-color: hsl(var(--destructive)) !important;
-    color: hsl(var(--destructive)) !important;
-    background-color: transparent !important;
-  }
-
-  .btn-contrast-destructive:hover {
-    background-color: hsl(var(--destructive) / 0.1) !important;
-    border-color: hsl(var(--destructive)) !important;
-    color: hsl(var(--destructive)) !important;
-    transform: translateY(-1px);
-  }
-
-  /* Assicura che queste classi si applichino SOLO quando specificate esplicitamente */
-  .btn-contrast-primary *,
-  .btn-contrast-secondary *,
-  .btn-contrast-destructive * {
-    color: inherit !important;
-  }
+.slider::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  border: none;
 }
