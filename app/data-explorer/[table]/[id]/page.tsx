@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
@@ -55,13 +56,21 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       data_creazione: "datetime",
-      stato: "string",
+      stato: "select",
       priorita: "number",
       note: "text",
       tags: "json",
       id_utente: "number",
       modifica: "datetime",
       notifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "pianificato", label: "Pianificato" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "annullato", label: "Annullato" },
+      ],
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
@@ -88,11 +97,19 @@ const TABLE_FIELDS = {
       descrizione: "text",
       data_inizio: "datetime",
       data_fine: "datetime",
-      stato: "string",
+      stato: "select",
       priorita: "number",
       note: "text",
       id_utente: "number",
       modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "da_fare", label: "Da fare" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "sospeso", label: "Sospeso" },
+      ],
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
@@ -109,7 +126,7 @@ const TABLE_FIELDS = {
       titolo: "string",
       descrizione: "text",
       scadenza: "datetime",
-      stato: "string",
+      stato: "select",
       priorita: "number",
       note: "text",
       id_utente: "number",
@@ -118,6 +135,13 @@ const TABLE_FIELDS = {
       notifica: "datetime",
       privato: "boolean",
       tags: "json",
+    },
+    selectOptions: {
+      stato: [
+        { value: "attivo", label: "Attivo" },
+        { value: "completato", label: "Completato" },
+        { value: "scaduto", label: "Scaduto" },
+      ],
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "scadenza"],
@@ -154,13 +178,21 @@ const TABLE_FIELDS = {
       id: "number",
       nome: "string",
       descrizione: "text",
-      stato: "string",
+      stato: "select",
       data_inizio: "datetime",
       data_fine: "datetime",
       budget: "number",
       note: "text",
       id_utente: "number",
       modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "pianificato", label: "Pianificato" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "sospeso", label: "Sospeso" },
+      ],
     },
     groups: {
       "Informazioni principali": [
@@ -214,11 +246,18 @@ const TABLE_FIELDS = {
       titolo: "string",
       slug: "string",
       contenuto: "text",
-      stato: "string",
+      stato: "select",
       meta_title: "string",
       meta_description: "text",
       id_utente: "number",
       modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "bozza", label: "Bozza" },
+        { value: "pubblicato", label: "Pubblicato" },
+        { value: "archiviato", label: "Archiviato" },
+      ],
     },
     groups: {
       "Informazioni principali": ["titolo", "slug", "stato"],
@@ -295,6 +334,7 @@ export default function ItemDetailPage() {
   const readOnlyFields = tableConfig?.readOnlyFields || []
   const fieldTypes = tableConfig?.types || {}
   const fieldGroups = tableConfig?.groups || {}
+  const selectOptions = tableConfig?.selectOptions || {}
 
   // Carica i dati dell'elemento
   const loadItem = useCallback(async () => {
@@ -306,10 +346,25 @@ export default function ItemDetailPage() {
     setLoading(true)
     try {
       if (isNewItem) {
-        // Crea un nuovo elemento vuoto
+        // Crea un nuovo elemento vuoto con data/ora attuale per i campi datetime
+        const now = new Date()
+        const currentDateTime = now.toISOString()
+
         const newItem: any = {
           id_utente: user.id,
         }
+
+        // Aggiungi data/ora attuale per i campi datetime comuni
+        if (fieldTypes.data_inizio === "datetime") {
+          newItem.data_inizio = currentDateTime
+        }
+        if (fieldTypes.data_creazione === "datetime") {
+          newItem.data_creazione = currentDateTime
+        }
+        if (fieldTypes.scadenza === "datetime") {
+          newItem.scadenza = currentDateTime
+        }
+
         setItem(newItem)
         setEditedItem(newItem)
         setLoading(false)
@@ -341,11 +396,11 @@ export default function ItemDetailPage() {
         description: `Impossibile caricare i dati: ${error.message}`,
         variant: "destructive",
       })
-      router.push(`/data-explorer`)
+      router.push(`/data-explorer/${tableName}`)
     } finally {
       setLoading(false)
     }
-  }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable])
+  }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable, fieldTypes])
 
   // Carica i dati all'avvio
   useEffect(() => {
@@ -437,7 +492,7 @@ export default function ItemDetailPage() {
     setEditedItem(item)
     setIsEditMode(false)
     if (isNewItem) {
-      router.push(`/data-explorer`)
+      router.push(`/data-explorer/${tableName}`)
     }
   }
 
@@ -461,8 +516,8 @@ export default function ItemDetailPage() {
         description: "L'elemento è stato eliminato con successo",
       })
 
-      // Torna alla lista
-      router.push(`/data-explorer`)
+      // Torna alla lista della tabella
+      router.push(`/data-explorer/${tableName}`)
     } catch (error: any) {
       console.error(`Errore nell'eliminazione dell'elemento:`, error)
       toast({
@@ -540,6 +595,25 @@ export default function ItemDetailPage() {
               onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value))}
               className="mt-1"
             />
+          </div>
+        )
+      case "select":
+        const options = selectOptions[field] || []
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((option: any) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )
       case "json":
@@ -780,7 +854,7 @@ export default function ItemDetailPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <Button variant="ghost" onClick={() => router.push("/data-explorer")} className="mb-2">
+              <Button variant="ghost" onClick={() => router.push(`/data-explorer/${tableName}`)} className="mb-2">
                 <ArrowLeft size={16} className="mr-2" /> Torna alla lista
               </Button>
               <CardTitle className="text-2xl">{getItemTitle()}</CardTitle>

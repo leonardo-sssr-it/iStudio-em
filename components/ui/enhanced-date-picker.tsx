@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { format, parseISO, formatISO } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { it } from "date-fns/locale"
 import { CalendarIcon, Clock, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -156,7 +156,17 @@ export function EnhancedDatePicker({
       finalDate.setMilliseconds(0)
 
       setSelectedDate(finalDate) // Aggiorna lo stato visualizzato
-      onChange(formatISO(finalDate)) // Usa formatISO che gestisce la conversione a stringa UTC standard
+
+      // Formatta la data senza conversione timezone
+      const year = finalDate.getFullYear()
+      const month = String(finalDate.getMonth() + 1).padStart(2, "0")
+      const day = String(finalDate.getDate()).padStart(2, "0")
+      const hour = String(finalDate.getHours()).padStart(2, "0")
+      const minute = String(finalDate.getMinutes()).padStart(2, "0")
+      const second = String(finalDate.getSeconds()).padStart(2, "0")
+
+      const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+      onChange(localISOString)
     } else if (!tempDate && !tempTime) {
       // Se entrambi sono vuoti, è una cancellazione
       setSelectedDate(undefined)
