@@ -185,13 +185,13 @@ const TABLE_FIELDS = {
     },
   },
   progetti: {
-    listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
+    listFields: ["id", "titolo", "stato", "data_inizio", "data_fine", "budget"],
     readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
-    requiredFields: ["nome"],
+    requiredFields: ["id", "titolo", "stato"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
-      nome: "string",
+      titolo: "string",
       descrizione: "text",
       stato: "select",
       priorita: "priority_select",
@@ -219,7 +219,7 @@ const TABLE_FIELDS = {
     },
     groups: {
       "Informazioni principali": [
-        "nome",
+        "titolo",
         "descrizione",
         "stato",
         "colore",
