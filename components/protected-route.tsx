@@ -156,7 +156,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
         if (!user && !redirectingRef.current) {
           console.log("ProtectedRoute: Timeout - utente non trovato, reindirizzamento al login")
           redirectingRef.current = true
-          router.push("/login")
+          router.push("/")
         }
       }
     }, 10000) // 10 secondi di timeout
@@ -182,7 +182,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
           if (!isValid && !redirectingRef.current) {
             console.log("Sessione non valida, reindirizzamento al login...")
             redirectingRef.current = true
-            router.push("/login")
+            router.push("/")
           }
         } catch (error) {
           console.error("Errore nella verifica della sessione:", error)
