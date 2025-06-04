@@ -26,7 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Trash2, Edit, X } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Edit, X, AlertCircle } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
@@ -47,6 +47,7 @@ const TABLE_FIELDS = {
   appuntamenti: {
     listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
     readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
+    requiredFields: ["titolo"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -90,6 +91,7 @@ const TABLE_FIELDS = {
   attivita: {
     listFields: ["id", "titolo", "data_inizio", "stato", "priorita", "attivo"],
     readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    requiredFields: ["titolo"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -120,6 +122,7 @@ const TABLE_FIELDS = {
   scadenze: {
     listFields: ["id", "titolo", "scadenza", "stato", "priorita", "privato"],
     readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["titolo"],
     defaultSort: "data_scadenza",
     types: {
       id: "number",
@@ -152,6 +155,7 @@ const TABLE_FIELDS = {
   todolist: {
     listFields: ["id", "titolo", "completato", "priorita", "scadenza"],
     readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["titolo", "descrizione"], // Descrizione è obbligatoria per todolist
     defaultSort: "priorita",
     types: {
       id: "number",
@@ -173,6 +177,7 @@ const TABLE_FIELDS = {
   progetti: {
     listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
     readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+    requiredFields: ["nome"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -214,6 +219,7 @@ const TABLE_FIELDS = {
   clienti: {
     listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
     readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["nome", "cognome"],
     defaultSort: "cognome",
     types: {
       id: "number",
@@ -241,6 +247,7 @@ const TABLE_FIELDS = {
   pagine: {
     listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
     readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["titolo"],
     defaultSort: "data_creazione",
     types: {
       id: "number",
@@ -337,6 +344,7 @@ export default function ItemDetailPage() {
   const [item, setItem] = useState<any>(null)
   const [editedItem, setEditedItem] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<string>("main")
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   // Estrai e valida i parametri
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -355,9 +363,35 @@ export default function ItemDetailPage() {
   // Ottieni la configurazione della tabella
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
   const readOnlyFields = tableConfig?.readOnlyFields || []
+  const requiredFields = tableConfig?.requiredFields || []
   const fieldTypes = tableConfig?.types || {}
   const fieldGroups = tableConfig?.groups || {}
   const selectOptions = tableConfig?.selectOptions || {}
+
+  // Funzione di validazione
+  const validateForm = (): string[] => {
+    const errors: string[] = []
+
+    if (!editedItem) return errors
+
+    // Controlla i campi obbligatori
+    requiredFields.forEach((field) => {
+      const value = editedItem[field]
+      if (!value || (typeof value === "string" && value.trim() === "")) {
+        const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+        errors.push(`Il campo "${label}" è obbligatorio`)
+      }
+    })
+
+    // Validazioni specifiche per todolist
+    if (tableName === "todolist") {
+      if (editedItem.descrizione && editedItem.descrizione.trim().length < 3) {
+        errors.push("La descrizione deve contenere almeno 3 caratteri")
+      }
+    }
+
+    return errors
+  }
 
   // Carica i dati dell'elemento
   const loadItem = useCallback(async () => {
@@ -369,9 +403,16 @@ export default function ItemDetailPage() {
     setLoading(true)
     try {
       if (isNewItem) {
-        // Crea un nuovo elemento vuoto
+        // Crea un nuovo elemento vuoto con valori di default
         const newItem: any = {
           id_utente: user.id,
+        }
+
+        // Imposta valori di default per campi obbligatori
+        if (tableName === "todolist") {
+          newItem.descrizione = "" // Inizializza come stringa vuota
+          newItem.completato = false
+          newItem.priorita = 1
         }
 
         setItem(newItem)
@@ -435,16 +476,43 @@ export default function ItemDetailPage() {
 
       return updated
     })
+
+    // Rimuovi errori di validazione quando l'utente modifica un campo
+    setValidationErrors([])
   }
 
   // Salva le modifiche
   const handleSave = async () => {
     if (!supabase || !tableName || !user?.id || !editedItem || !isValidTable) return
 
+    // Valida il form prima del salvataggio
+    const errors = validateForm()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      toast({
+        title: "Errori di validazione",
+        description: "Correggi gli errori evidenziati prima di salvare",
+        variant: "destructive",
+      })
+      return
+    }
+
     setSaving(true)
     try {
       // Prepara i dati da salvare
       const updateData = { ...editedItem }
+
+      // Pulisci e valida i dati
+      Object.keys(updateData).forEach((key) => {
+        // Rimuovi campi undefined o null non necessari
+        if (updateData[key] === undefined) {
+          delete updateData[key]
+        }
+        // Assicurati che le stringhe vuote siano gestite correttamente
+        if (typeof updateData[key] === "string" && updateData[key].trim() === "" && !requiredFields.includes(key)) {
+          updateData[key] = null
+        }
+      })
 
       // Aggiorna il campo modifica
       updateData.modifica = new Date().toISOString()
@@ -467,7 +535,17 @@ export default function ItemDetailPage() {
 
       if (result.error) {
         console.error("Errore salvataggio:", result.error)
-        throw result.error
+
+        // Gestisci errori specifici del database
+        let errorMessage = result.error.message
+        if (result.error.message.includes("check constraint")) {
+          if (result.error.message.includes("descrizione_check")) {
+            errorMessage =
+              "La descrizione non rispetta i requisiti del database. Assicurati che sia compilata correttamente."
+          }
+        }
+
+        throw new Error(errorMessage)
       }
 
       toast({
@@ -479,6 +557,7 @@ export default function ItemDetailPage() {
       setItem(result.data[0])
       setEditedItem(result.data[0])
       setIsEditMode(false)
+      setValidationErrors([])
 
       // Reindirizza alla pagina di dettaglio per i nuovi elementi
       if (isNewItem) {
@@ -500,6 +579,7 @@ export default function ItemDetailPage() {
   const handleCancelEdit = () => {
     setEditedItem(item)
     setIsEditMode(false)
+    setValidationErrors([])
     if (isNewItem) {
       router.push(`/data-explorer?table=${tableName}`)
     }
@@ -543,6 +623,8 @@ export default function ItemDetailPage() {
   const renderField = (field: string, value: any, type: string, readOnly = false) => {
     // Ottieni il label del campo
     const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+    const isRequired = requiredFields.includes(field)
+    const hasError = validationErrors.some((error) => error.includes(label))
 
     // Se è in modalità visualizzazione, mostra solo il valore
     if (!isEditMode || readOnly) {
@@ -559,13 +641,16 @@ export default function ItemDetailPage() {
       case "text":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Textarea
               id={field}
               value={value || ""}
               onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
               rows={4}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
         )
@@ -583,27 +668,32 @@ export default function ItemDetailPage() {
       case "datetime":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <EnhancedDatePicker
               id={field}
               value={value || ""}
               onChange={(newValue) => handleFieldChange(field, newValue)}
               placeholder={`Seleziona ${label.toLowerCase()}`}
-              className="mt-1"
-              showCurrentTime={!value} // Mostra l'ora corrente solo se il campo non è valorizzato
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              showCurrentTime={!value}
             />
           </div>
         )
       case "number":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Input
               id={field}
               type="number"
               value={value || ""}
               onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value))}
-              className="mt-1"
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
         )
@@ -611,9 +701,11 @@ export default function ItemDetailPage() {
         const options = selectOptions[field] || []
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
-              <SelectTrigger className="mt-1">
+              <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
                 <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
               </SelectTrigger>
               <SelectContent>
@@ -673,13 +765,16 @@ export default function ItemDetailPage() {
       default:
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Input
               id={field}
               type="text"
               value={value || ""}
               onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
         )
@@ -755,76 +850,97 @@ export default function ItemDetailPage() {
     const tabs = Object.keys(fieldGroups)
 
     return (
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4">
-          {tabs.map((group) => (
-            <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
-              {group}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div>
+        {/* Mostra errori di validazione */}
+        {validationErrors.length > 0 && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-center mb-2">
+              <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
+              <h4 className="text-sm font-medium text-red-800">Errori di validazione:</h4>
+            </div>
+            <ul className="text-sm text-red-700 list-disc list-inside">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-        {tabs.map((group) => {
-          const groupFields = fieldGroups[group as keyof typeof fieldGroups] || []
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            {tabs.map((group) => (
+              <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
+                {group}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-          return (
-            <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
-              <div className="space-y-4">
-                {groupFields.map((field) => {
-                  if (!allFields.includes(field)) return null
-                  const isReadOnly = readOnlyFields.includes(field)
+          {tabs.map((group) => {
+            const groupFields = fieldGroups[group as keyof typeof fieldGroups] || []
 
-                  // Gestione speciale per data_inizio e data_fine sulla stessa riga
-                  if (field === "data_inizio" && groupFields.includes("data_fine") && allFields.includes("data_fine")) {
-                    return (
-                      <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="data_inizio">Data inizio</Label>
-                          <EnhancedDatePicker
-                            id="data_inizio"
-                            value={editedItem.data_inizio || ""}
-                            onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
-                            placeholder="Seleziona data inizio"
-                            className="mt-1"
-                            showCurrentTime={!editedItem.data_inizio}
-                          />
+            return (
+              <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
+                <div className="space-y-4">
+                  {groupFields.map((field) => {
+                    if (!allFields.includes(field)) return null
+                    const isReadOnly = readOnlyFields.includes(field)
+
+                    // Gestione speciale per data_inizio e data_fine sulla stessa riga
+                    if (
+                      field === "data_inizio" &&
+                      groupFields.includes("data_fine") &&
+                      allFields.includes("data_fine")
+                    ) {
+                      return (
+                        <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="data_inizio">Data inizio</Label>
+                            <EnhancedDatePicker
+                              id="data_inizio"
+                              value={editedItem.data_inizio || ""}
+                              onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
+                              placeholder="Seleziona data inizio"
+                              className="mt-1"
+                              showCurrentTime={!editedItem.data_inizio}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="data_fine">Data fine</Label>
+                            <EnhancedDatePicker
+                              id="data_fine"
+                              value={editedItem.data_fine || ""}
+                              onChange={(newValue) => handleFieldChange("data_fine", newValue)}
+                              placeholder="Seleziona data fine"
+                              className="mt-1"
+                              showCurrentTime={!editedItem.data_fine}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor="data_fine">Data fine</Label>
-                          <EnhancedDatePicker
-                            id="data_fine"
-                            value={editedItem.data_fine || ""}
-                            onChange={(newValue) => handleFieldChange("data_fine", newValue)}
-                            placeholder="Seleziona data fine"
-                            className="mt-1"
-                            showCurrentTime={!editedItem.data_fine}
-                          />
-                        </div>
-                      </div>
+                      )
+                    }
+
+                    // Salta data_fine se è già stata renderizzata con data_inizio
+                    if (
+                      field === "data_fine" &&
+                      groupFields.includes("data_inizio") &&
+                      allFields.includes("data_inizio")
+                    ) {
+                      return null
+                    }
+
+                    return renderField(
+                      field,
+                      editedItem[field],
+                      fieldTypes[field as keyof typeof fieldTypes] || "string",
+                      isReadOnly,
                     )
-                  }
-
-                  // Salta data_fine se è già stata renderizzata con data_inizio
-                  if (
-                    field === "data_fine" &&
-                    groupFields.includes("data_inizio") &&
-                    allFields.includes("data_inizio")
-                  ) {
-                    return null
-                  }
-
-                  return renderField(
-                    field,
-                    editedItem[field],
-                    fieldTypes[field as keyof typeof fieldTypes] || "string",
-                    isReadOnly,
-                  )
-                })}
-              </div>
-            </TabsContent>
-          )
-        })}
-      </Tabs>
+                  })}
+                </div>
+              </TabsContent>
+            )
+          })}
+        </Tabs>
+      </div>
     )
   }
 
