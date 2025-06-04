@@ -94,6 +94,12 @@ export function EnhancedDatePicker({
     const input = e.currentTarget
     const [hours, minutes] = tempTime.split(":").map(Number)
 
+    if (e.key === "Enter") {
+      e.preventDefault()
+      confirmSelection()
+      return
+    }
+
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault()
 
@@ -150,15 +156,12 @@ export function EnhancedDatePicker({
       finalDate.setMilliseconds(0)
 
       setSelectedDate(finalDate) // Aggiorna lo stato visualizzato
-      // onChange(finalDate.toISOString()); // CORREZIONE TIMEZONE: Salva come UTC
       onChange(formatISO(finalDate)) // Usa formatISO che gestisce la conversione a stringa UTC standard
     } else if (!tempDate && !tempTime) {
       // Se entrambi sono vuoti, è una cancellazione
       setSelectedDate(undefined)
       onChange("")
     }
-    // Se tempDate è presente ma tempTime no (o viceversa), non fare nulla o mostra errore?
-    // Per ora, richiede entrambi o nessuno per una modifica/cancellazione.
     setOpen(false)
   }
 
@@ -175,20 +178,24 @@ export function EnhancedDatePicker({
     setOpen(false)
   }
 
+  // Gestione della pressione di Enter sul trigger
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      setOpen(!open)
+    }
+  }
+
   return (
     <div className={cn("flex flex-col sm:flex-row gap-2", className)}>
-      {" "}
-      {/* Rimosso sm:w-auto per consentire larghezza piena se necessario */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
             variant="outline"
-            className={cn(
-              "w-full justify-start text-left font-normal", // Rimosso sm:flex-1
-              !selectedDate && "text-muted-foreground",
-            )}
+            className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
             disabled={disabled}
+            onKeyDown={handleTriggerKeyDown}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {selectedDate ? (
@@ -212,13 +219,9 @@ export function EnhancedDatePicker({
             locale={it}
           />
           <div className="p-3 border-t space-y-3">
-            {" "}
-            {/* Aggiunto space-y-3 per spaziatura */}
             {/* Selezione ora */}
             <div className="flex items-center gap-2">
               <Label htmlFor={`${id}-time-popover`} className="text-sm font-medium">
-                {" "}
-                {/* Aggiunto -popover per ID univoco */}
                 Ora:
               </Label>
               <Input
@@ -227,9 +230,9 @@ export function EnhancedDatePicker({
                 step="300" // step 5 minuti
                 value={tempTime}
                 onChange={(e) => handleTimeChange(e.target.value)}
-                onKeyDown={handleTimeInputKeyDown} // Assicurati che questa funzione usi tempTime
-                className="w-32" // Rimosso w-full
-                disabled={disabled || !tempDate} // Disabilita se non c'è una data temporanea
+                onKeyDown={handleTimeInputKeyDown}
+                className="w-32"
+                disabled={disabled || !tempDate}
                 placeholder="HH:MM"
               />
             </div>
@@ -245,8 +248,6 @@ export function EnhancedDatePicker({
             </div>
             {/* Pulsanti di conferma */}
             <div className="flex gap-2 pt-2 border-t">
-              {" "}
-              {/* Aggiunto pt-2 e border-t */}
               <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1">
                 Annulla
               </Button>
@@ -258,7 +259,6 @@ export function EnhancedDatePicker({
           </div>
         </PopoverContent>
       </Popover>
-      {/* L'input dell'ora esterno non è più necessario qui, è dentro il popover */}
     </div>
   )
 }

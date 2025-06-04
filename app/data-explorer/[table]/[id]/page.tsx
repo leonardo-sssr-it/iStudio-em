@@ -25,8 +25,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Trash2, Edit, Calendar, X } from "lucide-react"
+import { ArrowLeft, Save, Trash2, Edit, X } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
+import { TagInput } from "@/components/ui/tag-input"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -64,7 +66,16 @@ const TABLE_FIELDS = {
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
       "Note e dettagli": ["note", "luogo", "tags", "notifica"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
+      "Informazioni di sistema": [
+        "id",
+        "id_utente",
+        "modifica",
+        "attivo",
+        "id_pro",
+        "id_att",
+        "id_cli",
+        "data_creazione",
+      ],
     },
   },
   attivita: {
@@ -110,7 +121,7 @@ const TABLE_FIELDS = {
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "scadenza"],
-      "Dettagli": ["note", "tags", "notifica", "privato", "id_pro"],
+      Dettagli: ["note", "tags", "notifica", "privato", "id_pro"],
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
@@ -345,10 +356,21 @@ export default function ItemDetailPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
-    setEditedItem((prev: any) => ({
-      ...prev,
-      [field]: value,
-    }))
+    setEditedItem((prev: any) => {
+      const updated = {
+        ...prev,
+        [field]: value,
+      }
+
+      // Se stiamo modificando data_inizio, aggiorna automaticamente data_fine (+1 ora)
+      if (field === "data_inizio" && value && !prev.data_fine) {
+        const startDate = new Date(value)
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // +1 ora
+        updated.data_fine = endDate.toISOString()
+      }
+
+      return updated
+    })
   }
 
   // Salva le modifiche
@@ -498,24 +520,13 @@ export default function ItemDetailPage() {
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field}>{label}</Label>
-            <div className="flex items-center mt-1">
-              <Input
-                id={field}
-                type="datetime-local"
-                value={formatDateForInput(value)}
-                onChange={(e) => handleFieldChange(field, e.target.value)}
-                className="flex-grow"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                onClick={() => handleFieldChange(field, new Date().toISOString())}
-                className="ml-2"
-              >
-                <Calendar size={16} />
-              </Button>
-            </div>
+            <EnhancedDatePicker
+              id={field}
+              value={value || ""}
+              onChange={(newValue) => handleFieldChange(field, newValue)}
+              placeholder={`Seleziona ${label.toLowerCase()}`}
+              className="mt-1"
+            />
           </div>
         )
       case "number":
@@ -528,6 +539,41 @@ export default function ItemDetailPage() {
               value={value || ""}
               onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value))}
               className="mt-1"
+            />
+          </div>
+        )
+      case "json":
+        if (field === "tags") {
+          return (
+            <div className="mb-4" key={field}>
+              <Label htmlFor={field}>{label}</Label>
+              <TagInput
+                id={field}
+                value={Array.isArray(value) ? value : []}
+                onChange={(tags) => handleFieldChange(field, tags)}
+                placeholder="Aggiungi tag..."
+                className="mt-1"
+              />
+            </div>
+          )
+        }
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <Textarea
+              id={field}
+              value={typeof value === "object" ? JSON.stringify(value, null, 2) : value || ""}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value)
+                  handleFieldChange(field, parsed)
+                } catch {
+                  handleFieldChange(field, e.target.value)
+                }
+              }}
+              className="mt-1 font-mono text-sm"
+              rows={4}
+              placeholder="JSON valido..."
             />
           </div>
         )
@@ -560,6 +606,19 @@ export default function ItemDetailPage() {
         return typeof value === "number" ? value.toLocaleString("it-IT") : value
       case "text":
         return <div className="whitespace-pre-wrap">{value}</div>
+      case "json":
+        if (Array.isArray(value)) {
+          return (
+            <div className="flex flex-wrap gap-1">
+              {value.map((item, index) => (
+                <Badge key={index} variant="secondary">
+                  {String(item)}
+                </Badge>
+              ))}
+            </div>
+          )
+        }
+        return <pre className="text-sm">{JSON.stringify(value, null, 2)}</pre>
       default:
         return formatValue(value)
     }
@@ -614,6 +673,44 @@ export default function ItemDetailPage() {
                 {groupFields.map((field) => {
                   if (!allFields.includes(field)) return null
                   const isReadOnly = readOnlyFields.includes(field)
+
+                  // Gestione speciale per data_inizio e data_fine sulla stessa riga
+                  if (field === "data_inizio" && groupFields.includes("data_fine") && allFields.includes("data_fine")) {
+                    return (
+                      <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="data_inizio">Data inizio</Label>
+                          <EnhancedDatePicker
+                            id="data_inizio"
+                            value={editedItem.data_inizio || ""}
+                            onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
+                            placeholder="Seleziona data inizio"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="data_fine">Data fine</Label>
+                          <EnhancedDatePicker
+                            id="data_fine"
+                            value={editedItem.data_fine || ""}
+                            onChange={(newValue) => handleFieldChange("data_fine", newValue)}
+                            placeholder="Seleziona data fine"
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  // Salta data_fine se è già stata renderizzata con data_inizio
+                  if (
+                    field === "data_fine" &&
+                    groupFields.includes("data_inizio") &&
+                    allFields.includes("data_inizio")
+                  ) {
+                    return null
+                  }
+
                   return renderField(
                     field,
                     editedItem[field],
@@ -699,7 +796,11 @@ export default function ItemDetailPage() {
             <div className="flex space-x-2">
               {isEditMode && (
                 <>
-                  <Button onClick={handleSave} disabled={saving} className="min-w-[150px]">
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white"
+                  >
                     {saving ? "Salvataggio..." : "Salva modifiche"}
                     {!saving && <Save size={16} className="ml-2" />}
                   </Button>
@@ -729,7 +830,11 @@ export default function ItemDetailPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
                         {deleting ? "Eliminazione..." : "Elimina"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
