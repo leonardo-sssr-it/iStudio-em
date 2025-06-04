@@ -378,38 +378,36 @@ export default function ItemDetailPage() {
 
       if (error) {
         console.error("Errore nel caricamento delle priorità:", error)
-        // Fallback con opzioni di default
-        setPriorityOptions([
-          { value: 1, nome: "Bassa" },
-          { value: 2, nome: "Media" },
-          { value: 3, nome: "Alta" },
-          { value: 4, nome: "Urgente" },
-        ])
-        return
+        toast({
+          title: "Errore di configurazione",
+          description: "Impossibile caricare le priorità dalla configurazione. Verificare la tabella 'configurazione'.",
+          variant: "destructive",
+        })
+        throw new Error(`Errore nel caricamento delle priorità: ${error.message}`)
       }
 
-      if (data?.priorita && Array.isArray(data.priorita)) {
-        setPriorityOptions(data.priorita)
-      } else {
-        // Fallback con opzioni di default
-        setPriorityOptions([
-          { value: 1, nome: "Bassa" },
-          { value: 2, nome: "Media" },
-          { value: 3, nome: "Alta" },
-          { value: 4, nome: "Urgente" },
-        ])
+      if (!data?.priorita || !Array.isArray(data.priorita) || data.priorita.length === 0) {
+        console.error("Configurazione priorità non valida o vuota")
+        toast({
+          title: "Configurazione incompleta",
+          description:
+            "La configurazione delle priorità non è valida o è vuota. Verificare il campo 'priorita' nella tabella 'configurazione'.",
+          variant: "destructive",
+        })
+        throw new Error("Configurazione priorità non valida o vuota")
       }
-    } catch (error) {
+
+      setPriorityOptions(data.priorita)
+    } catch (error: any) {
       console.error("Errore nel caricamento delle priorità:", error)
-      // Fallback con opzioni di default
-      setPriorityOptions([
-        { value: 1, nome: "Bassa" },
-        { value: 2, nome: "Media" },
-        { value: 3, nome: "Alta" },
-        { value: 4, nome: "Urgente" },
-      ])
+      setPriorityOptions([]) // Imposta un array vuoto invece di valori di default
+      toast({
+        title: "Errore",
+        description: `Impossibile caricare le priorità: ${error.message}`,
+        variant: "destructive",
+      })
     }
-  }, [supabase])
+  }, [supabase, toast])
 
   // Carica le opzioni di priorità all'avvio
   useEffect(() => {
@@ -753,18 +751,24 @@ export default function ItemDetailPage() {
             <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
               {label} {isRequired && <span className="text-red-500">*</span>}
             </Label>
-            <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, Number(val))}>
-              <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
-                <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {priorityOptions.map((option) => (
-                  <SelectItem key={option.value} value={String(option.value)}>
-                    {option.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {priorityOptions.length > 0 ? (
+              <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, Number(val))}>
+                <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
+                  <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
+                Impossibile caricare le opzioni di priorità. Verificare la configurazione.
+              </div>
+            )}
           </div>
         )
       case "select":
@@ -863,6 +867,9 @@ export default function ItemDetailPage() {
       case "number":
         return typeof value === "number" ? value.toLocaleString("it-IT") : value
       case "priority_select":
+        if (priorityOptions.length === 0) {
+          return <span className="text-red-500">Errore configurazione</span>
+        }
         const priorityOption = priorityOptions.find((option) => option.value === value)
         return priorityOption ? priorityOption.nome : value
       case "text":
