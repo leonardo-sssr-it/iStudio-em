@@ -360,12 +360,6 @@ export const AuthWidget = memo(function AuthWidget() {
                 </>
               )}
             </Button>
-
-            <div className="text-center text-sm text-muted-foreground">
-              <Link href="/login" className="hover:text-primary transition-colors">
-                Problemi di accesso?
-              </Link>
-            </div>
           </CardContent>
         </form>
       </Card>
