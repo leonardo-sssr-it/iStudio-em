@@ -298,6 +298,28 @@ function formatDateForInput(date: string | null | undefined): string {
   }
 }
 
+// Componente per il color picker
+const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+      <Input
+        type="color"
+        value={value || "#000000"}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full sm:w-20 h-10 p-1 cursor-pointer"
+      />
+      <Input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#000000"
+        className="w-full sm:flex-1"
+        pattern="^#[0-9A-Fa-f]{6}$"
+      />
+    </div>
+  )
+}
+
 // Componente principale
 export default function ItemDetailPage() {
   const { supabase } = useSupabase()
@@ -346,7 +368,7 @@ export default function ItemDetailPage() {
     setLoading(true)
     try {
       if (isNewItem) {
-        // Crea un nuovo elemento vuoto con data/ora attuale per i campi datetime
+        // Crea un nuovo elemento vuoto
         const now = new Date()
         const currentDateTime = now.toISOString()
 
@@ -354,16 +376,8 @@ export default function ItemDetailPage() {
           id_utente: user.id,
         }
 
-        // Aggiungi data/ora attuale per i campi datetime comuni
-        if (fieldTypes.data_inizio === "datetime") {
-          newItem.data_inizio = currentDateTime
-        }
-        if (fieldTypes.data_creazione === "datetime") {
-          newItem.data_creazione = currentDateTime
-        }
-        if (fieldTypes.scadenza === "datetime") {
-          newItem.scadenza = currentDateTime
-        }
+        // NON aggiungere automaticamente data/ora attuale per i campi datetime
+        // Verranno aggiunti solo quando l'utente interagisce con il form
 
         setItem(newItem)
         setEditedItem(newItem)
@@ -651,6 +665,13 @@ export default function ItemDetailPage() {
             />
           </div>
         )
+      case "color":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field}>{label}</Label>
+            <ColorPicker value={value || "#000000"} onChange={(val) => handleFieldChange(field, val)} />
+          </div>
+        )
       default:
         return (
           <div className="mb-4" key={field}>
@@ -693,6 +714,13 @@ export default function ItemDetailPage() {
           )
         }
         return <pre className="text-sm">{JSON.stringify(value, null, 2)}</pre>
+      case "color":
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: value || "#ffffff" }} />
+            <span>{value || "-"}</span>
+          </div>
+        )
       default:
         return formatValue(value)
     }
