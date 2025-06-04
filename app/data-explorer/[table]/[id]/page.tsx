@@ -187,7 +187,7 @@ const TABLE_FIELDS = {
   progetti: {
     listFields: ["id", "titolo", "stato", "data_inizio", "data_fine", "budget"],
     readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
-    requiredFields: ["id", "titolo", "stato"],
+    requiredFields: ["titolo", "stato"],
     defaultSort: "data_inizio",
     types: {
       id: "number",
@@ -301,6 +301,44 @@ const TABLE_FIELDS = {
   },
 }
 
+// Funzione per pulire i dati prima del salvataggio
+function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
+  const cleaned = { ...data }
+
+  // Rimuovi campi di sola lettura per i nuovi elementi
+  readOnlyFields.forEach((field) => {
+    if (field !== "id_utente") {
+      // Mantieni id_utente
+      delete cleaned[field]
+    }
+  })
+
+  // Pulisci tutti i campi
+  Object.keys(cleaned).forEach((key) => {
+    const value = cleaned[key]
+
+    // Rimuovi valori undefined
+    if (value === undefined) {
+      delete cleaned[key]
+      return
+    }
+
+    // Gestisci stringhe vuote
+    if (typeof value === "string") {
+      if (value.trim() === "") {
+        cleaned[key] = null
+      }
+    }
+
+    // Gestisci numeri NaN
+    if (typeof value === "number" && isNaN(value)) {
+      delete cleaned[key]
+    }
+  })
+
+  return cleaned
+}
+
 // Funzione per formattare le date in italiano
 function formatDateIT(date: string | null | undefined): string {
   if (!date) return ""
@@ -314,18 +352,6 @@ function formatDateIT(date: string | null | undefined): string {
       hour: "2-digit",
       minute: "2-digit",
     })
-  } catch (e) {
-    return ""
-  }
-}
-
-// Funzione per formattare le date per input datetime-local
-function formatDateForInput(date: string | null | undefined): string {
-  if (!date) return ""
-  try {
-    const d = new Date(date)
-    if (isNaN(d.getTime())) return ""
-    return d.toISOString().slice(0, 16) // formato YYYY-MM-DDThh:mm
   } catch (e) {
     return ""
   }
@@ -352,8 +378,6 @@ const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: str
     </div>
   )
 }
-
-// Aggiungi questo nuovo componente dopo il componente ColorPicker e prima del componente principale
 
 // Componente per la barra di avanzamento
 const ProgressBar = ({
@@ -474,7 +498,7 @@ export default function ItemDetailPage() {
   const itemId = Array.isArray(params.id) ? params.id[0] : params.id
 
   // Debug logging
-  console.log("Parametri URL:", { tableName, itemId, params })
+  console.log("Parametri URL:", { tableName, itemId, params, isNewItem })
 
   // Verifica che la tabella sia valida
   const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
@@ -498,51 +522,34 @@ export default function ItemDetailPage() {
     try {
       console.log("Caricamento opzioni priorità dal database...")
 
-      // Query per caricare il campo "priorita" (senza accento) dalla tabella configurazione
       const { data, error } = await supabase.from("configurazione").select("priorita").single()
 
       if (error) {
         console.error("Errore nel caricamento delle priorità:", error)
-        toast({
-          title: "Errore di configurazione",
-          description: `Impossibile caricare le priorità dalla configurazione. Errore: ${error.message}`,
-          variant: "destructive",
-        })
-        throw new Error(`Errore nel caricamento delle priorità: ${error.message}`)
+        setPriorityOptions([])
+        return
       }
 
       console.log("Dati configurazione priorità caricati:", data)
 
-      // La struttura è: {"priorita": {"priorità": [array di priorità]}}
       let priorityArray = null
 
       if (data?.priorita) {
-        // Controlla se priorita contiene direttamente un array
         if (Array.isArray(data.priorita)) {
           priorityArray = data.priorita
-        }
-        // Controlla se priorita contiene un oggetto con il campo "priorità" (con accento)
-        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) {
+        } else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) {
           priorityArray = data.priorita.priorità
-        }
-        // Controlla se priorita contiene un oggetto con il campo "priorita" (senza accento)
-        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) {
+        } else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) {
           priorityArray = data.priorita.priorita
         }
       }
 
       if (!priorityArray || priorityArray.length === 0) {
         console.error("Configurazione priorità non valida o vuota:", data)
-        toast({
-          title: "Configurazione incompleta",
-          description:
-            "La configurazione delle priorità non è valida o è vuota. Verificare il campo 'priorita' nella tabella 'configurazione'.",
-          variant: "destructive",
-        })
-        throw new Error("Configurazione priorità non valida o vuota")
+        setPriorityOptions([])
+        return
       }
 
-      // Mappa i dati per assicurarsi che abbiano la struttura corretta
       const mappedPriorities = priorityArray.map((item: any) => ({
         value: item.livello || item.value,
         nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
@@ -553,12 +560,7 @@ export default function ItemDetailPage() {
       setPriorityOptions(mappedPriorities)
     } catch (error: any) {
       console.error("Errore nel caricamento delle priorità:", error)
-      setPriorityOptions([]) // Imposta un array vuoto invece di valori di default
-      toast({
-        title: "Errore",
-        description: `Impossibile caricare le priorità: ${error.message}`,
-        variant: "destructive",
-      })
+      setPriorityOptions([])
     }
   }, [supabase])
 
@@ -569,47 +571,32 @@ export default function ItemDetailPage() {
     try {
       console.log("Caricamento opzioni gruppi dal database...")
 
-      // Query per caricare il campo "gruppi" dalla tabella configurazione
       const { data, error } = await supabase.from("configurazione").select("gruppi").single()
 
       if (error) {
         console.error("Errore nel caricamento dei gruppi:", error)
-        toast({
-          title: "Errore di configurazione",
-          description: `Impossibile caricare i gruppi dalla configurazione. Errore: ${error.message}`,
-          variant: "destructive",
-        })
-        throw new Error(`Errore nel caricamento dei gruppi: ${error.message}`)
+        setGroupOptions([])
+        return
       }
 
       console.log("Dati configurazione gruppi caricati:", data)
 
-      // La struttura è: {"gruppi": {"gruppi": [array di gruppi]}}
       let groupArray = null
 
       if (data?.gruppi) {
-        // Controlla se gruppi contiene direttamente un array
         if (Array.isArray(data.gruppi)) {
           groupArray = data.gruppi
-        }
-        // Controlla se gruppi contiene un oggetto con il campo "gruppi"
-        else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) {
+        } else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) {
           groupArray = data.gruppi.gruppi
         }
       }
 
       if (!groupArray || groupArray.length === 0) {
         console.error("Configurazione gruppi non valida o vuota:", data)
-        toast({
-          title: "Configurazione incompleta",
-          description:
-            "La configurazione dei gruppi non è valida o è vuota. Verificare il campo 'gruppi' nella tabella 'configurazione'.",
-          variant: "destructive",
-        })
-        throw new Error("Configurazione gruppi non valida o vuota")
+        setGroupOptions([])
+        return
       }
 
-      // Mappa i dati per assicurarsi che abbiano la struttura corretta
       const mappedGroups = groupArray.map((item: any) => ({
         value: item.id || item.value,
         nome: item.gruppo || item.nome || item.label || `Gruppo ${item.id || item.value}`,
@@ -620,12 +607,7 @@ export default function ItemDetailPage() {
       setGroupOptions(mappedGroups)
     } catch (error: any) {
       console.error("Errore nel caricamento dei gruppi:", error)
-      setGroupOptions([]) // Imposta un array vuoto invece di valori di default
-      toast({
-        title: "Errore",
-        description: `Impossibile caricare i gruppi: ${error.message}`,
-        variant: "destructive",
-      })
+      setGroupOptions([])
     }
   }, [supabase])
 
@@ -672,21 +654,45 @@ export default function ItemDetailPage() {
     setLoading(true)
     try {
       if (isNewItem) {
+        console.log("Creazione nuovo elemento per tabella:", tableName)
+
         // Crea un nuovo elemento vuoto con valori di default
         const newItem: any = {
           id_utente: user.id,
         }
 
-        // Imposta valori di default per campi obbligatori
+        // Imposta valori di default specifici per tabella
         if (tableName === "todolist") {
-          newItem.descrizione = "" // Inizializza come stringa vuota
+          newItem.titolo = ""
+          newItem.descrizione = ""
           newItem.completato = false
           newItem.priorita = 1
-        }
-
-        if (tableName === "clienti") {
+        } else if (tableName === "clienti") {
+          newItem.nome = ""
+          newItem.cognome = ""
+          newItem.email = ""
           newItem.attivo = true
           newItem.rappresentante = false
+        } else if (tableName === "progetti") {
+          newItem.titolo = ""
+          newItem.stato = "da_pianificare"
+          newItem.avanzamento = 0
+        } else if (tableName === "attivita") {
+          newItem.titolo = ""
+          newItem.stato = "da_fare"
+          newItem.priorita = 1
+        } else if (tableName === "appuntamenti") {
+          newItem.titolo = ""
+          newItem.stato = "pianificato"
+          newItem.priorita = 1
+        } else if (tableName === "scadenze") {
+          newItem.titolo = ""
+          newItem.stato = "attivo"
+          newItem.priorita = 1
+          newItem.privato = false
+        } else if (tableName === "pagine") {
+          newItem.titolo = ""
+          newItem.stato = "bozza"
         }
 
         console.log("Nuovo elemento creato:", newItem)
@@ -725,7 +731,7 @@ export default function ItemDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable, fieldTypes])
+  }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable])
 
   // Carica i dati all'avvio
   useEffect(() => {
@@ -776,20 +782,8 @@ export default function ItemDetailPage() {
 
     setSaving(true)
     try {
-      // Prepara i dati da salvare
-      const updateData = { ...editedItem }
-
-      // Pulisci e valida i dati
-      Object.keys(updateData).forEach((key) => {
-        // Rimuovi campi undefined o null non necessari
-        if (updateData[key] === undefined) {
-          delete updateData[key]
-        }
-        // Assicurati che le stringhe vuote siano gestite correttamente
-        if (typeof updateData[key] === "string" && updateData[key].trim() === "" && !requiredFields.includes(key)) {
-          updateData[key] = null
-        }
-      })
+      // Prepara i dati da salvare usando la funzione di pulizia
+      const updateData = cleanDataForSave(editedItem, isNewItem ? readOnlyFields : [])
 
       // Aggiorna il campo modifica
       updateData.modifica = new Date().toISOString()
@@ -797,7 +791,10 @@ export default function ItemDetailPage() {
       // Imposta l'id_utente per i nuovi elementi
       if (isNewItem) {
         updateData.id_utente = user.id
-        updateData.data_creazione = new Date().toISOString()
+        // Non includere data_creazione se non è nei campi della tabella
+        if (fieldTypes.data_creazione) {
+          updateData.data_creazione = new Date().toISOString()
+        }
       }
 
       console.log(`Salvataggio in tabella: ${tableName}`, updateData)
@@ -968,7 +965,7 @@ export default function ItemDetailPage() {
               id={field}
               type="number"
               value={value || ""}
-              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value))}
+              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value) || null)}
               className={`mt-1 ${hasError ? "border-red-500" : ""}`}
               placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
@@ -1103,7 +1100,6 @@ export default function ItemDetailPage() {
             />
           </div>
         )
-      // Nel metodo renderField, aggiungi questo case per il tipo "progress":
       case "progress":
         return (
           <div className="mb-4" key={field}>
@@ -1185,7 +1181,7 @@ export default function ItemDetailPage() {
           </div>
         )
       case "progress":
-        return <ProgressBar value={value} color={editedItem.colore || "#3b82f6"} readOnly />
+        return <ProgressBar value={value} color={editedItem?.colore || "#3b82f6"} readOnly />
       default:
         return formatValue(value)
     }
