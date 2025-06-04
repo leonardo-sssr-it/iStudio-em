@@ -58,7 +58,7 @@ const TABLE_FIELDS = {
       data_fine: "datetime",
       data_creazione: "datetime",
       stato: "select",
-      priorita: "number",
+      priorita: "priority_select",
       note: "text",
       tags: "json",
       id_utente: "number",
@@ -100,7 +100,7 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "number",
+      priorita: "priority_select",
       note: "text",
       id_utente: "number",
       modifica: "datetime",
@@ -130,7 +130,7 @@ const TABLE_FIELDS = {
       descrizione: "text",
       scadenza: "datetime",
       stato: "select",
-      priorita: "number",
+      priorita: "priority_select",
       note: "text",
       id_utente: "number",
       id_pro: "number",
@@ -155,14 +155,14 @@ const TABLE_FIELDS = {
   todolist: {
     listFields: ["id", "titolo", "completato", "priorita", "scadenza"],
     readOnlyFields: ["id", "id_utente", "modifica"],
-    requiredFields: ["titolo", "descrizione"], // Descrizione è obbligatoria per todolist
+    requiredFields: ["titolo", "descrizione"],
     defaultSort: "priorita",
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
       completato: "boolean",
-      priorita: "number",
+      priorita: "priority_select",
       scadenza: "datetime",
       note: "text",
       id_utente: "number",
@@ -345,6 +345,7 @@ export default function ItemDetailPage() {
   const [editedItem, setEditedItem] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<string>("main")
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
 
   // Estrai e valida i parametri
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -367,6 +368,55 @@ export default function ItemDetailPage() {
   const fieldTypes = tableConfig?.types || {}
   const fieldGroups = tableConfig?.groups || {}
   const selectOptions = tableConfig?.selectOptions || {}
+
+  // Carica le opzioni di priorità dal database
+  const loadPriorityOptions = useCallback(async () => {
+    if (!supabase) return
+
+    try {
+      const { data, error } = await supabase.from("configurazione").select("priorita").single()
+
+      if (error) {
+        console.error("Errore nel caricamento delle priorità:", error)
+        // Fallback con opzioni di default
+        setPriorityOptions([
+          { value: 1, nome: "Bassa" },
+          { value: 2, nome: "Media" },
+          { value: 3, nome: "Alta" },
+          { value: 4, nome: "Urgente" },
+        ])
+        return
+      }
+
+      if (data?.priorita && Array.isArray(data.priorita)) {
+        setPriorityOptions(data.priorita)
+      } else {
+        // Fallback con opzioni di default
+        setPriorityOptions([
+          { value: 1, nome: "Bassa" },
+          { value: 2, nome: "Media" },
+          { value: 3, nome: "Alta" },
+          { value: 4, nome: "Urgente" },
+        ])
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento delle priorità:", error)
+      // Fallback con opzioni di default
+      setPriorityOptions([
+        { value: 1, nome: "Bassa" },
+        { value: 2, nome: "Media" },
+        { value: 3, nome: "Alta" },
+        { value: 4, nome: "Urgente" },
+      ])
+    }
+  }, [supabase])
+
+  // Carica le opzioni di priorità all'avvio
+  useEffect(() => {
+    if (supabase) {
+      loadPriorityOptions()
+    }
+  }, [supabase, loadPriorityOptions])
 
   // Funzione di validazione
   const validateForm = (): string[] => {
@@ -697,6 +747,26 @@ export default function ItemDetailPage() {
             />
           </div>
         )
+      case "priority_select":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, Number(val))}>
+              <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
+                <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {priorityOptions.map((option) => (
+                  <SelectItem key={option.value} value={String(option.value)}>
+                    {option.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
       case "select":
         const options = selectOptions[field] || []
         return (
@@ -792,6 +862,9 @@ export default function ItemDetailPage() {
         return value ? "✓" : "✗"
       case "number":
         return typeof value === "number" ? value.toLocaleString("it-IT") : value
+      case "priority_select":
+        const priorityOption = priorityOptions.find((option) => option.value === value)
+        return priorityOption ? priorityOption.nome : value
       case "text":
         return <div className="whitespace-pre-wrap">{value}</div>
       case "json":
@@ -919,12 +992,41 @@ export default function ItemDetailPage() {
                       )
                     }
 
+                    // Gestione speciale per priorità e scadenza sulla stessa riga
+                    if (field === "priorita" && groupFields.includes("scadenza") && allFields.includes("scadenza")) {
+                      return (
+                        <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            {renderField(
+                              "priorita",
+                              editedItem.priorita,
+                              fieldTypes.priorita || "priority_select",
+                              isReadOnly,
+                            )}
+                          </div>
+                          <div>
+                            {renderField(
+                              "scadenza",
+                              editedItem.scadenza,
+                              fieldTypes.scadenza || "datetime",
+                              readOnlyFields.includes("scadenza"),
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+
                     // Salta data_fine se è già stata renderizzata con data_inizio
                     if (
                       field === "data_fine" &&
                       groupFields.includes("data_inizio") &&
                       allFields.includes("data_inizio")
                     ) {
+                      return null
+                    }
+
+                    // Salta scadenza se è già stata renderizzata con priorita
+                    if (field === "scadenza" && groupFields.includes("priorita") && allFields.includes("priorita")) {
                       return null
                     }
 
