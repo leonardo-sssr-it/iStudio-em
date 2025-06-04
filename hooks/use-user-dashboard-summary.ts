@@ -193,7 +193,7 @@ export function useUserDashboardSummary() {
         }
 
         // Appuntamenti
-        const appuntamentiResult = await processTable("appuntamenti", "appuntamenti", ["data_inizio", "data"], "titolo")
+        const appuntamentiResult = await processTable("appuntamenti", "appuntamenti", "data_inizio", "titolo")
         summaryCounts.push({
           type: "appuntamenti",
           label: "Appuntamenti",
@@ -211,7 +211,7 @@ export function useUserDashboardSummary() {
         })
 
         // Scadenze (Personali)
-        const scadenzeResult = await processTable("scadenze", "scadenze", ["data_scadenza", "data"], "titolo")
+        const scadenzeResult = await processTable("scadenze", "scadenze", "scadenza", "titolo")
         summaryCounts.push({
           type: "scadenze",
           label: "Scadenze",
@@ -239,7 +239,7 @@ export function useUserDashboardSummary() {
           console.warn(`Unexpected error checking for 'todolist' table, defaulting to it:`, e)
           todoTableName = "todolist" // Or 'todo' if that's a more likely fallback
         }
-        const todolistResult = await processTable(todoTableName, "todolist", ["data_scadenza", "data"], "titolo")
+        const todolistResult = await processTable(todoTableName, "todolist", "scadenza", "titolo")
         summaryCounts.push({
           type: "todolist",
           label: "Todo List",
