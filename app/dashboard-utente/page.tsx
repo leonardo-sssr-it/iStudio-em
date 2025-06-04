@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AgendaWidget } from "@/components/agenda-widget"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
+import { GalleryManagerWidget } from "@/components/gallery-manager-widget"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
 
@@ -20,6 +21,7 @@ const AVAILABLE_WIDGETS = [
   { id: "agenda", name: "Agenda", component: AgendaWidget },
   { id: "gantt", name: "Diagramma Gantt", component: GanttChartWidget },
   { id: "kanban", name: "Kanban Board", component: KanbanWidget },
+  { id: "gallery", name: "Gestione Galleria", component: GalleryManagerWidget },
 ]
 
 export default function UserDashboardPage() {
