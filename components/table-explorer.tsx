@@ -227,14 +227,14 @@ export function TableExplorer({ filterByUserId }: TableExplorerProps = {}) {
     if (selectedTable.includes("storage bucket")) {
       return `// Per i bucket di storage, usa l'API Storage
 const { data, error } = await supabase
-  .storage
-  .from('${cleanTableName}')
-  .list()
+.storage
+.from('${cleanTableName}')
+.list()
 `
     } else {
       return `const { data, error } = await supabase
-  .from('${cleanTableName}')
-  .select('${selectedColumnsArray.join(", ")}')
+.from('${cleanTableName}')
+.select('${selectedColumnsArray.join(", ")}')
 `
     }
   }, [selectedTable, getSelectedColumnsArray])
@@ -380,7 +380,7 @@ const { data, error } = await supabase
         <Button
           onClick={createDatabaseBackup}
           disabled={isCreatingBackup || !repository}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
         >
           {isCreatingBackup ? (
             <>
