@@ -44,14 +44,15 @@ function DashboardMobileContent() {
       {/* Link to Mobile Agenda */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <Link href="/dashboard-mobile/agenda" legacyBehavior>
-            <a className="flex items-center justify-between p-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
-              <div className="flex items-center">
-                <LayoutGrid className="h-6 w-6 mr-3" />
-                <span className="font-semibold">Vai all'Agenda Mobile</span>
-              </div>
-              <span>&rarr;</span>
-            </a>
+          <Link
+            href="/dashboard-mobile/agenda"
+            className="flex items-center justify-between p-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            <div className="flex items-center">
+              <LayoutGrid className="h-6 w-6 mr-3" />
+              <span className="font-semibold">Vai all'Agenda Mobile</span>
+            </div>
+            <span>&rarr;</span>
           </Link>
         </CardContent>
       </Card>
