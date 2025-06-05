@@ -1,35 +1,25 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Trash2, Edit, X } from "lucide-react"
-import { formatValue } from "@/lib/utils-db"
+import { ArrowLeft, X, AlertCircle, CheckCircle2, FileText, Calendar, Settings } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
+import { parseISO, formatISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -42,27 +32,91 @@ const AVAILABLE_TABLES = [
   { id: "pagine", label: "Pagine", icon: "📄" },
 ]
 
-// Definizione dei campi per ogni tabella
+// Funzione per pulire i dati prima del salvataggio
+function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
+  const cleaned = { ...data }
+
+  // Rimuovi campi di sola lettura per i nuovi elementi
+  readOnlyFields.forEach((field) => {
+    if (field !== "id_utente") {
+      // Mantieni id_utente
+      delete cleaned[field]
+    }
+  })
+
+  // Pulisci tutti i campi
+  Object.keys(cleaned).forEach((key) => {
+    const value = cleaned[key]
+
+    // Rimuovi valori undefined
+    if (value === undefined) {
+      delete cleaned[key]
+      return
+    }
+
+    // Rimuovi valori che sono la stringa "undefined"
+    if (value === "undefined") {
+      delete cleaned[key]
+      return
+    }
+
+    // Gestisci stringhe vuote
+    if (typeof value === "string") {
+      if (value.trim() === "") {
+        cleaned[key] = null
+      }
+    }
+
+    // Gestisci numeri NaN
+    if (typeof value === "number" && isNaN(value)) {
+      delete cleaned[key]
+    }
+  })
+
+  return cleaned
+}
+
+// Estendi la configurazione dei campi con più dettagli
 const TABLE_FIELDS = {
   appuntamenti: {
-    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
-    defaultSort: "data_inizio",
+    requiredFields: ["titolo", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "pianificato",
+      attivo: true,
+    },
+    fieldGroups: {
+      // Aggiunto per il layout a Card
+      principale: {
+        title: "Informazioni Principali",
+        icon: FileText, // Assicurati che FileText sia importato da lucide-react
+        fields: ["titolo", "descrizione", "stato"],
+      },
+      date: {
+        title: "Date e Orari",
+        icon: Calendar, // Assicurati che Calendar sia importato da lucide-react
+        fields: ["data_inizio", "data_fine"],
+      },
+      dettagli: {
+        title: "Dettagli Aggiuntivi",
+        icon: Settings, // Assicurati che Settings sia importato da lucide-react
+        fields: ["luogo", "note", "tags"],
+      },
+    },
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      luogo: "text",
       data_inizio: "datetime",
       data_fine: "datetime",
-      data_creazione: "datetime",
       stato: "select",
-      priorita: "number",
       note: "text",
-      tags: "json",
+      luogo: "string",
+      tags: "tags",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
-      notifica: "datetime",
     },
     selectOptions: {
       stato: [
@@ -72,25 +126,19 @@ const TABLE_FIELDS = {
         { value: "annullato", label: "Annullato" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
-      "Informazioni di sistema": [
-        "id",
-        "id_utente",
-        "modifica",
-        "attivo",
-        "id_pro",
-        "id_att",
-        "id_cli",
-        "data_creazione",
-      ],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
     },
   },
   attivita: {
-    listFields: ["id", "titolo", "data_inizio", "stato", "priorita", "attivo"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
-    defaultSort: "data_inizio",
+    requiredFields: ["titolo", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "da_fare",
+      priorita: 3,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -100,7 +148,9 @@ const TABLE_FIELDS = {
       stato: "select",
       priorita: "number",
       note: "text",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     selectOptions: {
@@ -111,30 +161,30 @@ const TABLE_FIELDS = {
         { value: "sospeso", label: "Sospeso" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      priorita: { min: 1, max: 5 },
     },
   },
   scadenze: {
-    listFields: ["id", "titolo", "scadenza", "stato", "priorita", "privato"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
-    defaultSort: "data_scadenza",
+    requiredFields: ["titolo", "data_scadenza"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "attivo",
+      priorita: 3,
+    },
+    fieldOrder: ["titolo", "descrizione", "data_scadenza", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      scadenza: "datetime",
+      data_scadenza: "datetime",
       stato: "select",
       priorita: "number",
       note: "text",
       id_utente: "number",
-      id_pro: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
-      notifica: "datetime",
-      privato: "boolean",
-      tags: "json",
     },
     selectOptions: {
       stato: [
@@ -143,47 +193,73 @@ const TABLE_FIELDS = {
         { value: "scaduto", label: "Scaduto" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "scadenza"],
-      Dettagli: ["note", "tags", "notifica", "privato", "id_pro"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      priorita: { min: 1, max: 5 },
     },
   },
   todolist: {
-    listFields: ["id", "titolo", "completato", "priorita", "scadenza"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
-    defaultSort: "priorita",
+    requiredFields: ["titolo", "descrizione"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      completato: false,
+      priorita: 3,
+    },
+    fieldOrder: ["titolo", "descrizione", "data_scadenza", "priorita", "completato", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
       completato: "boolean",
       priorita: "number",
-      scadenza: "datetime",
+      data_scadenza: "datetime",
       note: "text",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "completato", "priorita", "scadenza"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      descrizione: { minLength: 3, maxLength: 500 },
+      priorita: { min: 1, max: 5 },
     },
   },
   progetti: {
-    listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
-    defaultSort: "data_inizio",
+    requiredFields: ["nome", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "pianificato",
+      attivo: true,
+      avanzamento: 0,
+      colore: "#3B82F6",
+    },
+    fieldOrder: [
+      "nome",
+      "descrizione",
+      "stato",
+      "colore",
+      "gruppo",
+      "budget",
+      "data_inizio",
+      "data_fine",
+      "avanzamento",
+      "note",
+    ],
     types: {
       id: "number",
       nome: "string",
       descrizione: "text",
       stato: "select",
+      colore: "color",
+      gruppo: "string",
+      budget: "number",
       data_inizio: "datetime",
       data_fine: "datetime",
-      budget: "number",
+      avanzamento: "number",
       note: "text",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     selectOptions: {
@@ -194,62 +270,67 @@ const TABLE_FIELDS = {
         { value: "sospeso", label: "Sospeso" },
       ],
     },
-    groups: {
-      "Informazioni principali": [
-        "nome",
-        "descrizione",
-        "stato",
-        "colore",
-        "gruppo",
-        "budget",
-        "data_inizio",
-        "data_fine",
-        "avanzamento",
-      ],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+    validation: {
+      nome: { minLength: 3, maxLength: 100 },
+      avanzamento: { min: 0, max: 100 },
+      budget: { min: 0 },
     },
   },
   clienti: {
-    listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
-    defaultSort: "cognome",
+    requiredFields: ["nome", "cognome"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      attivo: true,
+    },
+    fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
     types: {
       id: "number",
       nome: "string",
       cognome: "string",
-      email: "string",
-      telefono: "string",
+      email: "email",
+      telefono: "tel",
       citta: "string",
       indirizzo: "string",
       cap: "string",
       piva: "string",
       codfisc: "string",
       note: "text",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
-    groups: {
-      "Informazioni personali": ["nome", "cognome", "email", "telefono"],
-      Indirizzo: ["citta", "indirizzo", "cap"],
-      "Informazioni fiscali": ["piva", "codfisc"],
-      "Note e dettagli": ["note"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    validation: {
+      nome: { minLength: 2, maxLength: 50 },
+      cognome: { minLength: 2, maxLength: 50 },
+      email: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
+      telefono: { pattern: "^[+]?[0-9\\s-()]+$" },
+      cap: { pattern: "^[0-9]{5}$" },
+      piva: { pattern: "^[0-9]{11}$" },
+      codfisc: { pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$" },
     },
   },
   pagine: {
-    listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
-    defaultSort: "data_creazione",
+    requiredFields: ["titolo", "slug"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "bozza",
+      privato: false,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
     types: {
       id: "number",
       titolo: "string",
       slug: "string",
-      contenuto: "text",
+      contenuto: "richtext",
       stato: "select",
+      privato: "boolean",
+      attivo: "boolean",
       meta_title: "string",
       meta_description: "text",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     selectOptions: {
@@ -259,227 +340,270 @@ const TABLE_FIELDS = {
         { value: "archiviato", label: "Archiviato" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "slug", "stato"],
-      Contenuto: ["contenuto"],
-      SEO: ["meta_title", "meta_description"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      slug: { pattern: "^[a-z0-9-]+$", minLength: 3, maxLength: 100 },
+      meta_title: { maxLength: 60 },
+      meta_description: { maxLength: 160 },
     },
   },
 }
 
-// Funzione per formattare le date in italiano
-function formatDateIT(date: string | null | undefined): string {
-  if (!date) return ""
-  try {
-    const d = new Date(date)
-    if (isNaN(d.getTime())) return ""
-    return d.toLocaleString("it-IT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch (e) {
-    return ""
-  }
-}
-
-// Funzione per formattare le date per input datetime-local
-function formatDateForInput(date: string | null | undefined): string {
-  if (!date) return ""
-  try {
-    const d = new Date(date)
-    if (isNaN(d.getTime())) return ""
-    return d.toISOString().slice(0, 16) // formato YYYY-MM-DDThh:mm
-  } catch (e) {
-    return ""
-  }
+// Componente per il color picker
+const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+      <Input
+        type="color"
+        value={value || "#000000"}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full sm:w-20 h-10 p-1 cursor-pointer"
+      />
+      <Input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#000000"
+        className="w-full sm:flex-1"
+        pattern="^#[0-9A-Fa-f]{6}$"
+      />
+    </div>
+  )
 }
 
 // Componente principale
-export default function ItemDetailPage() {
+export default function NewItemPage() {
   const { supabase } = useSupabase()
   const { user } = useAuth()
   const router = useRouter()
   const params = useParams()
-  const searchParams = useSearchParams()
-  const [isEditMode, setIsEditMode] = useState<boolean>(searchParams.get("edit") === "true" || params.id === "new")
-  const isNewItem = params.id === "new"
 
-  const [loading, setLoading] = useState<boolean>(true)
-  const [saving, setSaving] = useState<boolean>(false)
-  const [deleting, setDeleting] = useState<boolean>(false)
-  const [item, setItem] = useState<any>(null)
-  const [editedItem, setEditedItem] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<string>("main")
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState<any>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Estrai e valida i parametri
+  // Estrai il nome della tabella
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
-  const itemId = Array.isArray(params.id) ? params.id[0] : params.id
-
-  // Debug logging
-  console.log("Parametri URL:", { tableName, itemId, params })
 
   // Verifica che la tabella sia valida
   const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
 
-  if (!isValidTable && tableName) {
-    console.error(`Tabella non valida: ${tableName}`)
-  }
-
   // Ottieni la configurazione della tabella
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
-  const readOnlyFields = tableConfig?.readOnlyFields || []
+  const requiredFields = tableConfig?.requiredFields || []
+  const autoFields = tableConfig?.autoFields || []
+  const defaultValues = tableConfig?.defaultValues || {}
+  const fieldGroups = tableConfig?.fieldGroups || {} // Modificato da fieldOrder
   const fieldTypes = tableConfig?.types || {}
-  const fieldGroups = tableConfig?.groups || {}
   const selectOptions = tableConfig?.selectOptions || {}
+  const validation = tableConfig?.validation || {}
 
-  // Carica i dati dell'elemento
-  const loadItem = useCallback(async () => {
-    if (!supabase || !tableName || !user?.id || !isValidTable) {
-      console.log("Condizioni non soddisfatte:", { supabase: !!supabase, tableName, userId: user?.id, isValidTable })
-      return
-    }
-
-    setLoading(true)
-    try {
-      if (isNewItem) {
-        // Crea un nuovo elemento vuoto con data/ora attuale per i campi datetime
-        const now = new Date()
-        const currentDateTime = now.toISOString()
-
-        const newItem: any = {
-          id_utente: user.id,
-        }
-
-        // Aggiungi data/ora attuale per i campi datetime comuni
-        if (fieldTypes.data_inizio === "datetime") {
-          newItem.data_inizio = currentDateTime
-        }
-        if (fieldTypes.data_creazione === "datetime") {
-          newItem.data_creazione = currentDateTime
-        }
-        if (fieldTypes.scadenza === "datetime") {
-          newItem.scadenza = currentDateTime
-        }
-
-        setItem(newItem)
-        setEditedItem(newItem)
-        setLoading(false)
-        return
-      }
-
-      console.log(`Caricamento elemento da tabella: ${tableName}, ID: ${itemId}`)
-
-      // Carica l'elemento esistente
-      const { data, error } = await supabase
-        .from(tableName)
-        .select("*")
-        .eq("id", itemId)
-        .eq("id_utente", user.id)
-        .single()
-
-      if (error) {
-        console.error("Errore query Supabase:", error)
-        throw error
-      }
-
-      console.log("Dati caricati:", data)
-      setItem(data)
-      setEditedItem(data)
-    } catch (error: any) {
-      console.error(`Errore nel caricamento dell'elemento:`, error)
-      toast({
-        title: "Errore",
-        description: `Impossibile caricare i dati: ${error.message}`,
-        variant: "destructive",
-      })
-      router.push(`/data-explorer?table=${tableName}`)
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable, fieldTypes])
-
-  // Carica i dati all'avvio
+  // Inizializza i dati del form
   useEffect(() => {
-    if (supabase && user?.id && tableName && isValidTable) {
-      loadItem()
+    if (tableConfig && user) {
+      const initialData = {
+        ...defaultValues,
+        id_utente: user.id,
+      }
+
+      // Imposta valori di default specifici per tabella
+      if (tableName === "todolist") {
+        initialData.titolo = ""
+        initialData.descrizione = ""
+        initialData.completato = false
+        initialData.priorita = 3
+      }
+
+      setFormData(initialData)
     }
-  }, [supabase, user?.id, loadItem, tableName, isValidTable])
+  }, [tableConfig, user, tableName])
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
-    setEditedItem((prev: any) => {
-      const updated = {
-        ...prev,
-        [field]: value,
-      }
+    setFormData((prev: any) => {
+      const newData = { ...prev, [field]: value }
 
-      // Se stiamo modificando data_inizio, aggiorna automaticamente data_fine (+1 ora)
-      if (field === "data_inizio" && value && !prev.data_fine) {
-        const startDate = new Date(value)
-        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // +1 ora
-        updated.data_fine = endDate.toISOString()
+      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
+      if (field === "data_inizio" && value) {
+        try {
+          const startDate = parseISO(value) // parseISO gestisce stringhe ISO
+          if (!newData.data_fine) {
+            // Solo se data_fine non è già impostata
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Aggiungi 1 ora
+            newData.data_fine = formatISO(endDate) // formatISO per coerenza
+          }
+        } catch (e) {
+          console.warn("Data inizio non valida per calcolare data fine:", value)
+        }
       }
-
-      return updated
+      return newData
     })
+
+    // Rimuovi l'errore quando il campo viene modificato
+    if (errors[field]) {
+      setErrors((prevErrors) => {
+        const newErrors = { ...prevErrors }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+
+    // Validazione in tempo reale per alcuni campi
+    validateField(field, value)
   }
 
-  // Salva le modifiche
+  // Valida un singolo campo
+  const validateField = (field: string, value: any): boolean => {
+    const rules = validation[field]
+    if (!rules) return true
+
+    let error = ""
+
+    // Validazione lunghezza minima
+    if (rules.minLength && (!value || value.length < rules.minLength)) {
+      error = `Minimo ${rules.minLength} caratteri`
+    }
+
+    // Validazione lunghezza massima
+    if (rules.maxLength && value && value.length > rules.maxLength) {
+      error = `Massimo ${rules.maxLength} caratteri`
+    }
+
+    // Validazione valore minimo
+    if (rules.min !== undefined && value < rules.min) {
+      error = `Valore minimo: ${rules.min}`
+    }
+
+    // Validazione valore massimo
+    if (rules.max !== undefined && value > rules.max) {
+      error = `Valore massimo: ${rules.max}`
+    }
+
+    // Validazione pattern
+    if (rules.pattern && value) {
+      const regex = new RegExp(rules.pattern)
+      if (!regex.test(value)) {
+        error = getPatternErrorMessage(field, fieldTypes[field])
+      }
+    }
+
+    if (error) {
+      setErrors((prev) => ({ ...prev, [field]: error }))
+      return false
+    }
+
+    return true
+  }
+
+  // Ottieni il messaggio di errore per il pattern
+  const getPatternErrorMessage = (field: string, type: string): string => {
+    switch (type) {
+      case "email":
+        return "Email non valida"
+      case "tel":
+        return "Numero di telefono non valido"
+      case "string":
+        if (field === "slug") return "Solo lettere minuscole, numeri e trattini"
+        if (field === "cap") return "CAP deve essere di 5 cifre"
+        if (field === "piva") return "P.IVA deve essere di 11 cifre"
+        if (field === "codfisc") return "Codice fiscale non valido"
+        return "Formato non valido"
+      default:
+        return "Formato non valido"
+    }
+  }
+
+  // Valida tutti i campi
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Controlla i campi richiesti
+    requiredFields.forEach((field) => {
+      if (!formData[field] || (typeof formData[field] === "string" && !formData[field].trim())) {
+        newErrors[field] = "Campo obbligatorio"
+      }
+    })
+
+    // Valida tutti i campi con regole
+    Object.keys(formData).forEach((field) => {
+      if (!autoFields.includes(field) && !validateField(field, formData[field])) {
+        // L'errore è già stato impostato da validateField
+      }
+    })
+
+    // Validazioni speciali
+    if (tableName === "appuntamenti" || tableName === "attivita" || tableName === "progetti") {
+      if (formData.data_fine && formData.data_inizio && new Date(formData.data_fine) < new Date(formData.data_inizio)) {
+        newErrors.data_fine = "La data di fine deve essere successiva alla data di inizio"
+      }
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // Salva il nuovo elemento
   const handleSave = async () => {
-    if (!supabase || !tableName || !user?.id || !editedItem || !isValidTable) return
+    if (!supabase || !tableName || !user?.id || !isValidTable) return
+
+    // Valida il form
+    if (!validateForm()) {
+      toast({
+        title: "Errore di validazione",
+        description: "Controlla i campi evidenziati in rosso",
+        variant: "destructive",
+      })
+      return
+    }
 
     setSaving(true)
     try {
-      // Prepara i dati da salvare
-      const updateData = { ...editedItem }
+      // Prepara i dati da salvare usando la funzione di pulizia
+      const dataToSave = cleanDataForSave(formData, autoFields)
 
-      // Aggiorna il campo modifica
-      updateData.modifica = new Date().toISOString()
+      // Aggiorna i campi di sistema
+      dataToSave.id_utente = user.id
+      dataToSave.data_creazione = new Date().toISOString()
+      dataToSave.modifica = new Date().toISOString()
 
-      // Imposta l'id_utente per i nuovi elementi
-      if (isNewItem) {
-        updateData.id_utente = user.id
-        updateData.data_creazione = new Date().toISOString()
-      }
+      console.log(`Inserimento nuovo elemento in tabella: ${tableName}`, dataToSave)
 
-      console.log(`Salvataggio in tabella: ${tableName}`, updateData)
+      // Inserisci nel database
+      const { data, error } = await supabase.from(tableName).insert(dataToSave).select()
 
-      // Salva i dati
-      let result
-      if (isNewItem) {
-        result = await supabase.from(tableName).insert(updateData).select()
-      } else {
-        result = await supabase.from(tableName).update(updateData).eq("id", itemId).select()
-      }
+      if (error) {
+        console.error("Errore inserimento:", error)
 
-      if (result.error) {
-        console.error("Errore salvataggio:", result.error)
-        throw result.error
+        // Gestisci errori specifici del database
+        let errorMessage = error.message
+        if (error.message.includes("check constraint")) {
+          if (error.message.includes("descrizione_check")) {
+            errorMessage =
+              "La descrizione non rispetta i requisiti del database. Assicurati che sia compilata correttamente."
+          }
+        }
+
+        throw new Error(errorMessage)
       }
 
       toast({
-        title: "Salvato",
-        description: "I dati sono stati salvati con successo",
+        title: "Elemento creato con successo!",
+        description: "Il nuovo elemento è stato salvato nel database",
+        action: (
+          <div className="flex items-center">
+            <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+            <span>Creato</span>
+          </div>
+        ),
       })
 
-      // Aggiorna i dati locali
-      setItem(result.data[0])
-      setEditedItem(result.data[0])
-      setIsEditMode(false)
-
-      // Reindirizza alla pagina di dettaglio per i nuovi elementi
-      if (isNewItem) {
-        router.push(`/data-explorer/${tableName}/${result.data[0].id}`)
-      }
+      // Reindirizza alla pagina di dettaglio
+      router.push(`/data-explorer/${tableName}/${data[0].id}`)
     } catch (error: any) {
-      console.error(`Errore nel salvataggio dei dati:`, error)
+      console.error(`Errore nell'inserimento:`, error)
       toast({
-        title: "Errore",
-        description: `Impossibile salvare i dati: ${error.message}`,
+        title: "Errore durante il salvataggio",
+        description: `Impossibile creare l'elemento: ${error.message}`,
         variant: "destructive",
       })
     } finally {
@@ -487,325 +611,192 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Annulla le modifiche
-  const handleCancelEdit = () => {
-    setEditedItem(item)
-    setIsEditMode(false)
-    if (isNewItem) {
-      router.push(`/data-explorer?table=${tableName}`)
-    }
-  }
-
-  // Elimina l'elemento
-  const handleDelete = async () => {
-    if (!supabase || !tableName || !itemId || !isValidTable) return
-
-    setDeleting(true)
-    try {
-      console.log(`Eliminazione da tabella: ${tableName}, ID: ${itemId}`)
-
-      const { error } = await supabase.from(tableName).delete().eq("id", itemId)
-
-      if (error) {
-        console.error("Errore eliminazione:", error)
-        throw error
-      }
-
-      toast({
-        title: "Eliminato",
-        description: "L'elemento è stato eliminato con successo",
-      })
-
-      // Torna alla lista della tabella
-      router.push(`/data-explorer?table=${tableName}`)
-    } catch (error: any) {
-      console.error(`Errore nell'eliminazione dell'elemento:`, error)
-      toast({
-        title: "Errore",
-        description: `Impossibile eliminare l'elemento: ${error.message}`,
-        variant: "destructive",
-      })
-    } finally {
-      setDeleting(false)
-    }
-  }
-
   // Renderizza un campo in base al tipo
-  const renderField = (field: string, value: any, type: string, readOnly = false) => {
-    // Ottieni il label del campo
+  const renderField = (field: string, type: string) => {
+    // Salta i campi auto-generati
+    if (autoFields.includes(field)) return null
+
     const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+    const value = formData[field]
+    const error = errors[field]
+    const isRequired = requiredFields.includes(field)
 
-    // Se è in modalità visualizzazione, mostra solo il valore
-    if (!isEditMode || readOnly) {
-      return (
-        <div className="mb-4" key={field}>
-          <Label className="text-sm font-medium">{label}</Label>
-          <div className={`mt-1 p-2 rounded-md ${readOnly ? "bg-gray-100" : ""}`}>{renderFieldValue(value, type)}</div>
-        </div>
-      )
-    }
+    const fieldWrapper = (children: React.ReactNode) => (
+      <div className="space-y-2" key={field}>
+        <Label htmlFor={field} className="flex items-center">
+          {label}
+          {isRequired && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+        {children}
+        {error && (
+          <div className="flex items-center text-sm text-red-500">
+            <AlertCircle size={14} className="mr-1" />
+            {error}
+          </div>
+        )}
+      </div>
+    )
 
-    // Altrimenti, mostra il campo di input appropriato
     switch (type) {
       case "text":
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Textarea
-              id={field}
-              value={value || ""}
-              onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
-              rows={4}
-            />
-          </div>
+      case "richtext":
+        return fieldWrapper(
+          <Textarea
+            id={field}
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            rows={type === "richtext" ? 8 : 4}
+            placeholder={`Inserisci ${label.toLowerCase()}`}
+          />,
         )
+
       case "boolean":
-        return (
-          <div className="flex items-center space-x-2 mb-4" key={field}>
+        return fieldWrapper(
+          <div className="flex items-center space-x-2">
             <Switch
               id={field}
               checked={value || false}
               onCheckedChange={(checked) => handleFieldChange(field, checked)}
             />
-            <Label htmlFor={field}>{label}</Label>
-          </div>
+            <Label htmlFor={field} className="font-normal cursor-pointer">
+              {value ? "Sì" : "No"}
+            </Label>
+          </div>,
         )
+
       case "datetime":
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <EnhancedDatePicker
-              id={field}
-              value={value || ""}
-              onChange={(newValue) => handleFieldChange(field, newValue)}
-              placeholder={`Seleziona ${label.toLowerCase()}`}
-              className="mt-1"
-            />
-          </div>
+        return fieldWrapper(
+          <EnhancedDatePicker
+            id={field}
+            value={value || ""}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Seleziona ${label.toLowerCase()}`}
+            className={cn(error && "border-red-500")}
+          />,
         )
+
       case "number":
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Input
-              id={field}
-              type="number"
-              value={value || ""}
-              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value))}
-              className="mt-1"
-            />
-          </div>
+        const validationRules = validation[field] || {}
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="number"
+            value={value || ""}
+            onChange={(e) => {
+              const numValue = e.target.value ? Number(e.target.value) : null
+              handleFieldChange(field, numValue)
+            }}
+            className={cn(error && "border-red-500")}
+            min={validationRules.min}
+            max={validationRules.max}
+            placeholder={`Inserisci ${label.toLowerCase()}`}
+          />,
         )
+
       case "select":
         const options = selectOptions[field] || []
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((option: any) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )
-      case "json":
-        if (field === "tags") {
-          return (
-            <div className="mb-4" key={field}>
-              <Label htmlFor={field}>{label}</Label>
-              <TagInput
-                id={field}
-                value={Array.isArray(value) ? value : []}
-                onChange={(tags) => handleFieldChange(field, tags)}
-                placeholder="Aggiungi tag..."
-                className="mt-1"
-              />
-            </div>
-          )
-        }
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Textarea
-              id={field}
-              value={typeof value === "object" ? JSON.stringify(value, null, 2) : value || ""}
-              onChange={(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value)
-                  handleFieldChange(field, parsed)
-                } catch {
-                  handleFieldChange(field, e.target.value)
-                }
-              }}
-              className="mt-1 font-mono text-sm"
-              rows={4}
-              placeholder="JSON valido..."
-            />
-          </div>
-        )
-      default:
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Input
-              id={field}
-              type="text"
-              value={value || ""}
-              onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
-            />
-          </div>
-        )
-    }
-  }
-
-  // Renderizza il valore di un campo in base al tipo
-  const renderFieldValue = (value: any, type: string) => {
-    if (value === null || value === undefined) return "-"
-
-    switch (type) {
-      case "datetime":
-        return formatDateIT(value)
-      case "boolean":
-        return value ? "✓" : "✗"
-      case "number":
-        return typeof value === "number" ? value.toLocaleString("it-IT") : value
-      case "text":
-        return <div className="whitespace-pre-wrap">{value}</div>
-      case "json":
-        if (Array.isArray(value)) {
-          return (
-            <div className="flex flex-wrap gap-1">
-              {value.map((item, index) => (
-                <Badge key={index} variant="secondary">
-                  {String(item)}
-                </Badge>
+        return fieldWrapper(
+          <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
+            <SelectTrigger className={cn(error && "border-red-500")}>
+              <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((option: any) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
               ))}
-            </div>
-          )
-        }
-        return <pre className="text-sm">{JSON.stringify(value, null, 2)}</pre>
+            </SelectContent>
+          </Select>,
+        )
+
+      case "color":
+        return fieldWrapper(<ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />)
+
+      case "tags":
+        return fieldWrapper(
+          <TagInput
+            id={field}
+            value={value || []}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Aggiungi ${label.toLowerCase()}`}
+          />,
+        )
+
+      case "email":
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="email"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            placeholder="esempio@email.com"
+          />,
+        )
+
+      case "tel":
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="tel"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            placeholder="+39 123 456 7890"
+          />,
+        )
+
       default:
-        return formatValue(value)
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="text"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            placeholder={`Inserisci ${label.toLowerCase()}`}
+          />,
+        )
     }
   }
 
   // Ottieni il titolo della tabella
   const getTableTitle = () => {
     const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
-    return table ? table.label : "Dettaglio"
+    return table ? table.label : "Nuovo elemento"
   }
 
-  // Ottieni il titolo dell'elemento
-  const getItemTitle = () => {
-    if (isNewItem) return "Nuovo elemento"
-    if (!item) return "Caricamento..."
+  // Renderizza i campi di data, mettendo data_inizio e data_fine sulla stessa linea
+  const renderDateFields = (fields: string[]) => {
+    const dateFields = fields.filter((field) => fieldTypes[field] === "datetime")
 
-    // Usa il campo più appropriato come titolo
-    if (item.titolo) return item.titolo
-    if (item.nome) {
-      if (item.cognome) return `${item.nome} ${item.cognome}`
-      return item.nome
+    if (dateFields.length === 0) return null
+
+    // Se c'è un solo campo data nel gruppo, rendilo normalmente
+    if (dateFields.length === 1 && fields.length === 1) {
+      return <div className="space-y-4">{renderField(dateFields[0], fieldTypes[dateFields[0]])}</div>
     }
-    return `ID: ${item.id}`
-  }
 
-  // Renderizza i gruppi di campi
-  const renderFieldGroups = () => {
-    if (!editedItem) return null
-
-    // Ottieni tutti i campi dell'elemento
-    const allFields = Object.keys(editedItem)
-
-    // Crea tabs per i gruppi
-    const tabs = Object.keys(fieldGroups)
-
+    // Se ci sono 2 campi data (es. data_inizio e data_fine), mettili sulla stessa linea
+    // e gli altri campi del gruppo sotto.
     return (
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4">
-          {tabs.map((group) => (
-            <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
-              {group}
-            </TabsTrigger>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {dateFields.map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
           ))}
-        </TabsList>
-
-        {tabs.map((group) => {
-          const groupFields = fieldGroups[group as keyof typeof fieldGroups] || []
-
-          return (
-            <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
-              <div className="space-y-4">
-                {groupFields.map((field) => {
-                  if (!allFields.includes(field)) return null
-                  const isReadOnly = readOnlyFields.includes(field)
-
-                  // Gestione speciale per data_inizio e data_fine sulla stessa riga
-                  if (field === "data_inizio" && groupFields.includes("data_fine") && allFields.includes("data_fine")) {
-                    return (
-                      <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="data_inizio">Data inizio</Label>
-                          <EnhancedDatePicker
-                            id="data_inizio"
-                            value={editedItem.data_inizio || ""}
-                            onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
-                            placeholder="Seleziona data inizio"
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="data_fine">Data fine</Label>
-                          <EnhancedDatePicker
-                            id="data_fine"
-                            value={editedItem.data_fine || ""}
-                            onChange={(newValue) => handleFieldChange("data_fine", newValue)}
-                            placeholder="Seleziona data fine"
-                            className="mt-1"
-                          />
-                        </div>
-                      </div>
-                    )
-                  }
-
-                  // Salta data_fine se è già stata renderizzata con data_inizio
-                  if (
-                    field === "data_fine" &&
-                    groupFields.includes("data_inizio") &&
-                    allFields.includes("data_inizio")
-                  ) {
-                    return null
-                  }
-
-                  return renderField(
-                    field,
-                    editedItem[field],
-                    fieldTypes[field as keyof typeof fieldTypes] || "string",
-                    isReadOnly,
-                  )
-                })}
-              </div>
-            </TabsContent>
-          )
-        })}
-      </Tabs>
+        </div>
+        {/* Renderizza altri campi non-data del gruppo, se presenti */}
+        {fields
+          .filter((field) => fieldTypes[field] !== "datetime")
+          .map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
+      </div>
     )
   }
-
-  // Imposta i tab iniziali
-  useEffect(() => {
-    if (fieldGroups && Object.keys(fieldGroups).length > 0) {
-      setActiveTab(Object.keys(fieldGroups)[0].toLowerCase().replace(/\s+/g, "-"))
-    }
-  }, [fieldGroups])
 
   // Se la tabella non è valida, mostra errore
   if (tableName && !isValidTable) {
@@ -817,7 +808,7 @@ export default function ItemDetailPage() {
             <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/data-explorer?table=" + tableName)}>
+            <Button onClick={() => router.push("/data-explorer")}>
               <ArrowLeft size={16} className="mr-2" /> Torna alla lista
             </Button>
           </CardContent>
@@ -826,99 +817,103 @@ export default function ItemDetailPage() {
     )
   }
 
-  // Renderizza lo scheletro durante il caricamento
-  if (loading) {
-    return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="space-y-4">
+            {/* Pulsante torna indietro sempre in alto */}
+            <Button variant="ghost" onClick={() => router.push(`/data-explorer`)} className="w-fit">
+              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+            </Button>
+
+            {/* Titolo e descrizione */}
             <div>
-              <Button variant="ghost" onClick={() => router.push(`/data-explorer?table=${tableName}`)} className="mb-2">
-                <ArrowLeft size={16} className="mr-2" /> Torna alla lista
-              </Button>
-              <CardTitle className="text-2xl">{getItemTitle()}</CardTitle>
-              <CardDescription>
-                {getTableTitle()}{" "}
-                {!isNewItem && (
-                  <Badge variant="outline" className="ml-2">
-                    ID: {itemId}
-                  </Badge>
-                )}
+              <CardTitle className="text-xl sm:text-2xl">Nuovo {getTableTitle().slice(0, -1)}</CardTitle>
+              <CardDescription className="text-sm sm:text-base">
+                Compila i campi per creare un nuovo elemento
               </CardDescription>
             </div>
-            <div className="flex space-x-2">
-              {isEditMode && (
-                <>
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {saving ? "Salvataggio..." : "Salva modifiche"}
-                    {!saving && <Save size={16} className="ml-2" />}
-                  </Button>
-                  <Button variant="outline" onClick={handleCancelEdit}>
-                    <X size={16} className="mr-2" /> Annulla modifica
-                  </Button>
-                </>
-              )}
-              {!isNewItem && !isEditMode && (
-                <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                  <Edit size={16} className="mr-2" /> Modifica
-                </Button>
-              )}
-              {!isNewItem && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
-                      <Trash2 size={16} className="mr-2" /> Elimina
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                      >
-                        {deleting ? "Eliminazione..." : "Elimina"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+
+            {/* Pulsanti di azione - migliorati con background azzurro */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 sm:justify-end">
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full sm:w-auto order-1 sm:order-1 bg-blue-600 hover:bg-blue-700 text-white"
+                size="lg"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvataggio...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} className="mr-2" />
+                    Crea e Salva
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/data-explorer`)}
+                className="w-full sm:w-auto order-2 sm:order-2"
+              >
+                <X size={16} className="mr-2" /> Annulla
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>{editedItem && renderFieldGroups()}</CardContent>
+
+        <CardContent>
+          {/* Renderizza i campi in base alla configurazione della tabella */}
+          <div className="space-y-6">
+            {Object.keys(fieldTypes)
+              .filter((field) => !autoFields.includes(field))
+              .map((field) => (
+                <div key={field}>{renderField(field, fieldTypes[field])}</div>
+              ))}
+          </div>
+
+          {/* Mostra informazioni sui campi auto-compilati */}
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Campi compilati automaticamente:
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {autoFields.map((field) => (
+                      <Badge key={field} variant="secondary">
+                        {field}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+                  <span>
+                    I campi con <span className="text-red-500 mx-1">*</span> sono obbligatori
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </CardContent>
+
+        <CardFooter className="border-t bg-gray-50 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full text-sm text-gray-600 space-y-2 sm:space-y-0">
+            <div className="flex items-center">
+              <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+              <span>
+                I campi contrassegnati con <span className="text-red-500 mx-1">*</span> sono obbligatori
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">iStudio v0.4 - Sistema di gestione dati</div>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   )
