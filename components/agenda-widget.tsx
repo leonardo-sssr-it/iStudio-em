@@ -874,11 +874,17 @@ const MonthlyView = ({
   )
 }
 
-export function AgendaWidget() {
-  const { user, isAdmin } = useAuth()
-  const { isDebugEnabled, isLoading: isDebugConfigLoading } = useDebugConfig()
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
+// Add new prop 'mode' to AgendaWidgetProps
+export interface AgendaWidgetProps {
+  initialDate?: Date
+  mode?: "desktop" | "mobile" // Added mode prop
+}
+
+// In AgendaWidget function signature, use the new props
+export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProps) {
+  // ... existing state and hooks ...
+  const [currentDate, setCurrentDate] = useState(initialDate || new Date()) // Use initialDate prop
+  const [view, setView] = useState<"daily" | "weekly" | "monthly">(mode === "mobile" ? "daily" : "daily") // Default to daily for mobile
   const [filters, setFilters] = useState({
     attivita: true,
     progetti: true,
@@ -893,6 +899,9 @@ export function AgendaWidget() {
   const [showDebug, setShowDebug] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
   const [debugItems, setDebugItems] = useState<any[]>([])
+
+  const { isAdmin } = useAuth()
+  const { isDebugEnabled, isDebugConfigLoading } = useDebugConfig()
 
   // Determina se il debug è abilitato (solo per admin e se configurazione.debug è true)
   const isDebugAllowed = isAdmin && isDebugEnabled && !isDebugConfigLoading
@@ -1178,13 +1187,16 @@ export function AgendaWidget() {
     }
   }, [isDebugAllowed])
 
+  // In the JSX for Tabs:
+  // Modify TabsList to conditionally render Monthly tab
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-xl">Agenda</CardTitle>
+        {/* Header content remains largely the same, responsive classes should handle sizing */}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
+          <CardTitle className="text-xl whitespace-nowrap">Agenda</CardTitle>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
             <Button variant="outline" size="sm" onClick={navigatePrevious}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -1201,8 +1213,8 @@ export function AgendaWidget() {
                 onClick={() => setShowDebug(!showDebug)}
                 className={showDebug ? "bg-blue-100" : ""}
               >
-                <Bug className="h-4 w-4 mr-1" />
-                Debug
+                <Bug className="h-4 w-4 mr-1 sm:mr-1" />
+                <span className={mode === "mobile" ? "hidden sm:inline" : ""}>Debug</span>
               </Button>
             )}
           </div>
@@ -1211,39 +1223,46 @@ export function AgendaWidget() {
 
       <CardContent>
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Tabs defaultValue="daily" value={view} onValueChange={(v) => setView(v as any)}>
-              <TabsList>
-                <TabsTrigger value="daily" className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Giornaliera
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2">
+            <Tabs
+              defaultValue={mode === "mobile" ? "daily" : "daily"}
+              value={view}
+              onValueChange={(v) => setView(v as any)}
+            >
+              <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-none">
+                <TabsTrigger value="daily" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Giorno
                 </TabsTrigger>
-                <TabsTrigger value="weekly" className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Settimanale
+                <TabsTrigger value="weekly" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Settimana
                 </TabsTrigger>
-                <TabsTrigger value="monthly" className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Mensile
-                </TabsTrigger>
+                {mode === "desktop" && ( // Conditionally render Monthly tab
+                  <TabsTrigger value="monthly" className="flex items-center gap-1 text-xs sm:text-sm">
+                    <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Mese
+                  </TabsTrigger>
+                )}
               </TabsList>
             </Tabs>
 
-            <div className="flex items-center gap-2">
-              <div className="relative w-48">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
+              <div className="relative w-full sm:w-48">
                 <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                 <Input
                   placeholder="Cerca..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="pl-8 text-sm"
+                  aria-label="Cerca nell'agenda"
                 />
               </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <Filter className="h-4 w-4" />
+                  <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs sm:text-sm">
+                    <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
                     Filtri
                   </Button>
                 </DropdownMenuTrigger>
@@ -1356,21 +1375,28 @@ export function AgendaWidget() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button variant="outline" size="sm" onClick={exportAgenda} className="flex items-center gap-1">
-                <Download className="h-4 w-4" />
-                Esporta
-              </Button>
-
-              <Button variant="default" size="sm" className="flex items-center gap-1">
-                <Plus className="h-4 w-4" />
-                Nuovo
-              </Button>
-
+              {mode === "desktop" && ( // Conditionally render Export and New for desktop only for now
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportAgenda}
+                    className="flex items-center gap-1 text-xs sm:text-sm"
+                  >
+                    <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Esporta
+                  </Button>
+                  <Button variant="default" size="sm" className="flex items-center gap-1 text-xs sm:text-sm">
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Nuovo
+                  </Button>
+                </>
+              )}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <HelpCircle className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                      <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       <span className="sr-only">Legenda</span>
                     </Button>
                   </TooltipTrigger>
@@ -1383,9 +1409,11 @@ export function AgendaWidget() {
             </div>
           </div>
 
-          {/* Legenda dei colori */}
+          {/* ColorLegend can remain, it's small */}
           <ColorLegend />
 
+          {/* Error and Loading states remain the same */}
+          {/* Views rendering: Daily, Weekly, Monthly (conditionally) */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -1415,7 +1443,6 @@ export function AgendaWidget() {
                   isDebugEnabled={isDebugAllowed}
                 />
               )}
-
               {view === "weekly" && (
                 <WeeklyView
                   items={filteredItems}
@@ -1424,15 +1451,15 @@ export function AgendaWidget() {
                   isDebugEnabled={isDebugAllowed}
                 />
               )}
-
-              {view === "monthly" && (
-                <MonthlyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
+              {mode === "desktop" &&
+                view === "monthly" && ( // Conditionally render Monthly view
+                  <MonthlyView
+                    items={filteredItems}
+                    currentDate={currentDate}
+                    filters={filters}
+                    isDebugEnabled={isDebugAllowed}
+                  />
+                )}
 
               <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
                 <div className="flex items-center">
