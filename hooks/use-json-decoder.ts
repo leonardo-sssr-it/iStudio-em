@@ -9,6 +9,15 @@ export interface PriorityConfig {
   colore?: string
 }
 
+export interface KanbanColumnConfig {
+  id: string // String representation of 'livello' (e.g., "1", "2")
+  title: string // Nome della priorità
+  description?: string // Descrizione della priorità
+  headerColor?: string // Colore per l'header della colonna
+  level: number // Livello numerico originale
+  isEmpty: boolean // Indica se la colonna è vuota (sarà aggiornato dinamicamente)
+}
+
 export function useJsonDecoder() {
   const decodePriorities = useMemo(() => {
     return (jsonString: string | null | undefined): PriorityConfig[] => {
@@ -63,6 +72,22 @@ export function useJsonDecoder() {
     }
   }, [])
 
+  const createKanbanColumns = useMemo(() => {
+    return (priorities: PriorityConfig[]): KanbanColumnConfig[] => {
+      const columns: KanbanColumnConfig[] = priorities.map((priority) => ({
+        id: String(priority.livello),
+        title: priority.nome,
+        description: priority.descrizione,
+        headerColor: priority.colore || `bg-gray-200 dark:bg-gray-700`,
+        level: priority.livello,
+        isEmpty: true, // Will be updated when items are loaded
+      }))
+
+      console.log("useJsonDecoder: Created Kanban columns config:", columns)
+      return columns
+    }
+  }, [])
+
   const decodeGenericJson = useMemo(() => {
     return <T = any>(jsonString: string | null | undefined, fallback: T): T => {
       if (!jsonString) {
@@ -86,6 +111,7 @@ export function useJsonDecoder() {
 
   return {
     decodePriorities,
+    createKanbanColumns,
     decodeGenericJson,
   }
 }

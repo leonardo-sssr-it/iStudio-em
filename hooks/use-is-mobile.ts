@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react"
 
-export function useIsMobile(breakpoint = 1024) {
+export function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < breakpoint)
+      const width = window.innerWidth < breakpoint
+      const userAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      setIsMobile(width || userAgent)
     }
 
     // Check initial state

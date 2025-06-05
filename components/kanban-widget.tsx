@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link" // Import Link
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, CheckCircle, Clock, GripVertical } from "lucide-react"
@@ -13,17 +13,9 @@ import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import { useJsonDecoder, type PriorityConfig } from "@/hooks/use-json-decoder"
+import { useJsonDecoder, type KanbanColumnConfig } from "@/hooks/use-json-decoder"
 
 // --- Tipi Definiti ---
-type PrioritaConfigItem = {
-  id: string // String representation of 'livello' (e.g., "1", "2")
-  nome: string // Title for the column header (from config.nome)
-  descrizione?: string // Tooltip for the column header (from config.descrizione)
-  colore?: string
-  livello: number // The numeric priority level (from config.livello)
-}
-
 type KanbanItemBase = {
   id: string // Unique ID for DND (e.g., "attivita-123")
   title: string
@@ -41,15 +33,16 @@ type KanbanItem = KanbanItemBase & {
   originalRecordId: number // Actual ID in the database table
   id_utente?: string
   dbPriorityValue: string | number | null | Record<string, any> // Raw priority value from DB
-  assignedPriorityConfigId: string | null // Matched PrioritaConfigItem.id (String(livello))
+  assignedPriorityLevel: number | null // Matched priority level
 }
 
 type KanbanColumn = {
-  id: string // Corresponds to PrioritaConfigItem.id or UNCATEGORIZED_COLUMN_ID
-  title: string // From PrioritaConfigItem.nome
-  descrizione?: string // From PrioritaConfigItem.descrizione
+  id: string // Corresponds to KanbanColumnConfig.id or UNCATEGORIZED_COLUMN_ID
+  title: string // From KanbanColumnConfig.title
+  description?: string // From KanbanColumnConfig.description
   headerColor?: string
   items: KanbanItem[]
+  level?: number // Priority level
   isUncategorized?: boolean
 }
 
@@ -73,10 +66,10 @@ export function KanbanWidget() {
   const { toast } = useToast()
 
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
-  const [prioritiesConfig, setPrioritiesConfig] = useState<PrioritaConfigItem[]>([])
+  const [kanbanColumnsConfig, setKanbanColumnsConfig] = useState<KanbanColumnConfig[]>([])
   const [isDebugEnabled, setIsDebugEnabled] = useState(false)
 
-  const { decodePriorities } = useJsonDecoder()
+  const { decodePriorities, createKanbanColumns } = useJsonDecoder()
 
   const loadConfigAndPriorities = useCallback(async () => {
     if (!supabase || supabaseIsInitializing) {
@@ -92,52 +85,47 @@ export function KanbanWidget() {
       if (!configData) throw new Error("Configurazione non trovata.")
 
       // Use the JSON decoder hook to parse priorities
-      const decodedPriorities: PriorityConfig[] = decodePriorities(configData.priorita)
+      const decodedPriorities = decodePriorities(configData.priorita)
 
-      // Convert to PrioritaConfigItem format
-      const parsedPriorities: PrioritaConfigItem[] = decodedPriorities.map((p) => ({
-        id: String(p.livello), // Use stringified 'livello' as the unique ID
-        nome: p.nome,
-        descrizione: p.descrizione || "",
-        colore: p.colore,
-        livello: p.livello, // Store the numeric level
-      }))
+      // Create Kanban columns configuration
+      const columnsConfig = createKanbanColumns(decodedPriorities)
 
-      if (parsedPriorities.length === 0) {
-        console.warn("KanbanWidget: Nessuna priorità valida trovata nella configurazione.")
+      if (columnsConfig.length === 0) {
+        console.warn("KanbanWidget: Nessuna colonna di priorità valida trovata nella configurazione.")
       }
 
-      return { parsedPriorities, isDebug: configData.debug === true }
+      return { columnsConfig, isDebug: configData.debug === true }
     } catch (err: any) {
       console.error("KanbanWidget: Errore durante il caricamento della configurazione delle priorità:", err)
       const specificError = new Error(`Errore caricamento configurazione priorità: ${err.message}`)
       ;(specificError as any).originalError = err
       throw specificError
     }
-  }, [supabase, supabaseIsInitializing, decodePriorities])
+  }, [supabase, supabaseIsInitializing, decodePriorities, createKanbanColumns])
 
-  const getPriorityIdentifierFromDbItem = useCallback(
+  const getPriorityLevelFromDbItem = useCallback(
     (
       itemData: any,
-      localPrioritiesConfig: PrioritaConfigItem[],
-    ): { assignedId: string | null; rawValue: string | number | null | Record<string, any> } => {
+      localColumnsConfig: KanbanColumnConfig[],
+    ): { assignedLevel: number | null; rawValue: string | number | null | Record<string, any> } => {
       const rawPriority = itemData.priorita ?? itemData.priorita_id ?? null
-      if (rawPriority === null || rawPriority === undefined) return { assignedId: null, rawValue: null }
+      if (rawPriority === null || rawPriority === undefined) return { assignedLevel: null, rawValue: null }
 
-      let matchingPriorityConfig: PrioritaConfigItem | undefined
+      let matchingLevel: number | null = null
 
       if (typeof rawPriority === "number") {
-        matchingPriorityConfig = localPrioritiesConfig.find((p) => p.livello === rawPriority)
+        const matchingConfig = localColumnsConfig.find((config) => config.level === rawPriority)
+        matchingLevel = matchingConfig ? rawPriority : null
       } else if (typeof rawPriority === "string") {
         const numericValue = Number.parseInt(rawPriority, 10)
         if (!isNaN(numericValue)) {
-          matchingPriorityConfig = localPrioritiesConfig.find((p) => p.livello === numericValue)
+          const matchingConfig = localColumnsConfig.find((config) => config.level === numericValue)
+          matchingLevel = matchingConfig ? numericValue : null
         }
       }
-      // Could add handling for object-type rawPriority if necessary
 
       return {
-        assignedId: matchingPriorityConfig ? matchingPriorityConfig.id : null, // This will be String(livello)
+        assignedLevel: matchingLevel,
         rawValue: rawPriority,
       }
     },
@@ -145,13 +133,12 @@ export function KanbanWidget() {
   )
 
   const loadItems = useCallback(
-    async (userForQuery: AuthUser, currentPriorities: PrioritaConfigItem[]) => {
+    async (userForQuery: AuthUser, currentColumnsConfig: KanbanColumnConfig[]) => {
       if (!supabase) return []
       if (!userForQuery) return []
 
       const tables: KanbanItem["originalTable"][] = ["attivita", "progetti", "todolist"]
       let allKanbanItems: KanbanItem[] = []
-      const validLivellos = currentPriorities.map((p) => p.livello)
 
       for (const table of tables) {
         const { data, error } = await supabase.from(table).select("*").eq("id_utente", userForQuery.id)
@@ -162,18 +149,7 @@ export function KanbanWidget() {
         }
         if (data) {
           const items: KanbanItem[] = data.map((itemData: any) => {
-            const { assignedId, rawValue } = getPriorityIdentifierFromDbItem(itemData, currentPriorities)
-
-            // Determine if the item should be in "Uncategorized"
-            // It's uncategorized if assignedId is null (no matching config)
-            // OR if rawValue is a number but not one of the configured valid 'livello's
-            const finalAssignedId = assignedId
-            if (assignedId === null && typeof rawValue === "number" && !validLivellos.includes(rawValue)) {
-              // It has a numeric priority, but this number doesn't match any configured 'livello'.
-              // Keep finalAssignedId as null to place it in Uncategorized.
-            } else if (assignedId === null && (rawValue === null || rawValue === undefined)) {
-              // No priority set, definitely uncategorized.
-            }
+            const { assignedLevel, rawValue } = getPriorityLevelFromDbItem(itemData, currentColumnsConfig)
 
             return {
               id: `${table}-${itemData.id}`,
@@ -189,7 +165,7 @@ export function KanbanWidget() {
               originalRecordId: itemData.id,
               id_utente: itemData.id_utente,
               dbPriorityValue: rawValue,
-              assignedPriorityConfigId: finalAssignedId,
+              assignedPriorityLevel: assignedLevel,
             }
           })
           allKanbanItems = [...allKanbanItems, ...items]
@@ -197,7 +173,7 @@ export function KanbanWidget() {
       }
       return allKanbanItems
     },
-    [supabase, toast, getPriorityIdentifierFromDbItem],
+    [supabase, toast, getPriorityLevelFromDbItem],
   )
 
   useEffect(() => {
@@ -230,37 +206,40 @@ export function KanbanWidget() {
           return
         }
 
-        const { parsedPriorities: fetchedPriorities, isDebug: fetchedIsDebug } = configResult
+        const { columnsConfig, isDebug: fetchedIsDebug } = configResult
 
-        // ADD THIS CONSOLE LOG:
-        console.log("KanbanWidget: Fetched and Parsed Priorities Config:", fetchedPriorities)
+        console.log("KanbanWidget: Loaded Kanban columns configuration:", columnsConfig)
 
         if (isActive) {
-          setPrioritiesConfig(fetchedPriorities)
+          setKanbanColumnsConfig(columnsConfig)
           setIsDebugEnabled(fetchedIsDebug)
         }
 
-        const allItems = await loadItems(authUser, fetchedPriorities)
+        const allItems = await loadItems(authUser, columnsConfig)
         if (!isActive) return
 
         const newColumns: KanbanColumn[] = []
+
         // Uncategorized column first
         newColumns.push({
           id: UNCATEGORIZED_COLUMN_ID,
-          title: "Non Categorizzati / Priorità Disallineata",
-          descrizione: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
+          title: "Non Categorizzati",
+          description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
           headerColor: "bg-slate-200 dark:bg-slate-700",
-          items: allItems.filter((item) => item.assignedPriorityConfigId === null),
+          items: allItems.filter((item) => item.assignedPriorityLevel === null),
           isUncategorized: true,
         })
-        // Then, columns from configuration, sorted by 'livello'
-        fetchedPriorities.forEach((pConfig) => {
+
+        // Then, columns from configuration, sorted by level
+        columnsConfig.forEach((columnConfig) => {
+          const columnItems = allItems.filter((item) => item.assignedPriorityLevel === columnConfig.level)
           newColumns.push({
-            id: pConfig.id, // This is String(pConfig.livello)
-            title: pConfig.nome,
-            descrizione: pConfig.descrizione,
-            headerColor: pConfig.colore || "bg-gray-200 dark:bg-gray-700",
-            items: allItems.filter((item) => item.assignedPriorityConfigId === pConfig.id),
+            id: columnConfig.id,
+            title: columnConfig.title,
+            description: columnConfig.description,
+            headerColor: columnConfig.headerColor,
+            level: columnConfig.level,
+            items: columnItems,
           })
         })
 
@@ -294,8 +273,6 @@ export function KanbanWidget() {
 
     if (!sourceColumn || !destinationColumn || !draggedItem) return
 
-    const currentPrioritiesForDrag = prioritiesConfig // Use the state variable
-
     // Optimistic UI update
     const newColumnsState = columns.map((col) => {
       if (col.id === source.droppableId) return { ...col, items: col.items.filter((item) => item.id !== draggableId) }
@@ -303,7 +280,8 @@ export function KanbanWidget() {
         const newItems = Array.from(col.items)
         const updatedDraggedItem = {
           ...draggedItem,
-          assignedPriorityConfigId: destinationColumn.id === UNCATEGORIZED_COLUMN_ID ? null : destinationColumn.id,
+          assignedPriorityLevel:
+            destinationColumn.id === UNCATEGORIZED_COLUMN_ID ? null : destinationColumn.level || null,
         }
         newItems.splice(destination.index, 0, updatedDraggedItem)
         return { ...col, items: newItems }
@@ -313,20 +291,11 @@ export function KanbanWidget() {
     setColumns(newColumnsState)
 
     // Determine the new priority value for the database
-    let newDbPriorityValue: number | null = null // DB expects numeric 'livello' or null
-    const targetPriorityConfigItem = currentPrioritiesForDrag.find((p) => p.id === destinationColumn.id) // p.id is String(livello)
-
+    let newDbPriorityValue: number | null = null
     if (destinationColumn.id === UNCATEGORIZED_COLUMN_ID) {
       newDbPriorityValue = null
-    } else if (targetPriorityConfigItem) {
-      newDbPriorityValue = targetPriorityConfigItem.livello // This is the numeric level
     } else {
-      console.error(
-        `Configurazione priorità non trovata per colonna ID: ${destinationColumn.id}. La priorità non sarà modificata.`,
-      )
-      // Revert UI if config not found for a supposedly valid column
-      // For now, we proceed but the DB update for priority might be null or skipped.
-      // This case should ideally not happen if columns are generated from prioritiesConfig.
+      newDbPriorityValue = destinationColumn.level || null
     }
 
     const priorityFieldName = "priorita" // Field name in your DB tables
@@ -352,26 +321,27 @@ export function KanbanWidget() {
         description: `Impossibile aggiornare la priorità: ${err.message}`,
         variant: "destructive",
       })
-      // Revert UI on error by re-fetching or rolling back the optimistic update
+      // Revert UI on error by re-fetching
       if (currentUser) {
-        loadItems(currentUser, currentPrioritiesForDrag).then((allItems) => {
+        loadItems(currentUser, kanbanColumnsConfig).then((allItems) => {
           const revertedCols: KanbanColumn[] = []
           revertedCols.push({
             id: UNCATEGORIZED_COLUMN_ID,
-            title: "Non Categorizzati / Priorità Disallineata",
-            descrizione: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
+            title: "Non Categorizzati",
+            description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
             headerColor: "bg-slate-200 dark:bg-slate-700",
-            items: allItems.filter((item) => item.assignedPriorityConfigId === null),
+            items: allItems.filter((item) => item.assignedPriorityLevel === null),
             isUncategorized: true,
           })
-          currentPrioritiesForDrag.forEach((pConfig) => {
-            // currentPrioritiesForDrag is prioritiesConfig
+          kanbanColumnsConfig.forEach((columnConfig) => {
+            const columnItems = allItems.filter((item) => item.assignedPriorityLevel === columnConfig.level)
             revertedCols.push({
-              id: pConfig.id,
-              title: pConfig.nome,
-              descrizione: pConfig.descrizione,
-              headerColor: pConfig.colore || "bg-gray-200 dark:bg-gray-700",
-              items: allItems.filter((item) => item.assignedPriorityConfigId === pConfig.id),
+              id: columnConfig.id,
+              title: columnConfig.title,
+              description: columnConfig.description,
+              headerColor: columnConfig.headerColor,
+              level: columnConfig.level,
+              items: columnItems,
             })
           })
           setColumns(revertedCols)
@@ -390,13 +360,52 @@ export function KanbanWidget() {
   }
 
   if (isLoading) {
-    /* Skeleton UI */
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Caricamento Kanban...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex-shrink-0 w-72 md:w-80 bg-muted/50 rounded-lg p-4">
+                <div className="h-10 bg-muted rounded mb-4" />
+                <div className="space-y-3">
+                  <div className="h-28 bg-muted rounded" />
+                  <div className="h-28 bg-muted rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
+
   if (error) {
-    /* Error UI */
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Errore Kanban</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-destructive">{error}</p>
+        </CardContent>
+      </Card>
+    )
   }
+
   if (!currentUser) {
-    /* Not logged in UI */
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Accesso Richiesto</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Effettua l'accesso per visualizzare il Kanban.</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -422,9 +431,9 @@ export function KanbanWidget() {
                       className={cn(
                         "px-3 py-2 rounded-t-md mb-2 sticky top-0 z-10",
                         column.headerColor || "bg-gray-200 dark:bg-gray-800",
-                        "text-sm font-semibold text-foreground", // Ensure text is visible on custom header colors
+                        "text-sm font-semibold text-foreground",
                       )}
-                      title={column.descrizione} // Tooltip for column description
+                      title={column.description}
                     >
                       <h3 className="truncate flex items-center justify-between">
                         {column.title}
@@ -445,28 +454,26 @@ export function KanbanWidget() {
                             <Link
                               href={`/data-explorer/${item.originalTable}/${item.originalRecordId}`}
                               passHref
-                              legacyBehavior // Needed if <a> is direct child
+                              legacyBehavior
                             >
-                              <a // Main clickable area for navigation
+                              <a
                                 ref={providedDraggable.innerRef}
                                 {...providedDraggable.draggableProps}
-                                // dragHandleProps is moved to the GripVertical icon's container
                                 className={cn(
                                   "p-2.5 rounded-md border bg-card shadow-sm block cursor-pointer hover:shadow-md transition-shadow",
                                   PASTEL_COLORS[item.originalTable],
                                   snapshotDraggable.isDragging && "shadow-xl ring-2 ring-primary scale-105 opacity-95",
                                 )}
                                 onClick={(e) => {
-                                  // Prevent navigation during drag initiation
                                   if (snapshotDraggable.isDragging) {
                                     e.preventDefault()
                                   }
                                 }}
                               >
-                                <div // Container for drag handle and title
-                                  {...providedDraggable.dragHandleProps} // Apply drag handle here
+                                <div
+                                  {...providedDraggable.dragHandleProps}
                                   className="flex items-start mb-1 cursor-grab active:cursor-grabbing"
-                                  onClick={(e) => e.stopPropagation()} // Prevent click on handle from navigating if link is on parent
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground/70 flex-shrink-0 mt-0.5" />
                                   <h4
@@ -479,13 +486,10 @@ export function KanbanWidget() {
 
                                 {item.description && (
                                   <p className="text-xs text-muted-foreground line-clamp-2 my-1.5 ml-5">
-                                    {" "}
                                     {item.description}
                                   </p>
                                 )}
                                 <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs ml-5">
-                                  {" "}
-                                  {/* Indent badges */}
                                   {item.stato && (
                                     <Badge
                                       variant="outline"
@@ -523,8 +527,6 @@ export function KanbanWidget() {
                                   item.dbPriorityValue !== null &&
                                   item.dbPriorityValue !== undefined && (
                                     <p className="text-xs text-muted-foreground/80 mt-1.5 pt-1 border-t border-dashed ml-5">
-                                      {" "}
-                                      {/* Indent debug info */}
                                       Prio. DB:{" "}
                                       {typeof item.dbPriorityValue === "object"
                                         ? JSON.stringify(item.dbPriorityValue)
@@ -548,16 +550,3 @@ export function KanbanWidget() {
     </Card>
   )
 }
-
-// Helper to render Skeleton, Error, and Not Logged In UI (keep them concise or as separate components)
-// For brevity, I'll assume these parts are correctly implemented or can be reused.
-// Example for Skeleton:
-// if (isLoading) {
-//   return (
-//     <Card className="w-full">
-//       <CardHeader><CardTitle className="flex items-center"><Loader2 className="h-5 w-5 mr-2 animate-spin" />Caricamento Kanban...</CardTitle></CardHeader>
-//       <CardContent><div className="flex gap-4 overflow-x-auto pb-4">{[1, 2, 3].map((i) => (<div key={i} className="flex-shrink-0 w-72 md:w-80"><Skeleton className="h-10 w-full mb-4" /><div className="space-y-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-full" /></div></div>))}</div></CardContent>
-//     </Card>
-//   );
-// }
-// Similar for error and !currentUser states.
