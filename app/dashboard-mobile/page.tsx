@@ -46,7 +46,7 @@ function DashboardMobileContent() {
         <CardContent className="p-4">
           <Link
             href="/dashboard-mobile/agenda"
-            className="flex items-center justify-between p-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            className="flex items-center justify-between p-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
           >
             <div className="flex items-center">
               <LayoutGrid className="h-6 w-6 mr-3" />
