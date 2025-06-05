@@ -402,7 +402,7 @@ export function KanbanWidget() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Kanban Board</CardTitle>
+        <CardTitle>Vista Kanban delle Priorità</CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
