@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { useJsonDecoder, type PriorityConfig } from "@/hooks/use-json-decoder"
 
 // --- Tipi Definiti ---
 type PrioritaConfigItem = {
@@ -75,6 +76,8 @@ export function KanbanWidget() {
   const [prioritiesConfig, setPrioritiesConfig] = useState<PrioritaConfigItem[]>([])
   const [isDebugEnabled, setIsDebugEnabled] = useState(false)
 
+  const { decodePriorities } = useJsonDecoder()
+
   const loadConfigAndPriorities = useCallback(async () => {
     if (!supabase || supabaseIsInitializing) {
       return null
@@ -88,47 +91,30 @@ export function KanbanWidget() {
       if (configError) throw configError
       if (!configData) throw new Error("Configurazione non trovata.")
 
-      let parsedPriorities: PrioritaConfigItem[] = []
-      if (Array.isArray(configData.priorita)) {
-        parsedPriorities = configData.priorita
-          .map((p: any): PrioritaConfigItem | null => {
-            if (typeof p.livello !== "number") {
-              console.warn(
-                `KanbanWidget: Priorità con nome "${p.nome || "Sconosciuto"}" scartata. 'livello' mancante o non numerico.`,
-                p,
-              )
-              return null
-            }
-            if (typeof p.nome !== "string" || p.nome.trim() === "") {
-              console.warn(`KanbanWidget: Priorità con livello "${p.livello}" scartata. 'nome' mancante o vuoto.`, p)
-              return null
-            }
-            return {
-              id: String(p.livello), // Use stringified 'livello' as the unique ID
-              nome: p.nome,
-              descrizione: p.descrizione || "",
-              colore: p.colore,
-              livello: p.livello, // Store the numeric level
-            }
-          })
-          .filter((p): p is PrioritaConfigItem => p !== null) // Type guard to filter out nulls
-          .sort((a, b) => a.livello - b.livello) // Sort by level
-      } else {
-        console.warn("KanbanWidget: configurazione.priorita non è un array o è mancante.")
-      }
+      // Use the JSON decoder hook to parse priorities
+      const decodedPriorities: PriorityConfig[] = decodePriorities(configData.priorita)
+
+      // Convert to PrioritaConfigItem format
+      const parsedPriorities: PrioritaConfigItem[] = decodedPriorities.map((p) => ({
+        id: String(p.livello), // Use stringified 'livello' as the unique ID
+        nome: p.nome,
+        descrizione: p.descrizione || "",
+        colore: p.colore,
+        livello: p.livello, // Store the numeric level
+      }))
 
       if (parsedPriorities.length === 0) {
         console.warn("KanbanWidget: Nessuna priorità valida trovata nella configurazione.")
       }
+
       return { parsedPriorities, isDebug: configData.debug === true }
     } catch (err: any) {
       console.error("KanbanWidget: Errore durante il caricamento della configurazione delle priorità:", err)
-      // Rethrow a more specific error or handle it to set an error state
       const specificError = new Error(`Errore caricamento configurazione priorità: ${err.message}`)
       ;(specificError as any).originalError = err
       throw specificError
     }
-  }, [supabase, supabaseIsInitializing])
+  }, [supabase, supabaseIsInitializing, decodePriorities])
 
   const getPriorityIdentifierFromDbItem = useCallback(
     (
