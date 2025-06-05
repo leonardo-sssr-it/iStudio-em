@@ -6,12 +6,14 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AlertCircle, Calendar, CheckCircle, Clock, GripVertical, Loader2 } from "lucide-react"
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
-import { useSupabase } from "@/lib/supabase-provider" // AGGIUNGERE: Importa useSupabase
+import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider" // AGGIUNTO: Importa useAuth
+import type { AuthUser } from "@/lib/auth-context" // AGGIUNTO: Importa AuthUser type
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import type { User } from "@supabase/supabase-js"
+// Rimosso: import type { User } from "@supabase/supabase-js"
 
 // --- Tipi Definiti ---
 type PrioritaConfigItem = {
@@ -58,44 +60,25 @@ const PASTEL_COLORS: Record<KanbanItem["originalTable"], string> = {
 const UNCATEGORIZED_COLUMN_ID = "uncategorized"
 
 export function KanbanWidget() {
+  const { user: authUser, isLoading: authIsLoading } = useAuth() // OTTIENI: Utente da AuthProvider
+  const { supabase, isInitializing: supabaseIsInitializing } = useSupabase()
+
   const [columns, setColumns] = useState<KanbanColumn[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true) // Loading state per i dati del Kanban
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
-  // const supabase = createClientComponentClient() // RIMUOVERE QUESTA RIGA
-  const { supabase, isInitializing: supabaseInitializing } = useSupabase() // USARE QUESTO
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null) // MODIFICATO: Tipo a AuthUser
   const [prioritiesConfig, setPrioritiesConfig] = useState<PrioritaConfigItem[]>([])
   const [isDebugEnabled, setIsDebugEnabled] = useState(false)
 
-  const loadInitialData = useCallback(async () => {
-    // Aggiunto controllo per supabase e supabaseInitializing
-    if (!supabase || supabaseInitializing) {
-      console.log("KanbanWidget: Supabase client non pronto, attesa per loadInitialData.")
-      // Non impostare errore qui, l'useEffect esterno gestirà lo stato di caricamento/errore
-      // basato su supabaseInitializing. Restituire null per indicare che i dati non sono pronti.
+  // Carica solo la configurazione delle priorità e il flag di debug
+  const loadConfigAndPriorities = useCallback(async () => {
+    if (!supabase || supabaseIsInitializing) {
+      console.log("KanbanWidget: Supabase client non pronto per caricare la configurazione.")
       return null
     }
-
-    // Non è necessario setIsLoading(true) qui, lo gestisce l'useEffect chiamante
-    // setError(null) viene gestito anche dall'useEffect chiamante prima di fetchData
-
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-      if (userError || !user) {
-        // Se l'errore è "Auth session missing!", lancialo specificamente
-        if (userError?.message.includes("Auth session missing!")) {
-          throw new Error("Auth session missing!")
-        }
-        throw new Error(userError?.message || "Utente non autenticato.")
-      }
-      // Non è necessario setCurrentUser qui se lo restituiamo e lo gestisce l'useEffect
-      // setCurrentUser(user)
-
       const { data: configData, error: configError } = await supabase
         .from("configurazione")
         .select("priorita, debug")
@@ -103,9 +86,6 @@ export function KanbanWidget() {
 
       if (configError) throw configError
       if (!configData) throw new Error("Configurazione non trovata.")
-
-      // Non è necessario setIsDebugEnabled qui se lo restituiamo
-      // setIsDebugEnabled(configData.debug === true)
 
       let parsedPriorities: PrioritaConfigItem[] = []
       if (Array.isArray(configData.priorita)) {
@@ -126,22 +106,17 @@ export function KanbanWidget() {
       if (parsedPriorities.length === 0) {
         console.warn("Nessuna priorità trovata nella configurazione.")
       }
-      // Non è necessario setPrioritiesConfig qui se lo restituiamo
-      // setPrioritiesConfig(parsedPriorities)
-
-      return { user, parsedPriorities, isDebug: configData.debug === true }
+      return { parsedPriorities, isDebug: configData.debug === true }
     } catch (err: any) {
-      console.error("Errore nel caricamento dei dati iniziali:", err) // Questo loggherà l'errore "Auth session missing!"
-      // L'errore verrà propagato e gestito dall'useEffect chiamante
-      throw err // Rilancia l'errore per essere catturato da fetchData in useEffect
+      console.error("Errore nel caricamento della configurazione Kanban:", err)
+      throw err
     }
-  }, [supabase, supabaseInitializing]) // Aggiunte dipendenze
+  }, [supabase, supabaseIsInitializing])
 
   const getPriorityIdentifierFromDbItem = useCallback(
     (
-      // Aggiunto useCallback
       itemData: any,
-      localPrioritiesConfig: PrioritaConfigItem[], // Usare le priorità passate
+      localPrioritiesConfig: PrioritaConfigItem[],
     ): { assignedId: string | null; rawValue: string | number | null | Record<string, any> } => {
       const rawPriority = itemData.priorita ?? itemData.priorita_id ?? null
       if (rawPriority === null || rawPriority === undefined) return { assignedId: null, rawValue: null }
@@ -167,22 +142,27 @@ export function KanbanWidget() {
       return { assignedId: null, rawValue: rawPriority }
     },
     [],
-  ) // Nessuna dipendenza diretta se localPrioritiesConfig è sempre passato
+  )
 
   const loadItems = useCallback(
-    async (user: User, localPrioritiesConfig: PrioritaConfigItem[]) => {
+    async (userForQuery: AuthUser, currentPriorities: PrioritaConfigItem[]) => {
+      // MODIFICATO: Tipo a AuthUser
       if (!supabase) {
         console.error("KanbanWidget: Supabase client non disponibile in loadItems.")
         return []
       }
-      if (!user) return []
+      if (!userForQuery) {
+        // Dovrebbe essere già gestito dal chiamante
+        console.warn("KanbanWidget: loadItems chiamato senza utente.")
+        return []
+      }
 
       const tables: KanbanItem["originalTable"][] = ["attivita", "progetti", "todolist"]
       let allKanbanItems: KanbanItem[] = []
-      const validLivellos = localPrioritiesConfig.map((p) => p.livello).filter((l) => typeof l === "number") as number[]
+      const validLivellos = currentPriorities.map((p) => p.livello).filter((l) => typeof l === "number") as number[]
 
       for (const table of tables) {
-        const { data, error } = await supabase.from(table).select("*").eq("id_utente", user.id)
+        const { data, error } = await supabase.from(table).select("*").eq("id_utente", userForQuery.id) // USA: userForQuery.id
         if (error) {
           console.error(`Errore nel caricamento da ${table}:`, error)
           toast({ title: `Errore ${table}`, description: error.message, variant: "destructive" })
@@ -190,7 +170,7 @@ export function KanbanWidget() {
         }
         if (data) {
           const items: KanbanItem[] = data.map((itemData: any) => {
-            const { assignedId, rawValue } = getPriorityIdentifierFromDbItem(itemData, localPrioritiesConfig)
+            const { assignedId, rawValue } = getPriorityIdentifierFromDbItem(itemData, currentPriorities)
             let finalAssignedId = assignedId
             if (assignedId === null) {
               if (rawValue === null || rawValue === undefined) finalAssignedId = null
@@ -219,44 +199,59 @@ export function KanbanWidget() {
       }
       return allKanbanItems
     },
-    [supabase, toast, getPriorityIdentifierFromDbItem], // Aggiunta dipendenza
+    [supabase, toast, getPriorityIdentifierFromDbItem],
   )
 
   useEffect(() => {
     let isActive = true
 
     const fetchData = async () => {
-      if (!supabase || supabaseInitializing) {
-        if (!supabase && !supabaseInitializing && isActive) {
-          setError("Client Supabase non disponibile.")
-          setIsLoading(false)
-        }
-        // Se supabaseInitializing è true, aspetta il prossimo run dell'effetto
+      if (authIsLoading || supabaseIsInitializing) {
+        // Attende che auth e supabase siano pronti. Lo stato di isLoading è true di default.
         return
       }
 
+      if (!isActive) return
+
+      if (!authUser) {
+        // Auth ha terminato, supabase è pronto, ma non c'è utente autenticato
+        if (isActive) {
+          setError("Utente non autenticato per visualizzare il Kanban.")
+          setCurrentUser(null)
+          setColumns([])
+          setIsLoading(false)
+        }
+        return
+      }
+
+      // Utente autenticato disponibile, supabase pronto. Procedi.
       if (isActive) {
         setIsLoading(true)
-        setError(null) // Resetta errore precedente
+        setError(null)
+        setCurrentUser(authUser) // Imposta lo stato currentUser locale
       }
 
       try {
-        const initialDataResult = await loadInitialData()
-        if (!initialDataResult || !isActive) {
-          if (isActive && !initialDataResult) setIsLoading(false) // Assicura che isLoading sia false
+        const configResult = await loadConfigAndPriorities()
+        if (!configResult) {
+          // Gestisce il caso in cui loadConfigAndPriorities restituisce null
+          if (isActive) {
+            setError("Impossibile caricare la configurazione del Kanban.")
+            setIsLoading(false)
+          }
           return
         }
+        if (!isActive) return // Controllo dopo chiamata asincrona
 
-        const { user, parsedPriorities: localFetchedPriorities, isDebug: localFetchedIsDebug } = initialDataResult
+        const { parsedPriorities: fetchedPriorities, isDebug: fetchedIsDebug } = configResult
 
         if (isActive) {
-          setCurrentUser(user) // Imposta currentUser qui
-          setPrioritiesConfig(localFetchedPriorities) // Imposta prioritiesConfig qui
-          setIsDebugEnabled(localFetchedIsDebug) // Imposta isDebugEnabled qui
+          setPrioritiesConfig(fetchedPriorities)
+          setIsDebugEnabled(fetchedIsDebug)
         }
 
-        const allItems = await loadItems(user, localFetchedPriorities)
-        if (!isActive) return
+        const allItems = await loadItems(authUser, fetchedPriorities) // Passa authUser e le priorità appena caricate
+        if (!isActive) return // Controllo dopo chiamata asincrona
 
         const newColumns: KanbanColumn[] = []
         newColumns.push({
@@ -266,7 +261,7 @@ export function KanbanWidget() {
           items: allItems.filter((item) => item.assignedPriorityConfigId === null),
           isUncategorized: true,
         })
-        localFetchedPriorities.forEach((pConfig) => {
+        fetchedPriorities.forEach((pConfig) => {
           newColumns.push({
             id: pConfig.id,
             title: pConfig.value,
@@ -277,12 +272,14 @@ export function KanbanWidget() {
 
         if (isActive) {
           setColumns(newColumns)
-          setIsLoading(false)
         }
       } catch (err: any) {
         if (isActive) {
           console.error("KanbanWidget: Errore durante fetchData:", err)
           setError(err.message || "Errore caricamento dati Kanban.")
+        }
+      } finally {
+        if (isActive) {
           setIsLoading(false)
         }
       }
@@ -293,14 +290,15 @@ export function KanbanWidget() {
     return () => {
       isActive = false
     }
-  }, [supabase, supabaseInitializing, loadInitialData, loadItems])
+  }, [authUser, authIsLoading, supabase, supabaseIsInitializing, loadConfigAndPriorities, loadItems])
 
   const handleDragEnd = async (result: DropResult) => {
     if (!supabase) {
-      // Controllo aggiunto
       toast({ title: "Errore", description: "Client Supabase non disponibile.", variant: "destructive" })
       return
     }
+    // currentUser dallo stato è usato per il revert, che è corretto perché è authUser
+    // prioritiesConfig dallo stato è usato, che è corretto
     const { source, destination, draggableId } = result
     if (!destination || (source.droppableId === destination.droppableId && source.index === destination.index)) return
 
@@ -310,7 +308,7 @@ export function KanbanWidget() {
 
     if (!sourceColumn || !destinationColumn || !draggedItem) return
 
-    const currentPriorities = prioritiesConfig // Usa lo stato prioritiesConfig
+    const currentPrioritiesForDrag = prioritiesConfig // Usa lo stato prioritiesConfig
 
     const newColumnsState = columns.map((col) => {
       if (col.id === source.droppableId) return { ...col, items: col.items.filter((item) => item.id !== draggableId) }
@@ -328,7 +326,7 @@ export function KanbanWidget() {
     setColumns(newColumnsState)
 
     let newDbPriorityValue: number | string | null | Record<string, any> = null
-    const targetPriorityConfigItem = currentPriorities.find((p) => p.id === destinationColumn.id)
+    const targetPriorityConfigItem = currentPrioritiesForDrag.find((p) => p.id === destinationColumn.id)
 
     if (destinationColumn.id === UNCATEGORIZED_COLUMN_ID) newDbPriorityValue = null
     else if (targetPriorityConfigItem) {
@@ -357,20 +355,10 @@ export function KanbanWidget() {
         description: `Impossibile aggiornare: ${err.message}`,
         variant: "destructive",
       })
-      // Revert UI (semplificato per brevità, idealmente ricaricare i dati come prima)
-      // Per un revert completo, si dovrebbe ricaricare i dati come nella versione precedente
-      // Per ora, questo revert è solo locale e potrebbe non essere perfetto.
-      // La logica di revert precedente che ricaricava tutto era più robusta.
-      // Per semplicità, la lascio così, ma in produzione si dovrebbe considerare il revert completo.
-      const revertedColumns = [...columns] // Snapshot prima dell'ottimismo
-      // Trova l'item e rimettilo dov'era, o ricarica tutto
-      // Questa parte è complessa, per ora la ometto per focalizzarci sul fix principale
-      // Idealmente, si chiamerebbe di nuovo la sequenza di fetch come nel blocco catch di useEffect.
-      // Per ora, l'UI rimane nello stato ottimistico errato se il DB fallisce.
-      // Sarebbe meglio ricaricare:
+      // Logica di Revert (usa currentUser dallo stato, che è authUser)
       if (currentUser) {
-        // Assicurati che currentUser sia disponibile
-        loadItems(currentUser, currentPriorities).then((allItems) => {
+        loadItems(currentUser, currentPrioritiesForDrag).then((allItems) => {
+          // Passa currentPrioritiesForDrag
           const revertedCols: KanbanColumn[] = []
           revertedCols.push({
             id: UNCATEGORIZED_COLUMN_ID,
@@ -379,7 +367,7 @@ export function KanbanWidget() {
             items: allItems.filter((item) => item.assignedPriorityConfigId === null),
             isUncategorized: true,
           })
-          currentPriorities.forEach((pConfig) => {
+          currentPrioritiesForDrag.forEach((pConfig) => {
             revertedCols.push({
               id: pConfig.id,
               title: pConfig.value,
@@ -387,7 +375,7 @@ export function KanbanWidget() {
               items: allItems.filter((item) => item.assignedPriorityConfigId === pConfig.id),
             })
           })
-          setColumns(revertedCols)
+          setColumns(revertedCols) // Revert UI
         })
       }
     }
@@ -402,9 +390,8 @@ export function KanbanWidget() {
     }
   }
 
-  // Stati di rendering (caricamento, errore, nessun utente)
-  if (isLoading && columns.length === 0) {
-    // Mostra skeleton solo se non ci sono ancora colonne
+  if (isLoading) {
+    // Mostra skeleton se isLoading è true (impostato all'inizio di fetchData)
     return (
       <Card className="w-full">
         <CardHeader>
@@ -441,57 +428,15 @@ export function KanbanWidget() {
           <p className="text-sm text-destructive">{error}</p>
           <button
             onClick={() => {
-              // Logica di retry migliorata
+              // Per il retry, resettare isLoading e error e lasciare che useEffect faccia il suo corso
+              // Potrebbe essere necessario un modo per forzare il re-fetch se le dipendenze non cambiano.
+              // Per ora, un semplice reset potrebbe funzionare se l'errore era transitorio.
+              // Una strategia di retry più robusta potrebbe usare un contatore di tentativi.
               setIsLoading(true)
               setError(null)
-              // Non c'è bisogno di chiamare loadInitialData e loadItems direttamente qui,
-              // l'useEffect principale verrà rieseguito quando supabase/supabaseInitializing cambiano,
-              // o possiamo forzare un re-fetch modificando una dipendenza fittizia se necessario,
-              // ma la struttura attuale di useEffect dovrebbe gestire il re-fetch se lo stato di errore viene resettato.
-              // Per un retry esplicito, potremmo aggiungere un contatore di retry allo stato e incrementarlo.
-              // Per ora, resettare l'errore e isLoading potrebbe essere sufficiente se l'useEffect è ben strutturato.
-              // La cosa più semplice è richiamare la logica di fetch dell'useEffect:
-              const mainFetchData = async () => {
-                if (!supabase || supabaseInitializing) {
-                  /* ... gestisci ... */ return
-                }
-                try {
-                  const initialDataResult = await loadInitialData()
-                  if (!initialDataResult) {
-                    setIsLoading(false)
-                    return
-                  }
-                  const {
-                    user,
-                    parsedPriorities: localFetchedPriorities,
-                    isDebug: localFetchedIsDebug,
-                  } = initialDataResult
-                  setCurrentUser(user)
-                  setPrioritiesConfig(localFetchedPriorities)
-                  setIsDebugEnabled(localFetchedIsDebug)
-                  const allItems = await loadItems(user, localFetchedPriorities)
-                  const newCols: KanbanColumn[] = []
-                  newCols.push({
-                    /* ... uncategorized ... */ items: allItems.filter(
-                      (item) => item.assignedPriorityConfigId === null,
-                    ) /* ... */,
-                  })
-                  localFetchedPriorities.forEach((pConfig) =>
-                    newCols.push({
-                      /* ... priority col ... */ items: allItems.filter(
-                        (item) => item.assignedPriorityConfigId === pConfig.id,
-                      ) /* ... */,
-                    }),
-                  )
-                  setColumns(newCols)
-                  setIsLoading(false)
-                  setError(null)
-                } catch (err: any) {
-                  setError(err.message)
-                  setIsLoading(false)
-                }
-              }
-              mainFetchData()
+              // L'useEffect con le sue dipendenze (authUser, authIsLoading, etc.) dovrebbe
+              // rieseguire fetchData se lo stato di auth o supabase cambia o se questi erano la causa.
+              // Se l'errore è persistente nella logica di fetch, questo non lo risolverà.
             }}
             className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
           >
@@ -502,8 +447,8 @@ export function KanbanWidget() {
     )
   }
 
-  if (!currentUser && !isLoading) {
-    // Mostra solo se non sta caricando e non c'è utente
+  if (!currentUser) {
+    // Se non c'è utente (e non sta caricando e non c'è errore)
     return (
       <Card className="w-full">
         <CardHeader>
@@ -516,7 +461,6 @@ export function KanbanWidget() {
     )
   }
 
-  // Rendering del Kanban effettivo
   return (
     <Card className="w-full overflow-hidden">
       <CardHeader>
