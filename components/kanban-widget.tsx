@@ -4,337 +4,409 @@ import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertCircle, Calendar, CheckCircle, Clock, Loader2 } from "lucide-react"
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
+import { AlertCircle, Calendar, CheckCircle, Clock, GripVertical, Loader2 } from "lucide-react"
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import type { User } from "@supabase/supabase-js"
 
-// Definizione dei tipi
-type KanbanItem = {
-  id: string
+// --- Tipi Definiti ---
+type PrioritaConfigItem = {
+  id: string // Identificatore unico testuale (es. "alta", "p1")
+  value: string // Nome visualizzato (es. "Alta Priorità")
+  colore?: string // Colore per l'intestazione della colonna (es. "bg-red-500", "#FF0000")
+  livello?: number // Livello numerico della priorità
+}
+
+type KanbanItemBase = {
+  id: string // ID unico per D&D (es. "attivita-123")
   title: string
   description?: string
-  priorita: string | { id: string; value: string } | null
-  priorita_id?: string
-  priorita_value?: string
-  colore?: string
+  colore?: string // Colore specifico dell'item (diverso dal colore della tabella)
   data_inizio?: string | Date | null
   data_fine?: string | Date | null
   scadenza?: string | Date | null
-  tabella: string
-  record_id: number
   stato?: string
   avanzamento?: number
 }
 
-type KanbanColumn = {
-  id: string
-  title: string
-  items: KanbanItem[]
-  color?: string
+type KanbanItem = KanbanItemBase & {
+  originalTable: "attivita" | "progetti" | "todolist"
+  originalRecordId: number // ID del record nella tabella originale
+  id_utente?: string
+  // Valore grezzo della priorità dal DB per debug e logica di assegnazione iniziale
+  dbPriorityValue: string | number | null | Record<string, any>
+  // ID della PrioritaConfigItem a cui è assegnato, o 'uncategorized'
+  assignedPriorityConfigId: string | null
 }
 
-type PrioritaConfig = {
-  id: string
-  value: string
-  colore?: string
+type KanbanColumn = {
+  id: string // Corrisponde a PrioritaConfigItem.id o "uncategorized"
+  title: string
+  headerColor?: string // Colore per l'intestazione della colonna
+  items: KanbanItem[]
+  isUncategorized?: boolean // Flag per la colonna speciale
 }
+
+// Mapping dei colori pastello per tipo di elemento
+const PASTEL_COLORS: Record<KanbanItem["originalTable"], string> = {
+  attivita: "bg-sky-100 border-sky-300 text-sky-800",
+  progetti: "bg-purple-100 border-purple-300 text-purple-800",
+  todolist: "bg-emerald-100 border-emerald-300 text-emerald-800",
+}
+
+const UNCATEGORIZED_COLUMN_ID = "uncategorized"
 
 export function KanbanWidget() {
   const [columns, setColumns] = useState<KanbanColumn[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
   const { toast } = useToast()
   const supabase = createClientComponentClient()
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [prioritiesConfig, setPrioritiesConfig] = useState<PrioritaConfigItem[]>([])
+  const [isDebugEnabled, setIsDebugEnabled] = useState(false)
 
-  // Funzione per caricare le priorità dalla configurazione
-  const loadPriorities = useCallback(async () => {
+  // Funzione per caricare utente, configurazione e priorità
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+
     try {
-      const { data: configData, error: configError } = await supabase.from("configurazione").select("priorita").single()
+      // 1. Fetch authenticated user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+      if (userError || !user) {
+        throw new Error(userError?.message || "Utente non autenticato.")
+      }
+      setCurrentUser(user)
+
+      // 2. Fetch configurazione (priorita e debug)
+      const { data: configData, error: configError } = await supabase
+        .from("configurazione")
+        .select("priorita, debug")
+        .single()
 
       if (configError) throw configError
+      if (!configData) throw new Error("Configurazione non trovata.")
 
-      if (!configData?.priorita) {
-        throw new Error("Configurazione priorità non trovata")
-      }
+      setIsDebugEnabled(configData.debug === true)
 
-      // Estrai le priorità dalla configurazione
-      let priorities: PrioritaConfig[] = []
-
+      // 3. Parse configurazione.priorita
+      let parsedPriorities: PrioritaConfigItem[] = []
       if (Array.isArray(configData.priorita)) {
-        priorities = configData.priorita
-      } else if (typeof configData.priorita === "object") {
-        // Gestisci il caso in cui priorita sia un oggetto con chiavi
-        priorities = Object.values(configData.priorita)
+        parsedPriorities = configData.priorita.map((p: any, index: number) => ({
+          id: String(p.id || p.value || `p-${index}`),
+          value: String(p.value || p.nome || "N/D"),
+          colore: p.colore,
+          livello: typeof p.livello === "number" ? p.livello : p.id && !isNaN(Number(p.id)) ? Number(p.id) : undefined,
+        }))
+      } else if (typeof configData.priorita === "object" && configData.priorita !== null) {
+        parsedPriorities = Object.entries(configData.priorita).map(([key, p]: [string, any]) => ({
+          id: String(p.id || key),
+          value: String(p.value || p.nome || "N/D"),
+          colore: p.colore,
+          livello: typeof p.livello === "number" ? p.livello : p.id && !isNaN(Number(p.id)) ? Number(p.id) : undefined,
+        }))
       }
-
-      // Crea una colonna per ogni priorità
-      const priorityColumns: KanbanColumn[] = [
-        {
-          id: "no-priority",
-          title: "Da assegnare",
-          items: [],
-          color: "bg-gray-200 dark:bg-gray-700",
-        },
-        ...priorities.map((p) => ({
-          id: p.id || p.value,
-          title: p.value,
-          items: [],
-          color: p.colore || "bg-blue-200 dark:bg-blue-800",
-        })),
-      ]
-
-      return priorityColumns
+      if (parsedPriorities.length === 0) {
+        console.warn(
+          "Nessuna priorità trovata nella configurazione. Sarà presente solo la colonna 'Non Categorizzati'.",
+        )
+      }
+      setPrioritiesConfig(parsedPriorities)
+      return { user, parsedPriorities, isDebug: configData.debug === true }
     } catch (err: any) {
-      console.error("Errore nel caricamento delle priorità:", err)
-      setError(`Errore nel caricamento delle priorità: ${err.message}`)
-      return [
-        {
-          id: "no-priority",
-          title: "Da assegnare",
-          items: [],
-          color: "bg-gray-200 dark:bg-gray-700",
-        },
-      ]
+      console.error("Errore nel caricamento dei dati iniziali:", err)
+      setError(`Errore dati iniziali: ${err.message}`)
+      setIsLoading(false) // Assicurati che isLoading sia false in caso di errore qui
+      return null
     }
   }, [supabase])
 
-  // Funzione per normalizzare il valore della priorità
-  const normalizePriority = (item: any): { id: string; value: string } | null => {
-    if (!item.priorita) return null
+  // Funzione per normalizzare il campo priorita di un item del DB
+  const getPriorityIdentifierFromDbItem = (
+    itemData: any,
+    parsedPriorities: PrioritaConfigItem[],
+  ): { assignedId: string | null; rawValue: string | number | null | Record<string, any> } => {
+    const rawPriority =
+      itemData.priorita ?? // Questo potrebbe essere 'priorita_id' per todolist, o 'priorita' per altri
+      itemData.priorita_id ?? // Specifico per todolist se 'priorita' non c'è
+      null
 
-    // Se è già un oggetto con id e value
-    if (typeof item.priorita === "object" && item.priorita !== null) {
-      if (item.priorita.id && item.priorita.value) {
-        return { id: item.priorita.id, value: item.priorita.value }
-      }
-      // Gestisci altri formati possibili
-      if (item.priorita.id && item.priorita.nome) {
-        return { id: item.priorita.id, value: item.priorita.nome }
-      }
+    if (rawPriority === null || rawPriority === undefined) {
+      return { assignedId: null, rawValue: null }
     }
 
-    // Se è una stringa, prova a parsificarla come JSON
-    if (typeof item.priorita === "string") {
-      try {
-        const parsed = JSON.parse(item.priorita)
-        if (parsed && typeof parsed === "object") {
-          if (parsed.id && parsed.value) {
-            return { id: parsed.id, value: parsed.value }
-          }
-          if (parsed.id && parsed.nome) {
-            return { id: parsed.id, value: parsed.nome }
-          }
+    // Caso 1: rawPriority è un numero (probabilmente un 'livello')
+    if (typeof rawPriority === "number") {
+      const matchingPriority = parsedPriorities.find((p) => p.livello === rawPriority)
+      return { assignedId: matchingPriority ? matchingPriority.id : null, rawValue: rawPriority }
+    }
+
+    // Caso 2: rawPriority è una stringa (potrebbe essere un ID di priorità o un livello come stringa)
+    if (typeof rawPriority === "string") {
+      // Prova a matchare con id
+      let matchingPriority = parsedPriorities.find((p) => p.id === rawPriority)
+      if (matchingPriority) {
+        return { assignedId: matchingPriority.id, rawValue: rawPriority }
+      }
+      // Prova a matchare con livello (se la stringa è numerica)
+      const numericValue = Number.parseInt(rawPriority, 10)
+      if (!isNaN(numericValue)) {
+        matchingPriority = parsedPriorities.find((p) => p.livello === numericValue)
+        if (matchingPriority) {
+          return { assignedId: matchingPriority.id, rawValue: rawPriority }
         }
-      } catch (e) {
-        // Non è JSON valido, potrebbe essere solo un ID
-        return { id: item.priorita, value: item.priorita }
       }
+      return { assignedId: null, rawValue: rawPriority } // Non corrisponde a nulla, ma ha un valore
     }
 
-    // Se abbiamo priorita_id e priorita_value separati
-    if (item.priorita_id && item.priorita_value) {
-      return { id: item.priorita_id, value: item.priorita_value }
+    // Caso 3: rawPriority è un oggetto (es. {id: "p1", value: "Alta"})
+    if (typeof rawPriority === "object" && rawPriority !== null) {
+      const priorityObjectId = String(rawPriority.id || rawPriority.value || "")
+      const matchingPriority = parsedPriorities.find((p) => p.id === priorityObjectId)
+      return { assignedId: matchingPriority ? matchingPriority.id : null, rawValue: rawPriority }
     }
 
-    return null
+    return { assignedId: null, rawValue: rawPriority } // Default se non riconosciuto
   }
 
   // Funzione per caricare gli elementi dalle tabelle
   const loadItems = useCallback(
-    async (columns: KanbanColumn[]) => {
-      try {
-        // Definisci le tabelle da cui caricare gli elementi
-        const tables = ["attivita", "progetti", "todolist"]
-        let allItems: KanbanItem[] = []
+    async (user: User, parsedPriorities: PrioritaConfigItem[]) => {
+      if (!user) return [] // Non caricare item se l'utente non è definito
 
-        // Carica gli elementi da ogni tabella
-        for (const table of tables) {
-          const { data, error } = await supabase.from(table).select("*")
+      const tables: KanbanItem["originalTable"][] = ["attivita", "progetti", "todolist"]
+      let allKanbanItems: KanbanItem[] = []
+      const validLivellos = parsedPriorities.map((p) => p.livello).filter((l) => typeof l === "number") as number[]
 
-          if (error) throw error
+      for (const table of tables) {
+        // Assicurati che la tabella abbia id_utente prima di filtrare
+        // Questo controllo andrebbe fatto sulla base dello schema reale o configurazione
+        // Per ora, assumiamo che tutte e tre le tabelle abbiano id_utente come richiesto
+        const { data, error } = await supabase.from(table).select("*").eq("id_utente", user.id)
 
-          if (data) {
-            const tableItems: KanbanItem[] = data.map((item) => {
-              const priority = normalizePriority(item)
-
-              return {
-                id: `${table}-${item.id}`,
-                title: item.titolo || item.nome || item.descrizione || `${table} #${item.id}`,
-                description: item.descrizione,
-                priorita: priority,
-                priorita_id: priority?.id,
-                priorita_value: priority?.value,
-                colore: item.colore,
-                data_inizio: item.data_inizio,
-                data_fine: item.data_fine,
-                scadenza: item.scadenza,
-                tabella: table,
-                record_id: item.id,
-                stato: item.stato,
-                avanzamento: item.avanzamento,
-              }
-            })
-
-            allItems = [...allItems, ...tableItems]
-          }
+        if (error) {
+          console.error(`Errore nel caricamento da ${table}:`, error)
+          // Continua con le altre tabelle invece di bloccare tutto
+          toast({ title: `Errore ${table}`, description: error.message, variant: "destructive" })
+          continue
         }
 
-        // Distribuisci gli elementi nelle colonne appropriate
-        const updatedColumns = columns.map((column) => {
-          if (column.id === "no-priority") {
-            // Elementi senza priorità
-            column.items = allItems.filter((item) => !item.priorita_id && !item.priorita)
-          } else {
-            // Elementi con questa priorità
-            column.items = allItems.filter((item) => {
-              const priorityId =
-                item.priorita_id || (item.priorita && typeof item.priorita === "object" ? item.priorita.id : null)
-              return priorityId === column.id
-            })
-          }
-          return column
-        })
+        if (data) {
+          const items: KanbanItem[] = data.map((itemData: any) => {
+            const { assignedId, rawValue } = getPriorityIdentifierFromDbItem(itemData, parsedPriorities)
 
-        return updatedColumns
-      } catch (err: any) {
-        console.error("Errore nel caricamento degli elementi:", err)
-        setError(`Errore nel caricamento degli elementi: ${err.message}`)
-        return columns
+            let finalAssignedId = assignedId
+            // Logica per la colonna "Non Categorizzati"
+            if (assignedId === null) {
+              // Se non c'è un match diretto con le priorità configurate
+              if (rawValue === null || rawValue === undefined) {
+                // Priorità non impostata
+                finalAssignedId = null // Va in non categorizzati
+              } else if (typeof rawValue === "number" && !validLivellos.includes(rawValue)) {
+                // Priorità numerica ma non corrisponde a nessun livello valido
+                finalAssignedId = null // Va in non categorizzati
+              } else {
+                // Ha un valore di priorità ma non mappato (es. stringa non riconosciuta)
+                // Potrebbe comunque andare in non categorizzati o una colonna "errori"
+                finalAssignedId = null
+              }
+            }
+
+            return {
+              id: `${table}-${itemData.id}`,
+              title: String(itemData.titolo || itemData.nome || itemData.descrizione || "Senza Titolo"),
+              description: itemData.descrizione,
+              colore: itemData.colore,
+              data_inizio: itemData.data_inizio,
+              data_fine: itemData.data_fine,
+              scadenza: itemData.scadenza,
+              stato: itemData.stato,
+              avanzamento: itemData.avanzamento,
+              originalTable: table,
+              originalRecordId: itemData.id,
+              id_utente: itemData.id_utente,
+              dbPriorityValue: rawValue,
+              assignedPriorityConfigId: finalAssignedId,
+            }
+          })
+          allKanbanItems = [...allKanbanItems, ...items]
+        }
       }
+      return allKanbanItems
     },
-    [supabase],
+    [supabase, toast],
   )
 
-  // Carica i dati all'avvio
+  // Effetto principale per caricare tutto e costruire le colonne
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        const priorityColumns = await loadPriorities()
-        const populatedColumns = await loadItems(priorityColumns)
-        setColumns(populatedColumns)
-      } catch (err: any) {
-        setError(`Errore nel caricamento dei dati: ${err.message}`)
-      } finally {
-        setIsLoading(false)
+    loadInitialData().then((initialDataResults) => {
+      if (!initialDataResults) {
+        // Errore gestito in loadInitialData, isLoading è già false
+        return
       }
-    }
+      const { user, parsedPriorities } = initialDataResults
 
-    fetchData()
-  }, [loadPriorities, loadItems])
+      loadItems(user, parsedPriorities)
+        .then((allItems) => {
+          // Costruisci le colonne
+          const newColumns: KanbanColumn[] = []
 
-  // Gestione del drag and drop
-  const handleDragEnd = async (result: any) => {
-    setIsDragging(false)
+          // Colonna "Non Categorizzati / Priorità Disallineata"
+          newColumns.push({
+            id: UNCATEGORIZED_COLUMN_ID,
+            title: "Non Categorizzati / Priorità Disallineata",
+            headerColor: "bg-slate-200 dark:bg-slate-700",
+            items: allItems.filter((item) => item.assignedPriorityConfigId === null),
+            isUncategorized: true,
+          })
 
+          // Colonne per ogni priorità configurata
+          parsedPriorities.forEach((pConfig) => {
+            newColumns.push({
+              id: pConfig.id,
+              title: pConfig.value,
+              headerColor: pConfig.colore || "bg-gray-200 dark:bg-gray-700",
+              items: allItems.filter((item) => item.assignedPriorityConfigId === pConfig.id),
+            })
+          })
+
+          setColumns(newColumns)
+          setIsLoading(false)
+        })
+        .catch((itemError) => {
+          console.error("Errore nel caricamento degli items:", itemError)
+          setError(`Errore items: ${itemError.message}`)
+          setIsLoading(false)
+        })
+    })
+  }, [loadInitialData, loadItems]) // Aggiunto loadItems alle dipendenze
+
+  const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result
 
-    // Dropped outside the list or no movement
     if (!destination || (source.droppableId === destination.droppableId && source.index === destination.index)) {
       return
     }
 
-    // Find the item that was dragged
-    const itemId = draggableId
     const sourceColumn = columns.find((col) => col.id === source.droppableId)
-    const item = sourceColumn?.items.find((i) => i.id === itemId)
+    const destinationColumn = columns.find((col) => col.id === destination.droppableId)
+    const draggedItem = sourceColumn?.items.find((item) => item.id === draggableId)
 
-    if (!item) return
-
-    // Create a copy of the columns
-    const newColumns = [...columns]
-
-    // Remove from source column
-    const sourceColumnIndex = newColumns.findIndex((col) => col.id === source.droppableId)
-    newColumns[sourceColumnIndex].items = newColumns[sourceColumnIndex].items.filter((i) => i.id !== itemId)
-
-    // Add to destination column
-    const destColumnIndex = newColumns.findIndex((col) => col.id === destination.droppableId)
-    const destColumn = newColumns[destColumnIndex]
-
-    // Update the item's priority
-    const newPriorityId = destColumn.id === "no-priority" ? null : destColumn.id
-    const newPriorityValue = destColumn.id === "no-priority" ? null : destColumn.title
-
-    const updatedItem = {
-      ...item,
-      priorita_id: newPriorityId,
-      priorita_value: newPriorityValue,
-      priorita: newPriorityId ? { id: newPriorityId, value: newPriorityValue || "" } : null,
+    if (!sourceColumn || !destinationColumn || !draggedItem) {
+      console.error("Item o colonna non trovata durante D&D", { sourceColumn, destinationColumn, draggedItem })
+      return
     }
 
-    // Insert at the new position
-    newColumns[destColumnIndex].items.splice(destination.index, 0, updatedItem)
-
-    // Update state optimistically
-    setColumns(newColumns)
-
-    // Update in the database
-    try {
-      const { tabella, record_id } = item
-      const now = new Date().toISOString()
-
-      // Prepare the update data based on the table structure
-      const updateData: any = { modifica: now }
-
-      if (newPriorityId) {
-        // Different tables might store priority differently
-        if (tabella === "attivita" || tabella === "progetti") {
-          updateData.priorita = { id: newPriorityId, value: newPriorityValue }
-        } else if (tabella === "todolist") {
-          updateData.priorita_id = newPriorityId
-          updateData.priorita_value = newPriorityValue
-        } else {
-          // Default fallback
-          updateData.priorita = { id: newPriorityId, value: newPriorityValue }
-        }
-      } else {
-        // Clear priority
-        if (tabella === "attivita" || tabella === "progetti") {
-          updateData.priorita = null
-        } else if (tabella === "todolist") {
-          updateData.priorita_id = null
-          updateData.priorita_value = null
-        } else {
-          updateData.priorita = null
-        }
+    // Aggiornamento ottimistico dell'UI
+    const newColumnsState = columns.map((col) => {
+      if (col.id === source.droppableId) {
+        return { ...col, items: col.items.filter((item) => item.id !== draggableId) }
       }
+      if (col.id === destination.droppableId) {
+        const newItems = Array.from(col.items)
+        // Aggiorna l'assignedPriorityConfigId dell'item spostato
+        const updatedDraggedItem = {
+          ...draggedItem,
+          assignedPriorityConfigId: destinationColumn.id === UNCATEGORIZED_COLUMN_ID ? null : destinationColumn.id,
+        }
+        newItems.splice(destination.index, 0, updatedDraggedItem)
+        return { ...col, items: newItems }
+      }
+      return col
+    })
+    setColumns(newColumnsState)
 
-      const { error } = await supabase.from(tabella).update(updateData).eq("id", record_id)
+    // Preparazione aggiornamento DB
+    let newDbPriorityValue: number | string | null | Record<string, any> = null
+    const targetPriorityConfig = prioritiesConfig.find((p) => p.id === destinationColumn.id)
 
-      if (error) throw error
+    if (destinationColumn.id === UNCATEGORIZED_COLUMN_ID) {
+      newDbPriorityValue = null
+    } else if (targetPriorityConfig) {
+      // Privilegia 'livello' se numerico, altrimenti 'id' se la tabella lo accetta, o l'oggetto intero
+      // Questa logica deve corrispondere a come la tabella 'draggedItem.originalTable' si aspetta la priorità
+      if (typeof targetPriorityConfig.livello === "number") {
+        newDbPriorityValue = targetPriorityConfig.livello
+      } else {
+        // Se la tabella si aspetta un oggetto JSON per la priorità:
+        // newDbPriorityValue = { id: targetPriorityConfig.id, value: targetPriorityConfig.value };
+        // Se la tabella si aspetta l'ID stringa:
+        newDbPriorityValue = targetPriorityConfig.id
+        // Per ora, assumiamo che la tabella accetti il 'livello' o l'ID stringa.
+        // Se la tabella 'todolist' ha campi separati priorita_id, priorita_value, la logica qui deve cambiare.
+        // La richiesta originale implicava che attivita.priorita, todolist.priorita, progetti.priorita fossero i campi diretti.
+      }
+    } else {
+      console.warn(`Configurazione priorità non trovata per destinazione ${destinationColumn.id}`)
+      // Potrebbe essere necessario revertire l'UI se non si sa cosa salvare
+      // Per ora, si procede con null se la config non è trovata (simile a non categorizzato)
+      newDbPriorityValue = null
+    }
+
+    // Determina il nome corretto del campo priorità per la tabella specifica
+    const priorityFieldName = "priorita" // Default
+    // if (draggedItem.originalTable === 'todolist') {
+    //   // Se todolist usa priorita_id e priorita_value, la logica di update è più complessa
+    //   // Per ora, si assume un campo 'priorita' unificato come da richiesta
+    // }
+
+    try {
+      const { error: updateError } = await supabase
+        .from(draggedItem.originalTable)
+        .update({
+          [priorityFieldName]: newDbPriorityValue,
+          modifica: new Date().toISOString(),
+        })
+        .eq("id", draggedItem.originalRecordId)
+
+      if (updateError) throw updateError
 
       toast({
-        title: "Priorità aggiornata",
-        description: `La priorità di "${item.title}" è stata aggiornata con successo.`,
+        title: "Priorità Aggiornata",
+        description: `Priorità di "${draggedItem.title}" aggiornata con successo.`,
         variant: "success",
       })
     } catch (err: any) {
       console.error("Errore nell'aggiornamento della priorità:", err)
-
       toast({
-        title: "Errore",
-        description: `Impossibile aggiornare la priorità: ${err.message}`,
+        title: "Errore Aggiornamento",
+        description: `Impossibile aggiornare: ${err.message}`,
         variant: "destructive",
       })
-
-      // Revert the state
-      loadItems(await loadPriorities()).then(setColumns)
+      // Revert UI (ricaricando i dati)
+      loadInitialData().then((initialDataResults) => {
+        if (!initialDataResults) return
+        loadItems(initialDataResults.user, initialDataResults.parsedPriorities).then((allItems) => {
+          const revertedColumns: KanbanColumn[] = []
+          revertedColumns.push({
+            id: UNCATEGORIZED_COLUMN_ID,
+            title: "Non Categorizzati / Priorità Disallineata",
+            headerColor: "bg-slate-200 dark:bg-slate-700",
+            items: allItems.filter((item) => item.assignedPriorityConfigId === null),
+            isUncategorized: true,
+          })
+          prioritiesConfig.forEach((pConfig) => {
+            revertedColumns.push({
+              id: pConfig.id,
+              title: pConfig.value,
+              headerColor: pConfig.colore || "bg-gray-200 dark:bg-gray-700",
+              items: allItems.filter((item) => item.assignedPriorityConfigId === pConfig.id),
+            })
+          })
+          setColumns(revertedColumns)
+        })
+      })
     }
   }
 
-  const handleDragStart = () => {
-    setIsDragging(true)
-  }
-
-  // Funzione per formattare la data
   const formatDate = (date: string | Date | null) => {
     if (!date) return null
     try {
@@ -344,24 +416,23 @@ export function KanbanWidget() {
     }
   }
 
-  // Rendering dello stato di caricamento
   if (isLoading) {
     return (
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center">
             <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-            Caricamento Kanban
+            Caricamento Kanban...
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex-shrink-0 w-72">
-                <Skeleton className="h-8 w-full mb-4" />
+              <div key={i} className="flex-shrink-0 w-72 md:w-80">
+                <Skeleton className="h-10 w-full mb-4" />
                 <div className="space-y-3">
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-28 w-full" />
+                  <Skeleton className="h-28 w-full" />
                 </div>
               </div>
             ))}
@@ -371,42 +442,78 @@ export function KanbanWidget() {
     )
   }
 
-  // Rendering dello stato di errore
   if (error) {
     return (
       <Card className="w-full bg-destructive/10 border-destructive">
         <CardHeader className="flex flex-row items-center space-x-2">
           <AlertCircle className="h-5 w-5 text-destructive" />
-          <CardTitle className="text-destructive">Errore nel caricamento del Kanban</CardTitle>
+          <CardTitle className="text-destructive">Errore Kanban</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-destructive">{error}</p>
           <button
             onClick={() => {
-              setIsLoading(true)
-              loadItems(columns).then((cols) => {
-                setColumns(cols)
-                setIsLoading(false)
-                setError(null)
+              setIsLoading(true) // Set loading true before retrying
+              loadInitialData().then((initialDataResults) => {
+                if (!initialDataResults) {
+                  setIsLoading(false)
+                  return
+                } // Error handled in loadInitialData
+                loadItems(initialDataResults.user, initialDataResults.parsedPriorities)
+                  .then((allItems) => {
+                    const newCols: KanbanColumn[] = []
+                    newCols.push({
+                      id: UNCATEGORIZED_COLUMN_ID,
+                      title: "Non Categorizzati / Priorità Disallineata",
+                      headerColor: "bg-slate-200 dark:bg-slate-700",
+                      items: allItems.filter((item) => item.assignedPriorityConfigId === null),
+                      isUncategorized: true,
+                    })
+                    prioritiesConfig.forEach((pConfig) => {
+                      newCols.push({
+                        id: pConfig.id,
+                        title: pConfig.value,
+                        headerColor: pConfig.colore || "bg-gray-200 dark:bg-gray-700",
+                        items: allItems.filter((item) => item.assignedPriorityConfigId === pConfig.id),
+                      })
+                    })
+                    setColumns(newCols)
+                    setError(null) // Clear error on successful retry
+                  })
+                  .catch((itemErr) => setError(`Errore ricaricando items: ${itemErr.message}`))
+                  .finally(() => setIsLoading(false))
               })
             }}
-            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
           >
-            Riprova
+            Riprova Caricamento
           </button>
         </CardContent>
       </Card>
     )
   }
 
+  if (!currentUser) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Kanban Priorità</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>Per favore, effettua il login per visualizzare il Kanban.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
-    <Card className="w-full">
+    <Card className="w-full overflow-hidden">
       <CardHeader>
-        <CardTitle>Vista Kanban delle Priorità</CardTitle>
+        <CardTitle>Kanban Priorità</CardTitle>
       </CardHeader>
-      <CardContent className="p-0 overflow-hidden">
-        <DragDropContext onDragEnd={handleDragEnd} onDragStart={handleDragStart}>
-          <div className={cn("flex gap-4 overflow-x-auto p-4 min-h-[500px]", isDragging && "cursor-grabbing")}>
+      <CardContent className="p-0">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px]">
             {columns.map((column) => (
               <Droppable key={column.id} droppableId={column.id}>
                 {(provided, snapshot) => (
@@ -414,86 +521,107 @@ export function KanbanWidget() {
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className={cn(
-                      "flex-shrink-0 w-72 rounded-lg p-2",
-                      snapshot.isDraggingOver ? "bg-muted/80" : "bg-muted/50",
-                      column.color && !snapshot.isDraggingOver && column.color,
+                      "flex-shrink-0 w-72 md:w-80 rounded-lg p-1 flex flex-col", // p-1 for tighter packing
+                      snapshot.isDraggingOver ? "bg-primary/10" : "bg-muted/50",
                     )}
                   >
-                    <h3 className="font-medium text-sm mb-3 px-2 py-1 bg-background/80 rounded-md backdrop-blur-sm">
-                      {column.title}
-                      <Badge variant="outline" className="ml-2 bg-background/50">
-                        {column.items.length}
-                      </Badge>
-                    </h3>
+                    <div
+                      className={cn(
+                        "px-3 py-2 rounded-t-md mb-2 sticky top-0 z-10",
+                        column.headerColor || "bg-gray-200 dark:bg-gray-800",
+                      )}
+                    >
+                      <h3 className="font-semibold text-sm text-foreground truncate flex items-center justify-between">
+                        {column.title}
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {column.items.length}
+                        </Badge>
+                      </h3>
+                    </div>
 
-                    <div className="space-y-2">
+                    <div className="flex-grow overflow-y-auto space-y-2 px-2 pb-2 custom-scrollbar">
+                      {column.items.length === 0 && (
+                        <div className="p-4 text-center text-xs text-muted-foreground bg-background/30 rounded-md border border-dashed mt-2">
+                          Nessun elemento
+                        </div>
+                      )}
                       {column.items.map((item, index) => (
                         <Draggable key={item.id} draggableId={item.id} index={index}>
-                          {(provided, snapshot) => (
+                          {(providedDraggable, snapshotDraggable) => (
                             <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
+                              ref={providedDraggable.innerRef}
+                              {...providedDraggable.draggableProps}
                               className={cn(
-                                "p-3 rounded-md bg-card border shadow-sm",
-                                snapshot.isDragging && "shadow-lg ring-2 ring-primary",
-                                item.colore && `border-l-4 border-l-[${item.colore}]`,
+                                "p-2.5 rounded-md border bg-card shadow-sm",
+                                PASTEL_COLORS[item.originalTable],
+                                snapshotDraggable.isDragging && "shadow-xl ring-2 ring-primary scale-105",
                               )}
-                              style={{
-                                ...provided.draggableProps.style,
-                                borderLeftColor: item.colore || undefined,
-                              }}
                             >
-                              <div className="flex justify-between items-start mb-1">
-                                <h4 className="font-medium text-sm line-clamp-2" title={item.title}>
+                              <div
+                                {...providedDraggable.dragHandleProps}
+                                className="flex items-center mb-1 cursor-grab active:cursor-grabbing"
+                              >
+                                <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground/70" />
+                                <h4
+                                  className="font-medium text-sm leading-tight line-clamp-2 flex-grow"
+                                  title={item.title}
+                                >
                                   {item.title}
                                 </h4>
-                                <Badge variant="outline" className="text-xs capitalize">
-                                  {item.tabella}
-                                </Badge>
                               </div>
 
                               {item.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-2 my-1.5">{item.description}</p>
                               )}
 
-                              <div className="flex flex-wrap gap-1 mt-2 text-xs">
+                              <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs">
                                 {item.stato && (
-                                  <Badge variant="secondary" className="text-xs">
+                                  <Badge variant="outline" className="text-xs py-0.5 px-1.5 bg-background/70">
                                     {item.stato}
                                   </Badge>
                                 )}
-
                                 {item.avanzamento !== undefined && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs py-0.5 px-1.5 bg-background/70 flex items-center gap-1"
+                                  >
                                     <CheckCircle className="h-3 w-3" />
                                     {item.avanzamento}%
                                   </Badge>
                                 )}
-
                                 {(item.scadenza || item.data_fine) && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs py-0.5 px-1.5 bg-background/70 flex items-center gap-1"
+                                  >
                                     <Calendar className="h-3 w-3" />
                                     {formatDate(item.scadenza || item.data_fine)}
                                   </Badge>
                                 )}
-
                                 {item.data_inizio && (
-                                  <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs py-0.5 px-1.5 bg-background/70 flex items-center gap-1"
+                                  >
                                     <Clock className="h-3 w-3" />
                                     {formatDate(item.data_inizio)}
                                   </Badge>
                                 )}
                               </div>
+                              {isDebugEnabled &&
+                                item.dbPriorityValue !== null &&
+                                item.dbPriorityValue !== undefined && (
+                                  <p className="text-xs text-muted-foreground/80 mt-1.5 pt-1 border-t border-dashed">
+                                    Prio. DB:{" "}
+                                    {typeof item.dbPriorityValue === "object"
+                                      ? JSON.stringify(item.dbPriorityValue)
+                                      : String(item.dbPriorityValue)}
+                                  </p>
+                                )}
                             </div>
                           )}
                         </Draggable>
                       ))}
-                      {column.items.length === 0 && (
-                        <div className="p-4 text-center text-sm text-muted-foreground bg-background/50 rounded-md border border-dashed">
-                          Nessun elemento
-                        </div>
-                      )}
                       {provided.placeholder}
                     </div>
                   </div>
