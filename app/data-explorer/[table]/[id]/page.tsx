@@ -1259,6 +1259,24 @@ export default function ItemDetailPage() {
                       groupFields.includes("data_fine") &&
                       allFields.includes("data_fine")
                     ) {
+                      if (!isEditMode) {
+                        return (
+                          <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Data inizio</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.data_inizio, fieldTypes.data_inizio || "datetime")}
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Data fine</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.data_fine, fieldTypes.data_fine || "datetime")}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
                       return (
                         <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -1289,6 +1307,24 @@ export default function ItemDetailPage() {
 
                     // Gestione speciale per priorita e scadenza sulla stessa riga
                     if (field === "priorita" && groupFields.includes("scadenza") && allFields.includes("scadenza")) {
+                      if (!isEditMode) {
+                        return (
+                          <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Priorità</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.priorita, fieldTypes.priorita || "priority_select")}
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Scadenza</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.scadenza, fieldTypes.scadenza || "datetime")}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
                       return (
                         <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -1296,7 +1332,7 @@ export default function ItemDetailPage() {
                               "priorita",
                               editedItem.priorita,
                               fieldTypes.priorita || "priority_select",
-                              isReadOnly,
+                              readOnlyFields.includes("priorita"),
                             )}
                           </div>
                           <div>
@@ -1313,9 +1349,34 @@ export default function ItemDetailPage() {
 
                     // Gestione speciale per stato e colore sulla stessa riga
                     if (field === "stato" && groupFields.includes("colore") && allFields.includes("colore")) {
+                      if (!isEditMode) {
+                        return (
+                          <div key="status-color" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Stato</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.stato, fieldTypes.stato || "select")}
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Colore</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.colore, fieldTypes.colore || "color")}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
                       return (
                         <div key="status-color" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>{renderField("stato", editedItem.stato, fieldTypes.stato || "select", isReadOnly)}</div>
+                          <div>
+                            {renderField(
+                              "stato",
+                              editedItem.stato,
+                              fieldTypes.stato || "select",
+                              readOnlyFields.includes("stato"),
+                            )}
+                          </div>
                           <div>
                             {renderField(
                               "colore",

@@ -246,6 +246,9 @@ export function KanbanWidget() {
 
         const { parsedPriorities: fetchedPriorities, isDebug: fetchedIsDebug } = configResult
 
+        // ADD THIS CONSOLE LOG:
+        console.log("KanbanWidget: Fetched and Parsed Priorities Config:", fetchedPriorities)
+
         if (isActive) {
           setPrioritiesConfig(fetchedPriorities)
           setIsDebugEnabled(fetchedIsDebug)
@@ -491,7 +494,6 @@ export function KanbanWidget() {
                                 {item.description && (
                                   <p className="text-xs text-muted-foreground line-clamp-2 my-1.5 ml-5">
                                     {" "}
-                                    {/* Indent description */}
                                     {item.description}
                                   </p>
                                 )}

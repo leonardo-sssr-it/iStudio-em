@@ -28,7 +28,6 @@ import {
   Clock,
   Info,
   Search,
-  Plus,
   Filter,
   Download,
   AlertCircle,
@@ -49,6 +48,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-provider" // Ensure this path is correct
 import { useDebugConfig } from "@/hooks/use-debug-config"
+import { cn } from "@/lib/utils"
 
 // Funzioni di utilità per il debug
 const formatDateForDebug = (date: Date | undefined): string => {
@@ -1153,7 +1153,15 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
               value={view}
               onValueChange={(v) => setView(v as any)}
             >
-              <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:grid-cols-none">
+              <TabsList
+                className={cn(
+                  mode === "mobile"
+                    ? "grid w-full grid-cols-2"
+                    : "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+                  // For desktop, we use the default shadcn/ui classes for TabsList or simply 'inline-flex' if you want minimal styling.
+                  // The default classes provide the standard look and feel.
+                )}
+              >
                 <TabsTrigger value="daily" className="flex items-center gap-1 text-xs sm:text-sm">
                   <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Giorno
                 </TabsTrigger>
@@ -1286,19 +1294,14 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                 </DropdownMenuContent>
               </DropdownMenu>
               {mode === "desktop" && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exportAgenda}
-                    className="flex items-center gap-1 text-xs sm:text-sm"
-                  >
-                    <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
-                  </Button>
-                  <Button variant="default" size="sm" className="flex items-center gap-1 text-xs sm:text-sm">
-                    <Plus className="h-3 w-3 sm:h-4 sm:w-4" /> Nuovo
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportAgenda}
+                  className="flex items-center gap-1 text-xs sm:text-sm"
+                >
+                  <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
+                </Button>
               )}
               <TooltipProvider>
                 <Tooltip>
