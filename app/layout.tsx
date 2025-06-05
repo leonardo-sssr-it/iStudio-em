@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <NextThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <SupabaseProvider>
-            <AuthProvider>
+            <AuthProvider> {/* AuthProvider is here */}
               <SidebarProvider>
                 <SidebarStateProvider>
                   <ThemeProvider>

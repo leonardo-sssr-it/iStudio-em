@@ -14,7 +14,7 @@ import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
 import { GalleryManagerWidget } from "@/components/gallery-manager-widget"
 import { Button } from "@/components/ui/button"
-import { RefreshCw } from "lucide-react"
+import { RefreshCw } from 'lucide-react'
 
 // Definizione dei widget disponibili
 const AVAILABLE_WIDGETS = [
