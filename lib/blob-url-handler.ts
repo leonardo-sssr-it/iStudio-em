@@ -1,41 +1,52 @@
-// Utility for handling blob URLs safely
+// Utility for handling blob URLs safely and providing placeholders
 export class BlobUrlHandler {
-  private static failedUrls = new Set<string>()
+  // This Set can be used to keep track of URLs that have definitively failed to load,
+  // potentially to avoid retrying them immediately.
+  private static failedExternalUrls = new Set<string>()
 
-  static async validateBlobUrl(url: string): Promise<boolean> {
-    if (this.failedUrls.has(url)) {
-      return false
+  /**
+   * Returns a placeholder image URL.
+   * @param width Width of the placeholder image.
+   * @param height Height of the placeholder image.
+   * @param text Text to display on the placeholder image.
+   * @returns A string representing the placeholder image URL.
+   */
+  static getPlaceholderImage(width = 400, height = 300, text = "Image Not Available"): string {
+    const query = encodeURIComponent(text)
+    // Ensure placeholder.svg is in the public directory
+    return `/placeholder.svg?width=${width}&height=${height}&text=${query}`
+  }
+
+  /**
+   * Adds a URL to a list of known failed external URLs.
+   * This can be used by `useSafeImage` or other components to mark a URL as problematic.
+   * @param url The URL that failed to load.
+   */
+  static addFailedExternalUrl(url: string): void {
+    if (!url.startsWith("blob:") && !url.startsWith("data:")) {
+      this.failedExternalUrls.add(url)
     }
-
-    try {
-      if (!url.startsWith("blob:")) {
-        return true // Not a blob URL, assume it's valid
-      }
-
-      const response = await fetch(url, { method: "HEAD" })
-      if (!response.ok) {
-        this.failedUrls.add(url)
-        return false
-      }
-
-      return true
-    } catch (error) {
-      console.warn(`Blob URL validation failed for ${url}:`, error)
-      this.failedUrls.add(url)
-      return false
-    }
   }
 
-  static async safeLoadImage(url: string): Promise<string | null> {
-    const isValid = await this.validateBlobUrl(url)
-    return isValid ? url : null
+  /**
+   * Checks if a URL is in the list of known failed external URLs.
+   * @param url The URL to check.
+   * @returns True if the URL is known to have failed, false otherwise.
+   */
+  static isFailedExternalUrl(url: string): boolean {
+    return this.failedExternalUrls.has(url)
   }
 
-  static getPlaceholderImage(width = 400, height = 300): string {
-    return `/placeholder.svg?height=${height}&width=${width}&text=Image+Not+Available`
+  /**
+   * Clears the list of known failed external URLs.
+   */
+  static clearFailedExternalUrls(): void {
+    this.failedExternalUrls.clear()
   }
 
-  static clearFailedUrls(): void {
-    this.failedUrls.clear()
-  }
+  // The previous `validateBlobUrl` and `safeLoadImage` methods that attempted to `fetch`
+  // blob URLs or external URLs with HEAD requests have been removed.
+  // The responsibility of checking image load status is now primarily within `useSafeImage`
+  // using the native Image object's onload/onerror events, which is more reliable
+  // for client-side image validation across different URL types.
 }
