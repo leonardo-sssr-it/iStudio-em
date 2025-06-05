@@ -6,17 +6,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Sanitizes a string to be used as a safe identifier
- * Removes special characters and ensures it's a valid identifier
+ * Sanitizes an identifier by removing special characters and spaces
+ * @param identifier The identifier to sanitize
+ * @returns A sanitized string safe for use as an identifier
  */
-export function sanitizeIdentifier(str: string): string {
-  if (!str || typeof str !== "string") return ""
+export function sanitizeIdentifier(identifier: string): string {
+  if (!identifier) return ""
 
-  return str
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_") // Replace non-alphanumeric chars with underscore
-    .replace(/^[0-9]/, "_$&") // Prefix with underscore if starts with number
-    .replace(/_+/g, "_") // Replace multiple underscores with single
-    .replace(/^_|_$/g, "") // Remove leading/trailing underscores
-    .substring(0, 50) // Limit length
+  // Replace spaces and special characters with underscores
+  // Remove any characters that aren't alphanumeric or underscores
+  // Ensure it doesn't start with a number (for HTML IDs)
+  const sanitized = identifier
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_]/g, "")
+    .replace(/^(\d)/, "_$1")
+
+  return sanitized || "id" // Fallback to 'id' if the result is empty
 }
