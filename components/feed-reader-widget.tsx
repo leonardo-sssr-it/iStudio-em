@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { FeedItemModal } from "./feed-item-modal" // Assumendo che sia nella stessa directory o @/components/
 import { Rss, AlertTriangle, Loader2 } from "lucide-react"
-import { useAppConfig } from "../hooks/use-app-config" // MODIFICATO: Percorso relativo
+import { useAppConfig } from "../hooks/use-app-config"
 
 type FeedItem = {
   title?: string
