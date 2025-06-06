@@ -13,11 +13,10 @@ import { AgendaWidget } from "@/components/agenda-widget"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
 import { GalleryManagerWidget } from "@/components/gallery-manager-widget"
-import { FeedReaderWidget } from "@/components/feed-reader-widget" // Importa il nuovo widget
+import { FeedReaderWidget } from "@/components/feed-reader-widget"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
 
-// Definizione dei widget disponibili
 const AVAILABLE_WIDGETS = [
   { id: "agenda", name: "Agenda", component: AgendaWidget },
   { id: "gantt", name: "Diagramma Gantt", component: GanttChartWidget },
@@ -27,17 +26,17 @@ const AVAILABLE_WIDGETS = [
     id: "feed1",
     name: "Feed Notizie 1",
     component: () => <FeedReaderWidget configKey="feed1" title="Feed Notizie Principale" />,
-  }, // Aggiungi il FeedReaderWidget
+  },
   {
     id: "feed2",
     name: "Feed Notizie 2",
     component: () => <FeedReaderWidget configKey="feed2" title="Feed Secondario" numberOfItems={3} />,
-  }, // Esempio con altra chiave e opzioni
+  },
 ]
 
 export default function UserDashboardPage() {
   const { user } = useAuth()
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("kanban") // Puoi cambiare il default se vuoi
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("feed1") // Default to feed1 for testing
   const [key, setKey] = useState(0)
 
   const selectedWidget = AVAILABLE_WIDGETS.find((widget) => widget.id === selectedWidgetId)
@@ -83,13 +82,8 @@ export default function UserDashboardPage() {
           </div>
 
           <div className="widget-container mt-4">
-            {" "}
-            {/* Aggiunto mt-4 per spaziatura */}
             {selectedWidget ? (
-              <div key={`${selectedWidget.id}-${key}`}>
-                {/* Non serve più il titolo qui perché il widget stesso ha un titolo */}
-                {React.createElement(selectedWidget.component)}
-              </div>
+              <div key={`${selectedWidget.id}-${key}`}>{React.createElement(selectedWidget.component)}</div>
             ) : (
               <Card>
                 <CardHeader>

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { FeedItemModal } from "./feed-item-modal"
+import { FeedItemModal } from "./feed-item-modal" // Assumendo che sia nella stessa directory o @/components/
 import { Rss, AlertTriangle, Loader2 } from "lucide-react"
-import { useAppConfig } from "@/hooks/use-app-config" // Importa il nuovo hook
+import { useAppConfig } from "../hooks/use-app-config" // MODIFICATO: Percorso relativo
 
 type FeedItem = {
   title?: string
@@ -16,32 +16,37 @@ type FeedItem = {
 }
 
 interface FeedReaderWidgetProps {
-  // feedUrl non è più una prop obbligatoria, verrà presa dalla configurazione
   numberOfItems?: number
   title?: string
-  configKey?: "feed1" | "feed2" | "feed3" // Permette di specificare quale chiave di configurazione usare
+  configKey?: "feed1" | "feed2" | "feed3"
 }
 
 export function FeedReaderWidget({
   numberOfItems = 5,
   title = "Feed Notizie",
-  configKey = "feed1", // Default a feed1
+  configKey = "feed1",
 }: FeedReaderWidgetProps) {
-  const { config, isLoading: isLoadingConfig, error: errorConfig } = useAppConfig() // Usa l'hook
+  const { config, isLoading: isLoadingConfig, error: errorConfig } = useAppConfig()
 
   const [items, setItems] = useState<FeedItem[]>([])
   const [selectedItem, setSelectedItem] = useState<FeedItem | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isLoadingFeed, setIsLoadingFeed] = useState(false) // Rinominato per chiarezza
-  const [errorFeed, setErrorFeed] = useState<string | null>(null) // Rinominato per chiarezza
+  const [isLoadingFeed, setIsLoadingFeed] = useState(false)
+  const [errorFeed, setErrorFeed] = useState<string | null>(null)
 
-  const feedUrl = config?.[configKey] as string | undefined
+  // Estrai feedUrl solo dopo che config è stato caricato e non è null
+  const feedUrl = !isLoadingConfig && config ? (config[configKey] as string | undefined) : undefined
 
   useEffect(() => {
-    if (isLoadingConfig || !feedUrl) {
-      if (!isLoadingConfig && !feedUrl && !errorConfig) {
-        setErrorFeed(`URL del feed non configurato per la chiave '${configKey}'.`)
+    // Non procedere se la configurazione sta caricando, c'è un errore di configurazione, o feedUrl non è ancora definito
+    if (isLoadingConfig || errorConfig || !feedUrl) {
+      if (!isLoadingConfig && !errorConfig && config && !feedUrl) {
+        setErrorFeed(
+          `URL del feed non configurato per la chiave '${configKey}'. Verificare la tabella 'configurazione'.`,
+        )
       }
+      // Se isLoadingConfig è true, il widget mostrerà già lo spinner per la configurazione
+      // Se errorConfig è true, il widget mostrerà già l'errore di configurazione
       return
     }
 
@@ -65,7 +70,7 @@ export function FeedReaderWidget({
     }
 
     fetchFeed()
-  }, [feedUrl, numberOfItems, isLoadingConfig, errorConfig, configKey])
+  }, [feedUrl, numberOfItems, isLoadingConfig, errorConfig, config, configKey]) // Aggiunto config a dependencies
 
   const handleItemClick = (item: FeedItem) => {
     setSelectedItem(item)
@@ -112,7 +117,8 @@ export function FeedReaderWidget({
     )
   }
 
-  if (!feedUrl && !isLoadingConfig) {
+  // Questo blocco ora viene raggiunto solo se isLoadingConfig è false e errorConfig è null
+  if (!feedUrl) {
     return (
       <Card className="w-full">
         <CardHeader>
@@ -125,7 +131,8 @@ export function FeedReaderWidget({
           <AlertTriangle className="h-8 w-8 mb-2" />
           <p className="font-semibold">Configurazione mancante:</p>
           <p className="text-sm text-center">
-            L'URL del feed per la chiave '{configKey}' non è stato trovato nella tabella 'configurazione'.
+            L'URL del feed per la chiave '{configKey}' non è stato trovato o non è valido nella tabella
+            'configurazione'.
           </p>
         </CardContent>
       </Card>
@@ -150,13 +157,14 @@ export function FeedReaderWidget({
             <p className="ml-2">Caricamento feed...</p>
           </div>
         )}
-        {errorFeed && !isLoadingFeed && (
-          <div className="flex flex-col items-center justify-center py-4 text-red-600 dark:text-red-400">
-            <AlertTriangle className="h-8 w-8 mb-2" />
-            <p className="font-semibold">Errore nel caricamento del feed:</p>
-            <p className="text-sm text-center">{errorFeed}</p>
-          </div>
-        )}
+        {errorFeed &&
+          !isLoadingFeed && ( // Mostra errore feed solo se non stiamo caricando il feed
+            <div className="flex flex-col items-center justify-center py-4 text-red-600 dark:text-red-400">
+              <AlertTriangle className="h-8 w-8 mb-2" />
+              <p className="font-semibold">Errore nel caricamento del feed:</p>
+              <p className="text-sm text-center">{errorFeed}</p>
+            </div>
+          )}
         {!isLoadingFeed && !errorFeed && items.length === 0 && (
           <p className="text-muted-foreground py-4 text-center">Nessun elemento trovato nel feed.</p>
         )}
