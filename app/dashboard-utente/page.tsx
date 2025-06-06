@@ -13,8 +13,9 @@ import { AgendaWidget } from "@/components/agenda-widget"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
 import { GalleryManagerWidget } from "@/components/gallery-manager-widget"
+import { FeedReaderWidget } from "@/components/feed-reader-widget" // Importa il nuovo widget
 import { Button } from "@/components/ui/button"
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw } from "lucide-react"
 
 // Definizione dei widget disponibili
 const AVAILABLE_WIDGETS = [
@@ -22,17 +23,25 @@ const AVAILABLE_WIDGETS = [
   { id: "gantt", name: "Diagramma Gantt", component: GanttChartWidget },
   { id: "kanban", name: "Kanban Board", component: KanbanWidget },
   { id: "gallery", name: "Gestione Galleria", component: GalleryManagerWidget },
+  {
+    id: "feed1",
+    name: "Feed Notizie 1",
+    component: () => <FeedReaderWidget configKey="feed1" title="Feed Notizie Principale" />,
+  }, // Aggiungi il FeedReaderWidget
+  {
+    id: "feed2",
+    name: "Feed Notizie 2",
+    component: () => <FeedReaderWidget configKey="feed2" title="Feed Secondario" numberOfItems={3} />,
+  }, // Esempio con altra chiave e opzioni
 ]
 
 export default function UserDashboardPage() {
   const { user } = useAuth()
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("kanban")
-  const [key, setKey] = useState(0) // Chiave per forzare il re-render del widget
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("kanban") // Puoi cambiare il default se vuoi
+  const [key, setKey] = useState(0)
 
-  // Trova il widget selezionato
   const selectedWidget = AVAILABLE_WIDGETS.find((widget) => widget.id === selectedWidgetId)
 
-  // Funzione per ricaricare il widget corrente
   const reloadWidget = () => {
     setKey((prev) => prev + 1)
   }
@@ -48,12 +57,9 @@ export default function UserDashboardPage() {
             <p className="text-gray-600 dark:text-gray-400">Ecco una panoramica delle tue attività e impegni.</p>
           </div>
 
-          {/* Riepilogo statistico (mantenuto come richiesto) */}
           <UserSummary />
-
           <Separator className="my-2" />
 
-          {/* Selettore di widget */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h2 className="text-2xl font-semibold tracking-tight">Widget Disponibili</h2>
@@ -76,11 +82,12 @@ export default function UserDashboardPage() {
             </Button>
           </div>
 
-          {/* Visualizzazione del widget selezionato */}
-          <div className="widget-container">
+          <div className="widget-container mt-4">
+            {" "}
+            {/* Aggiunto mt-4 per spaziatura */}
             {selectedWidget ? (
               <div key={`${selectedWidget.id}-${key}`}>
-                <h2 className="text-xl font-semibold mb-4">{selectedWidget.name}</h2>
+                {/* Non serve più il titolo qui perché il widget stesso ha un titolo */}
                 {React.createElement(selectedWidget.component)}
               </div>
             ) : (
