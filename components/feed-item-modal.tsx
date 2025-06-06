@@ -1,9 +1,10 @@
 "use client"
 
-import { X, ZoomIn, ZoomOut } from "lucide-react"
+import { X, ZoomIn, ZoomOut, Printer, ExternalLink } from "lucide-react"
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type FeedItem = {
   title?: string
@@ -58,6 +59,10 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
     setFontSizeIndex((prev) => Math.max(prev - 1, 0))
   }
 
+  const handlePrint = () => {
+    window.print()
+  }
+
   const formattedDate = item.isoDate
     ? new Date(item.isoDate).toLocaleDateString("it-IT", {
         year: "numeric",
@@ -70,58 +75,88 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="text-xl md:text-2xl break-words">{item.title || "Dettaglio Feed"}</DialogTitle>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 printable-modal">
+        <DialogHeader className="p-6 pb-0 dialog-header-no-print">
+          <DialogTitle className="text-xl md:text-2xl break-words feed-title-print">
+            {item.title || "Dettaglio Feed"}
+          </DialogTitle>
           <DialogClose asChild>
-            <Button variant="ghost" size="icon" className="absolute right-4 top-4">
+            <Button variant="ghost" size="icon" className="absolute right-4 top-4 close-button-no-print">
               <X className="h-5 w-5" />
               <span className="sr-only">Chiudi</span>
             </Button>
           </DialogClose>
         </DialogHeader>
 
-        <div className="px-6 pb-2 flex items-center justify-between border-b">
-          <div className="text-xs text-muted-foreground">
+        <div className="px-6 pt-2 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b feed-meta-print">
+          <div className="text-xs text-muted-foreground mb-2 sm:mb-0">
             {item.creator && <p>Autore: {item.creator}</p>}
             {formattedDate && <p>Pubblicato: {formattedDate}</p>}
+            {item.link && (
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center mt-1"
+              >
+                Leggi l'articolo originale <ExternalLink className="h-3 w-3 ml-1" />
+              </a>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={decreaseFontSize} disabled={fontSizeIndex === 0}>
-              <ZoomOut className="h-4 w-4" />
-              <span className="sr-only">Riduci testo</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={increaseFontSize}
-              disabled={fontSizeIndex === FONT_SIZES.length - 1}
-            >
-              <ZoomIn className="h-4 w-4" />
-              <span className="sr-only">Aumenta testo</span>
-            </Button>
+          <div className="flex items-center gap-2 font-controls-no-print">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={decreaseFontSize} disabled={fontSizeIndex === 0}>
+                    <ZoomOut className="h-4 w-4" />
+                    <span className="sr-only">Riduci testo</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Riduci dimensione testo</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={increaseFontSize}
+                    disabled={fontSizeIndex === FONT_SIZES.length - 1}
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                    <span className="sr-only">Aumenta testo</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Aumenta dimensione testo</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handlePrint}>
+                    <Printer className="h-4 w-4" />
+                    <span className="sr-only">Stampa</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Stampa articolo</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-grow p-6 prose prose-sm sm:prose-base dark:prose-invert max-w-none">
-          {/* Applica la classe della dimensione del font qui */}
-          <div
-            className={currentFontSizeClass}
-            dangerouslySetInnerHTML={{ __html: item.content || "<p>Nessun contenuto disponibile.</p>" }}
-          />
+        <div
+          className={`overflow-y-auto flex-grow p-6 prose prose-sm sm:prose-base dark:prose-invert max-w-none feed-content-print ${currentFontSizeClass}`}
+        >
+          <div dangerouslySetInnerHTML={{ __html: item.content || "<p>Nessun contenuto disponibile.</p>" }} />
         </div>
-        {item.link && (
-          <div className="p-6 border-t">
-            <a
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              Leggi l'articolo originale &rarr;
-            </a>
-          </div>
-        )}
+        {/* Link originale in fondo rimosso */}
       </DialogContent>
     </Dialog>
   )

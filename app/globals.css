@@ -132,3 +132,91 @@ body {
   border-radius: 4px;
   border: none;
 }
+
+/* Stili di stampa per FeedItemModal */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-modal,
+  .printable-modal * {
+    visibility: visible;
+  }
+  .printable-modal {
+    position: absolute !important; /* Usa !important per sovrascrivere stili inline se necessario */
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important; /* Assicura che non superi la larghezza della pagina */
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 20px !important; /* Aggiungi un po' di padding per la stampa */
+    background-color: white !important; /* Sfondo bianco per la stampa */
+    color: black !important; /* Testo nero per la stampa */
+  }
+
+  /* Nascondi elementi non necessari per la stampa */
+  .dialog-header-no-print,
+  .dialog-footer-no-print /* Se avessi un footer specifico da nascondere */,
+  .font-controls-no-print,
+  .close-button-no-print {
+    display: none !important;
+  }
+
+  /* Assicura che il contenuto del feed sia stampabile e ben formattato */
+  .feed-content-print {
+    overflow-y: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    font-size: 12pt !important; /* Dimensione base per la stampa */
+    line-height: 1.5 !important;
+  }
+  .feed-content-print div,
+  .feed-content-print p,
+  .feed-content-print span,
+  .feed-content-print li {
+    font-size: inherit !important; /* Eredita dal genitore .feed-content-print */
+    color: black !important; /* Assicura che il testo sia nero */
+  }
+  .feed-content-print img {
+    max-width: 100% !important; /* Assicura che le immagini non superino la larghezza */
+    height: auto !important;
+  }
+  .feed-content-print a {
+    color: #0000ee !important; /* Colore standard per i link in stampa */
+    text-decoration: underline !important;
+  }
+  .feed-content-print a[href]:after {
+    content: " (" attr(href) ")"; /* Mostra URL dei link */
+    font-size: 10pt;
+  }
+
+  .feed-title-print {
+    font-size: 18pt !important;
+    font-weight: bold !important;
+    margin-bottom: 15px !important;
+    color: black !important;
+  }
+
+  .feed-meta-print {
+    border-bottom: 1px solid #ccc !important; /* Aggiunge una linea separatrice */
+    padding-bottom: 10px !important;
+    margin-bottom: 15px !important;
+  }
+  .feed-meta-print p {
+    font-size: 10pt !important;
+    margin-bottom: 5px !important;
+    color: #333 !important;
+  }
+  .feed-meta-print a {
+    /* Link originale nella sezione meta */
+    font-size: 10pt !important;
+  }
+  .feed-meta-print a[href]:after {
+    /* Evita di duplicare l'URL se già visibile */
+    content: "";
+  }
+}
