@@ -1,7 +1,8 @@
 "use client"
 
-import { X, ZoomIn, ZoomOut, Printer, ExternalLink } from "lucide-react"
-import { useEffect, useState, useCallback } from "react"
+import { X, ZoomIn, ZoomOut, ExternalLink } from "lucide-react"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import DOMPurify from "dompurify"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -21,8 +22,10 @@ interface FeedItemModalProps {
   onClose: () => void
 }
 
-const FONT_SIZES = ["text-xs", "text-sm", "text-base", "text-lg", "text-xl"]
-const DEFAULT_FONT_SIZE_INDEX = 2 // text-base
+// Array di valori CSS per la dimensione del font.
+// Corrispondono a text-xs, text-sm, text-base, text-lg, text-xl
+const FONT_SIZE_VALUES = ["0.8rem", "0.9rem", "1rem", "1.1rem", "1.2rem"]
+const DEFAULT_FONT_SIZE_INDEX = 2 // 1rem (corrisponde a text-base)
 
 export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
   const [fontSizeIndex, setFontSizeIndex] = useState(DEFAULT_FONT_SIZE_INDEX)
@@ -47,20 +50,22 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
     }
   }, [isOpen, handleKeyDown])
 
+  // Sanitizza l'HTML del contenuto del feed usando DOMPurify
+  const sanitizedContent = useMemo(() => {
+    if (typeof window !== "undefined" && item?.content) {
+      return DOMPurify.sanitize(item.content)
+    }
+    return "<p>Nessun contenuto disponibile.</p>"
+  }, [item?.content])
+
   if (!item) return null
 
-  const currentFontSizeClass = FONT_SIZES[fontSizeIndex]
-
   const increaseFontSize = () => {
-    setFontSizeIndex((prev) => Math.min(prev + 1, FONT_SIZES.length - 1))
+    setFontSizeIndex((prev) => Math.min(prev + 1, FONT_SIZE_VALUES.length - 1))
   }
 
   const decreaseFontSize = () => {
     setFontSizeIndex((prev) => Math.max(prev - 1, 0))
-  }
-
-  const handlePrint = () => {
-    window.print()
   }
 
   const formattedDate = item.isoDate
@@ -75,12 +80,10 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 printable-modal custom-feed-modal-dialog-content">
-        <DialogHeader className="p-6 pb-4 dialog-header-no-print flex flex-row items-start justify-between gap-4">
-          <DialogTitle className="text-xl md:text-2xl break-words feed-title-print">
-            {item.title || "Dettaglio Feed"}
-          </DialogTitle>
-          <div className="flex items-center gap-2 font-controls-no-print flex-shrink-0">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 custom-feed-modal-dialog-content">
+        <DialogHeader className="p-6 pb-4 flex flex-row items-start justify-between gap-4">
+          <DialogTitle className="text-xl md:text-2xl break-words">{item.title || "Dettaglio Feed"}</DialogTitle>
+          <div className="flex items-center gap-2 flex-shrink-0">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -101,7 +104,7 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
                     variant="outline"
                     size="sm"
                     onClick={increaseFontSize}
-                    disabled={fontSizeIndex === FONT_SIZES.length - 1}
+                    disabled={fontSizeIndex === FONT_SIZE_VALUES.length - 1}
                   >
                     <ZoomIn className="h-4 w-4" />
                     <span className="sr-only">Aumenta testo</span>
@@ -109,19 +112,6 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Aumenta dimensione testo</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={handlePrint}>
-                    <Printer className="h-4 w-4" />
-                    <span className="sr-only">Stampa</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Stampa articolo</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -141,7 +131,7 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
           </div>
         </DialogHeader>
 
-        <div className="px-6 pt-0 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b feed-meta-print">
+        <div className="px-6 pt-0 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b">
           <div className="text-xs text-muted-foreground mb-2 sm:mb-0">
             {(item.creator || formattedDate) && (
               <p className="mb-1">
@@ -165,14 +155,12 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
           </div>
         </div>
 
-        <div
-          // Contenitore scrollabile per la visualizzazione a schermo
-          className={`overflow-y-auto flex-grow p-6 feed-content-print`}
-        >
+        <div className="overflow-y-auto flex-grow p-6">
           <div
-            // Contenitore per l'HTML, con classi prose e dimensione font dinamica
-            className={`prose prose-sm sm:prose-base dark:prose-invert max-w-none ${currentFontSizeClass}`}
-            dangerouslySetInnerHTML={{ __html: item.content || "<p>Nessun contenuto disponibile.</p>" }}
+            className="prose prose-sm sm:prose-base dark:prose-invert max-w-none"
+            // Applica lo stile inline per la dimensione del font
+            style={{ fontSize: FONT_SIZE_VALUES[fontSizeIndex] }}
+            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
           />
         </div>
       </DialogContent>
