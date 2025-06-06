@@ -2,85 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
   }
 }
 
@@ -93,117 +58,83 @@ body {
   }
 }
 
-/* Stili per il slider personalizzato */
-.slider::-webkit-slider-thumb {
-  appearance: none;
-  height: 20px;
-  width: 20px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #3b82f6;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-in-out;
-}
-
-.slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.slider::-moz-range-thumb {
-  height: 20px;
-  width: 20px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #3b82f6;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease-in-out;
-}
-
-.slider::-moz-range-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.slider::-moz-range-track {
-  height: 8px;
-  border-radius: 4px;
-  border: none;
-}
-
 /* Stili di stampa per FeedItemModal */
 @media print {
   body {
-    -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
-    print-color-adjust: exact !important; /* Firefox */
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
+
   .printable-modal,
   .printable-modal * {
-    visibility: visible;
+    visibility: visible !important;
   }
+
   .printable-modal {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100% !important; /* Assicura che non superi la larghezza del foglio */
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 1in !important; /* Margine di stampa standard */
-    background-color: white !important;
-    color: black !important;
-    font-size: 12pt; /* Dimensione base per la stampa */
-    line-height: 1.4;
+    padding: 1in !important; /* Margini di stampa standard */
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    background-color: white !important; /* Sfondo bianco per la stampa */
+    color: black !important; /* Testo nero per la stampa */
   }
 
-  /* Nascondi elementi non necessari per la stampa */
+  .printable-modal div,
+  .printable-modal p,
+  .printable-modal span,
+  .printable-modal li,
+  .printable-modal h1,
+  .printable-modal h2,
+  .printable-modal h3,
+  .printable-modal h4,
+  .printable-modal h5,
+  .printable-modal h6 {
+    font-size: inherit !important; /* Eredita dal 12pt del modal */
+    color: black !important;
+    background-color: transparent !important;
+  }
+
   .dialog-header-no-print,
-  .font-controls-no-print {
+  .font-controls-no-print,
+  .close-button-no-print /* Se ci fosse una classe specifica per la X standard */,
+  .dialog-footer-no-print {
+    /* Se ci fosse un footer da nascondere */
     display: none !important;
   }
 
   .feed-title-print {
-    font-size: 18pt !important;
+    font-size: 18pt !important; /* Dimensione maggiore per il titolo in stampa */
     font-weight: bold !important;
-    margin-bottom: 0.5in !important; /* Spazio dopo il titolo */
-    color: black !important;
-    text-align: left; /* Allinea a sinistra per stampa */
+    margin-bottom: 0.5in !important; /* Spazio sotto il titolo */
   }
 
   .feed-meta-print {
-    border-bottom: 1px solid #ccc !important;
-    padding-bottom: 0.25in !important;
-    margin-bottom: 0.25in !important;
     font-size: 10pt !important;
-    color: #333 !important;
+    margin-bottom: 0.25in !important; /* Spazio sotto i metadati */
+    border-bottom: 1px solid #ccc !important; /* Separatore leggero */
+    padding-bottom: 0.25in !important;
   }
-  .feed-meta-print p {
-    margin-bottom: 5px !important;
+
+  .feed-meta-print a[href] {
+    color: #0000ee !important; /* Colore standard per i link in stampa */
+    text-decoration: underline !important;
   }
-  .feed-meta-print a {
-    /* Link originale nella sezione meta */
-    color: #0000ee !important;
-    text-decoration: none !important; /* Rimuovi sottolineatura se il link è già chiaro */
-    word-break: break-all; /* Permetti al link lungo di andare a capo */
-  }
-  .feed-meta-print a:after {
-    content: " [" attr(href) "]"; /* Mostra URL tra parentesi solo se il testo del link non è già l'URL */
-    font-size: 9pt;
-    /* Se il testo del link è l'URL stesso, questa regola potrebbe essere rimossa o condizionata */
-    /* Per ora la lascio, ma se il testo del link è l'URL, potrebbe essere duplicato */
-  }
-  /* Se il testo del link è l'URL, non aggiungere l'URL di nuovo */
+  /* Evita di duplicare l'URL se il testo del link è già l'URL */
   .feed-meta-print a[href]:not(:empty):after {
-    content: normal !important; /* Sovrascrive la regola generale se il link ha già testo (che sarà l'URL) */
+    content: normal !important;
   }
 
   .feed-content-print {
@@ -211,44 +142,47 @@ body {
     height: auto !important;
     max-height: none !important;
   }
-  .feed-content-print div,
-  .feed-content-print p,
-  .feed-content-print span,
-  .feed-content-print li,
-  .feed-content-print h1,
-  .feed-content-print h2,
-  .feed-content-print h3,
-  .feed-content-print h4,
-  .feed-content-print h5,
-  .feed-content-print h6 {
-    font-size: inherit !important; /* Eredita dal genitore .printable-modal */
-    color: black !important;
-    background-color: transparent !important;
-  }
+
   .feed-content-print img {
-    max-width: 100% !important;
+    max-width: 100% !important; /* Immagini responsive alla larghezza del contenuto */
     height: auto !important;
-    page-break-inside: avoid;
-  }
-  .feed-content-print a {
-    color: #0000ee !important;
-    text-decoration: underline !important;
-    word-break: break-all;
-  }
-  /* Evita di aggiungere l'URL se il testo del link è già l'URL */
-  .feed-content-print a[href]:not(:empty):after {
-    content: normal !important;
+    page-break-inside: avoid !important;
   }
 
-  /* Evita interruzioni di pagina inopportune */
+  .feed-content-print a[href]:not(:empty):after {
+    content: " [" attr(href) "]" !important; /* Mostra URL per link nel contenuto */
+    font-size: 9pt !important;
+    word-break: break-all; /* Evita overflow per URL lunghi */
+  }
+  /* Se il testo del link è GIA' l'URL, non aggiungere l'URL tra parentesi */
+  .feed-content-print a[href][title]:not(:empty):after {
+    content: normal !important; /* Sovrascrive se il title è presente (assumendo che title = href) */
+  }
+
+  /* Migliorare interruzioni di pagina */
   h1,
   h2,
   h3,
   h4,
   h5,
   h6,
-  p {
-    page-break-after: avoid;
-    page-break-inside: avoid;
+  .feed-title-print {
+    page-break-after: avoid !important;
   }
+  p,
+  blockquote,
+  ul,
+  ol,
+  dl {
+    page-break-inside: avoid !important;
+  }
+  table,
+  figure {
+    page-break-inside: avoid !important;
+  }
+}
+
+/* Nasconde la X di default del DialogContent di shadcn/ui */
+.custom-feed-modal-dialog-content > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  display: none !important;
 }

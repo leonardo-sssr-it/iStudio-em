@@ -3,7 +3,7 @@
 import { X, ZoomIn, ZoomOut, Printer, ExternalLink } from "lucide-react"
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog" // Rimosso DialogClose da qui
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type FeedItem = {
@@ -75,39 +75,15 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 printable-modal">
-        <DialogHeader className="p-6 pb-0 dialog-header-no-print">
-          <DialogTitle className="text-xl md:text-2xl break-words feed-title-print mr-8">
-            {" "}
-            {/* Aggiunto mr-8 per spazio per eventuale X se fosse qui */}
+      {/* Aggiunta classe 'custom-feed-modal-dialog-content' per mirare la X di default con CSS */}
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 printable-modal custom-feed-modal-dialog-content">
+        <DialogHeader className="p-6 pb-4 dialog-header-no-print flex flex-row items-start justify-between gap-4">
+          {/* Titolo a sinistra */}
+          <DialogTitle className="text-xl md:text-2xl break-words feed-title-print">
             {item.title || "Dettaglio Feed"}
           </DialogTitle>
-          {/* La X standard è stata rimossa da qui */}
-        </DialogHeader>
-
-        <div className="px-6 pt-2 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b feed-meta-print">
-          <div className="text-xs text-muted-foreground mb-2 sm:mb-0">
-            {(item.creator || formattedDate) && (
-              <p className="mb-1">
-                {item.creator && <span>Autore: {item.creator}</span>}
-                {item.creator && formattedDate && <span className="mx-1">|</span>}
-                {formattedDate && <span>Pubblicato: {formattedDate}</span>}
-              </p>
-            )}
-            {item.link && (
-              <a
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={item.link} // Titolo dell'URL è l'URL stesso
-                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center break-all"
-              >
-                {item.link} {/* Testo del link è l'URL stesso */}
-                <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
-              </a>
-            )}
-          </div>
-          <div className="flex items-center gap-2 font-controls-no-print self-start sm:self-center">
+          {/* Controlli a destra */}
+          <div className="flex items-center gap-2 font-controls-no-print flex-shrink-0">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -166,6 +142,32 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
               </Tooltip>
             </TooltipProvider>
           </div>
+        </DialogHeader>
+
+        {/* Sezione Meta Info (Autore, Data, Link Originale) */}
+        <div className="px-6 pt-0 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b feed-meta-print">
+          <div className="text-xs text-muted-foreground mb-2 sm:mb-0">
+            {(item.creator || formattedDate) && (
+              <p className="mb-1">
+                {item.creator && <span>Autore: {item.creator}</span>}
+                {item.creator && formattedDate && <span className="mx-1">|</span>}
+                {formattedDate && <span>Pubblicato: {formattedDate}</span>}
+              </p>
+            )}
+            {item.link && (
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={item.link}
+                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center break-all"
+              >
+                {item.link}
+                <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
+              </a>
+            )}
+          </div>
+          {/* I controlli sono stati spostati nell'header */}
         </div>
 
         <div
