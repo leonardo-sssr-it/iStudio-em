@@ -75,14 +75,11 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Aggiunta classe 'custom-feed-modal-dialog-content' per mirare la X di default con CSS */}
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 printable-modal custom-feed-modal-dialog-content">
         <DialogHeader className="p-6 pb-4 dialog-header-no-print flex flex-row items-start justify-between gap-4">
-          {/* Titolo a sinistra */}
           <DialogTitle className="text-xl md:text-2xl break-words feed-title-print">
             {item.title || "Dettaglio Feed"}
           </DialogTitle>
-          {/* Controlli a destra */}
           <div className="flex items-center gap-2 font-controls-no-print flex-shrink-0">
             <TooltipProvider>
               <Tooltip>
@@ -144,7 +141,6 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
           </div>
         </DialogHeader>
 
-        {/* Sezione Meta Info (Autore, Data, Link Originale) */}
         <div className="px-6 pt-0 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b feed-meta-print">
           <div className="text-xs text-muted-foreground mb-2 sm:mb-0">
             {(item.creator || formattedDate) && (
@@ -167,13 +163,17 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
               </a>
             )}
           </div>
-          {/* I controlli sono stati spostati nell'header */}
         </div>
 
         <div
-          className={`overflow-y-auto flex-grow p-6 prose prose-sm sm:prose-base dark:prose-invert max-w-none feed-content-print ${currentFontSizeClass}`}
+          // Contenitore scrollabile per la visualizzazione a schermo
+          className={`overflow-y-auto flex-grow p-6 feed-content-print`}
         >
-          <div dangerouslySetInnerHTML={{ __html: item.content || "<p>Nessun contenuto disponibile.</p>" }} />
+          <div
+            // Contenitore per l'HTML, con classi prose e dimensione font dinamica
+            className={`prose prose-sm sm:prose-base dark:prose-invert max-w-none ${currentFontSizeClass}`}
+            dangerouslySetInnerHTML={{ __html: item.content || "<p>Nessun contenuto disponibile.</p>" }}
+          />
         </div>
       </DialogContent>
     </Dialog>

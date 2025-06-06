@@ -79,17 +79,17 @@
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
-    max-width: 100% !important; /* Assicura che non superi la larghezza del foglio */
+    max-width: 100% !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 1in !important; /* Margini di stampa standard */
+    padding: 1in !important;
     font-size: 12pt !important;
     line-height: 1.4 !important;
-    background-color: white !important; /* Sfondo bianco per la stampa */
-    color: black !important; /* Testo nero per la stampa */
+    background-color: white !important;
+    color: black !important;
   }
 
   .printable-modal div,
@@ -102,64 +102,80 @@
   .printable-modal h4,
   .printable-modal h5,
   .printable-modal h6 {
-    font-size: inherit !important; /* Eredita dal 12pt del modal */
+    font-size: inherit !important;
     color: black !important;
     background-color: transparent !important;
   }
 
   .dialog-header-no-print,
-  .font-controls-no-print,
-  .close-button-no-print /* Se ci fosse una classe specifica per la X standard */,
-  .dialog-footer-no-print {
-    /* Se ci fosse un footer da nascondere */
+  .font-controls-no-print {
     display: none !important;
   }
 
   .feed-title-print {
-    font-size: 18pt !important; /* Dimensione maggiore per il titolo in stampa */
+    font-size: 18pt !important;
     font-weight: bold !important;
-    margin-bottom: 0.5in !important; /* Spazio sotto il titolo */
+    margin-bottom: 0.5in !important;
   }
 
   .feed-meta-print {
     font-size: 10pt !important;
-    margin-bottom: 0.25in !important; /* Spazio sotto i metadati */
-    border-bottom: 1px solid #ccc !important; /* Separatore leggero */
+    margin-bottom: 0.25in !important;
+    border-bottom: 1px solid #ccc !important;
     padding-bottom: 0.25in !important;
   }
 
   .feed-meta-print a[href] {
-    color: #0000ee !important; /* Colore standard per i link in stampa */
+    color: #0000ee !important;
     text-decoration: underline !important;
   }
-  /* Evita di duplicare l'URL se il testo del link è già l'URL */
+
   .feed-meta-print a[href]:not(:empty):after {
     content: normal !important;
   }
 
   .feed-content-print {
+    padding: 0 !important; /* Rimuove il padding per la stampa, il modal ha già padding */
     overflow-y: visible !important;
     height: auto !important;
     max-height: none !important;
+    width: 100% !important; /* Assicura che prenda tutta la larghezza */
+    display: block !important; /* Assicura che si comporti come un blocco */
+  }
+
+  /* Stili specifici per il div che contiene l'HTML renderizzato da dangerouslySetInnerHTML */
+  .feed-content-print > div {
+    width: 100% !important;
+    max-width: none !important; /* Sovrascrive eventuali max-width di prose */
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important; /* Assicura che si comporti come un blocco */
+    font-size: 12pt !important; /* Applica la dimensione base anche qui per sicurezza */
+  }
+
+  /* Rimuove il max-width imposto da .prose per la stampa */
+  .feed-content-print .prose,
+  .feed-content-print .prose-sm,
+  .feed-content-print .sm\:prose-base {
+    max-width: none !important;
   }
 
   .feed-content-print img {
-    max-width: 100% !important; /* Immagini responsive alla larghezza del contenuto */
+    max-width: 100% !important;
     height: auto !important;
     page-break-inside: avoid !important;
   }
 
   .feed-content-print a[href]:not(:empty):after {
-    content: " [" attr(href) "]" !important; /* Mostra URL per link nel contenuto */
+    content: " [" attr(href) "]" !important;
     font-size: 9pt !important;
-    word-break: break-all; /* Evita overflow per URL lunghi */
-  }
-  /* Se il testo del link è GIA' l'URL, non aggiungere l'URL tra parentesi */
-  .feed-content-print a[href][title]:not(:empty):after {
-    content: normal !important; /* Sovrascrive se il title è presente (assumendo che title = href) */
+    word-break: break-all;
   }
 
-  /* Migliorare interruzioni di pagina */
+  .feed-content-print a[href][title]:not(:empty):after {
+    content: normal !important;
+  }
+
   h1,
   h2,
   h3,
@@ -182,7 +198,6 @@
   }
 }
 
-/* Nasconde la X di default del DialogContent di shadcn/ui */
 .custom-feed-modal-dialog-content > button[class*="absolute"][class*="right-4"][class*="top-4"] {
   display: none !important;
 }
