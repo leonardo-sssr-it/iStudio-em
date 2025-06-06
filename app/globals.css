@@ -135,6 +135,11 @@ body {
 
 /* Stili di stampa per FeedItemModal */
 @media print {
+  body {
+    -webkit-print-color-adjust: exact !important; /* Chrome, Safari */
+    print-color-adjust: exact !important; /* Firefox */
+  }
+
   body * {
     visibility: hidden;
   }
@@ -143,80 +148,107 @@ body {
     visibility: visible;
   }
   .printable-modal {
-    position: absolute !important; /* Usa !important per sovrascrivere stili inline se necessario */
+    position: absolute !important;
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
-    max-width: 100% !important; /* Assicura che non superi la larghezza della pagina */
+    max-width: 100% !important;
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
     box-shadow: none !important;
     border: none !important;
-    padding: 20px !important; /* Aggiungi un po' di padding per la stampa */
-    background-color: white !important; /* Sfondo bianco per la stampa */
-    color: black !important; /* Testo nero per la stampa */
+    padding: 1in !important; /* Margine di stampa standard */
+    background-color: white !important;
+    color: black !important;
+    font-size: 12pt; /* Dimensione base per la stampa */
+    line-height: 1.4;
   }
 
   /* Nascondi elementi non necessari per la stampa */
   .dialog-header-no-print,
-  .dialog-footer-no-print /* Se avessi un footer specifico da nascondere */,
-  .font-controls-no-print,
-  .close-button-no-print {
+  .font-controls-no-print {
     display: none !important;
-  }
-
-  /* Assicura che il contenuto del feed sia stampabile e ben formattato */
-  .feed-content-print {
-    overflow-y: visible !important;
-    height: auto !important;
-    max-height: none !important;
-    font-size: 12pt !important; /* Dimensione base per la stampa */
-    line-height: 1.5 !important;
-  }
-  .feed-content-print div,
-  .feed-content-print p,
-  .feed-content-print span,
-  .feed-content-print li {
-    font-size: inherit !important; /* Eredita dal genitore .feed-content-print */
-    color: black !important; /* Assicura che il testo sia nero */
-  }
-  .feed-content-print img {
-    max-width: 100% !important; /* Assicura che le immagini non superino la larghezza */
-    height: auto !important;
-  }
-  .feed-content-print a {
-    color: #0000ee !important; /* Colore standard per i link in stampa */
-    text-decoration: underline !important;
-  }
-  .feed-content-print a[href]:after {
-    content: " (" attr(href) ")"; /* Mostra URL dei link */
-    font-size: 10pt;
   }
 
   .feed-title-print {
     font-size: 18pt !important;
     font-weight: bold !important;
-    margin-bottom: 15px !important;
+    margin-bottom: 0.5in !important; /* Spazio dopo il titolo */
     color: black !important;
+    text-align: left; /* Allinea a sinistra per stampa */
   }
 
   .feed-meta-print {
-    border-bottom: 1px solid #ccc !important; /* Aggiunge una linea separatrice */
-    padding-bottom: 10px !important;
-    margin-bottom: 15px !important;
+    border-bottom: 1px solid #ccc !important;
+    padding-bottom: 0.25in !important;
+    margin-bottom: 0.25in !important;
+    font-size: 10pt !important;
+    color: #333 !important;
   }
   .feed-meta-print p {
-    font-size: 10pt !important;
     margin-bottom: 5px !important;
-    color: #333 !important;
   }
   .feed-meta-print a {
     /* Link originale nella sezione meta */
-    font-size: 10pt !important;
+    color: #0000ee !important;
+    text-decoration: none !important; /* Rimuovi sottolineatura se il link è già chiaro */
+    word-break: break-all; /* Permetti al link lungo di andare a capo */
   }
-  .feed-meta-print a[href]:after {
-    /* Evita di duplicare l'URL se già visibile */
-    content: "";
+  .feed-meta-print a:after {
+    content: " [" attr(href) "]"; /* Mostra URL tra parentesi solo se il testo del link non è già l'URL */
+    font-size: 9pt;
+    /* Se il testo del link è l'URL stesso, questa regola potrebbe essere rimossa o condizionata */
+    /* Per ora la lascio, ma se il testo del link è l'URL, potrebbe essere duplicato */
+  }
+  /* Se il testo del link è l'URL, non aggiungere l'URL di nuovo */
+  .feed-meta-print a[href]:not(:empty):after {
+    content: normal !important; /* Sovrascrive la regola generale se il link ha già testo (che sarà l'URL) */
+  }
+
+  .feed-content-print {
+    overflow-y: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .feed-content-print div,
+  .feed-content-print p,
+  .feed-content-print span,
+  .feed-content-print li,
+  .feed-content-print h1,
+  .feed-content-print h2,
+  .feed-content-print h3,
+  .feed-content-print h4,
+  .feed-content-print h5,
+  .feed-content-print h6 {
+    font-size: inherit !important; /* Eredita dal genitore .printable-modal */
+    color: black !important;
+    background-color: transparent !important;
+  }
+  .feed-content-print img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+  .feed-content-print a {
+    color: #0000ee !important;
+    text-decoration: underline !important;
+    word-break: break-all;
+  }
+  /* Evita di aggiungere l'URL se il testo del link è già l'URL */
+  .feed-content-print a[href]:not(:empty):after {
+    content: normal !important;
+  }
+
+  /* Evita interruzioni di pagina inopportune */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    page-break-after: avoid;
+    page-break-inside: avoid;
   }
 }

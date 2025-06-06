@@ -3,7 +3,7 @@
 import { X, ZoomIn, ZoomOut, Printer, ExternalLink } from "lucide-react"
 import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog" // Rimosso DialogClose da qui
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type FeedItem = {
@@ -77,33 +77,37 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 printable-modal">
         <DialogHeader className="p-6 pb-0 dialog-header-no-print">
-          <DialogTitle className="text-xl md:text-2xl break-words feed-title-print">
+          <DialogTitle className="text-xl md:text-2xl break-words feed-title-print mr-8">
+            {" "}
+            {/* Aggiunto mr-8 per spazio per eventuale X se fosse qui */}
             {item.title || "Dettaglio Feed"}
           </DialogTitle>
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon" className="absolute right-4 top-4 close-button-no-print">
-              <X className="h-5 w-5" />
-              <span className="sr-only">Chiudi</span>
-            </Button>
-          </DialogClose>
+          {/* La X standard è stata rimossa da qui */}
         </DialogHeader>
 
         <div className="px-6 pt-2 pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b feed-meta-print">
           <div className="text-xs text-muted-foreground mb-2 sm:mb-0">
-            {item.creator && <p>Autore: {item.creator}</p>}
-            {formattedDate && <p>Pubblicato: {formattedDate}</p>}
+            {(item.creator || formattedDate) && (
+              <p className="mb-1">
+                {item.creator && <span>Autore: {item.creator}</span>}
+                {item.creator && formattedDate && <span className="mx-1">|</span>}
+                {formattedDate && <span>Pubblicato: {formattedDate}</span>}
+              </p>
+            )}
             {item.link && (
               <a
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center mt-1"
+                title={item.link} // Titolo dell'URL è l'URL stesso
+                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center break-all"
               >
-                Leggi l'articolo originale <ExternalLink className="h-3 w-3 ml-1" />
+                {item.link} {/* Testo del link è l'URL stesso */}
+                <ExternalLink className="h-3 w-3 ml-1 flex-shrink-0" />
               </a>
             )}
           </div>
-          <div className="flex items-center gap-2 font-controls-no-print">
+          <div className="flex items-center gap-2 font-controls-no-print self-start sm:self-center">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -148,6 +152,19 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={onClose}>
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Chiudi</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Chiudi finestra</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -156,7 +173,6 @@ export function FeedItemModal({ item, isOpen, onClose }: FeedItemModalProps) {
         >
           <div dangerouslySetInnerHTML={{ __html: item.content || "<p>Nessun contenuto disponibile.</p>" }} />
         </div>
-        {/* Link originale in fondo rimosso */}
       </DialogContent>
     </Dialog>
   )
