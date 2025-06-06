@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import Parser from "rss-parser"
 
-// Forzare il runtime Node.js per questo route handler
+// Anche se non ha risolto prima, lasciarlo non dovrebbe nuocere e potrebbe essere utile in altri contesti.
 export const runtime = "nodejs"
-// export const dynamic = 'force-dynamic' // Opzionale: se vuoi assicurarti che non venga mai cachato staticamente
+// export const dynamic = 'force-dynamic'
 
 type FeedItem = {
   title?: string
@@ -17,7 +17,7 @@ type FeedItem = {
 
 type ParsedFeed = {
   items: FeedItem[]
-  title?: string // Aggiunto per logging
+  title?: string
 }
 
 const parser = new Parser<ParsedFeed, FeedItem>({
@@ -37,9 +37,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[Node.js Runtime] Fetching feed from: ${feedUrl}`)
-    const feed = await parser.parseURL(feedUrl)
-    console.log(`[Node.js Runtime] Successfully parsed feed: ${feed.title || "No title"}`)
+    console.log(`[API Route] Attempting to fetch feed content from: ${feedUrl}`)
+
+    // Passo 1: Recupera il contenuto del feed usando fetch nativo
+    const response = await fetch(feedUrl, {
+      headers: {
+        "User-Agent": "FeedReaderWidget/1.0 (+http://localhost:3000)", // Alcuni server richiedono un User-Agent
+        Accept: "application/rss+xml, application/xml, text/xml",
+      },
+      // Considera di aggiungere un timeout se necessario, anche se fetch di default ne ha uno
+      // signal: AbortSignal.timeout(10000) // Esempio di timeout di 10 secondi (richiede Node 16.14+ o polyfill)
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status} while fetching feed: ${response.statusText}`)
+    }
+
+    const xmlString = await response.text()
+    console.log(`[API Route] Successfully fetched XML content. Length: ${xmlString.length}`)
+
+    // Passo 2: Parsa la stringa XML usando rss-parser
+    const feed = await parser.parseString(xmlString)
+    console.log(`[API Route] Successfully parsed feed from XML string: ${feed.title || "No title"}`)
 
     const items = feed.items.slice(0, maxItems).map((item) => ({
       title: item.title,
@@ -52,8 +71,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items })
   } catch (error) {
-    console.error("[Node.js Runtime] Error fetching or parsing feed:", error)
+    console.error("[API Route] Error in GET handler:", error)
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred"
-    return NextResponse.json({ error: `Failed to fetch or parse feed: ${errorMessage}` }, { status: 500 })
+    return NextResponse.json({ error: `Failed to process feed: ${errorMessage}` }, { status: 500 })
   }
 }
