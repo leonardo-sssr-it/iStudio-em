@@ -1,12 +1,17 @@
 "use client"
 
+import type React from "react"
+
 import { useAuth } from "@/lib/auth-provider"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { User, Database, List, Filter, LogOut } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { User, Database, List, Filter, LogOut, Loader2, Save } from "lucide-react"
 import Link from "next/link"
 import { memo, useRef, useEffect, useState } from "react"
+import { useSupabase } from "@/lib/supabase-provider"
 
 // Componente card memoizzato per evitare re-render inutili
 const AdminCard = memo(
@@ -77,10 +82,19 @@ const useIntersectionObserver = (options = {}) => {
 // Componente principale memoizzato
 const AdminDashboardContent = memo(() => {
   const { user, logout } = useAuth()
+  const { supabase } = useSupabase()
   const [cardsRef, cardsVisible] = useIntersectionObserver()
   const [card1Visible, setCard1Visible] = useState(false)
   const [card2Visible, setCard2Visible] = useState(false)
   const [card3Visible, setCard3Visible] = useState(false)
+  const [activeTab, setActiveTab] = useState("database")
+
+  // Stati per la configurazione
+  const [configData, setConfigData] = useState<Record<string, any>>({})
+  const [configFields, setConfigFields] = useState<Array<{ name: string; type: string; nullable: boolean }>>([])
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false)
+  const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [configErrors, setConfigErrors] = useState<Record<string, string>>({})
 
   // Animazione sequenziale delle card
   useEffect(() => {
@@ -96,6 +110,311 @@ const AdminDashboardContent = memo(() => {
       }
     }
   }, [cardsVisible])
+
+  // Carica la struttura e i dati della tabella configurazione
+  useEffect(() => {
+    if (activeTab === "configurazione" && supabase) {
+      loadConfigurationData()
+    }
+  }, [activeTab, supabase])
+
+  const loadConfigurationData = async () => {
+    if (!supabase) return
+
+    setIsLoadingConfig(true)
+    try {
+      // Carica la struttura della tabella
+      const { data: columns, error: columnsError } = await supabase
+        .from("information_schema.columns")
+        .select("column_name, data_type, is_nullable")
+        .eq("table_name", "configurazione")
+        .eq("table_schema", "public")
+
+      if (columnsError) {
+        console.error("Errore nel caricamento delle colonne:", columnsError)
+        // Fallback: usa una query diretta
+        const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
+
+        if (configRow) {
+          const fields = Object.keys(configRow).map((key) => ({
+            name: key,
+            type:
+              typeof configRow[key] === "number" ? "integer" : typeof configRow[key] === "boolean" ? "boolean" : "text",
+            nullable: true,
+          }))
+          setConfigFields(fields)
+          setConfigData(configRow)
+        }
+      } else {
+        const fields =
+          columns?.map((col) => ({
+            name: col.column_name,
+            type: col.data_type,
+            nullable: col.is_nullable === "YES",
+          })) || []
+        setConfigFields(fields)
+
+        // Carica i dati attuali
+        const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
+
+        setConfigData(configRow || {})
+      }
+    } catch (error) {
+      console.error("Errore nel caricamento della configurazione:", error)
+    } finally {
+      setIsLoadingConfig(false)
+    }
+  }
+
+  const handleConfigChange = (fieldName: string, value: any) => {
+    setConfigData((prev) => ({ ...prev, [fieldName]: value }))
+
+    // Rimuovi errori per questo campo
+    if (configErrors[fieldName]) {
+      setConfigErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors[fieldName]
+        return newErrors
+      })
+    }
+  }
+
+  const validateConfigField = (field: { name: string; type: string; nullable: boolean }, value: any): string | null => {
+    if (!field.nullable && (value === null || value === undefined || value === "")) {
+      return "Campo obbligatorio"
+    }
+
+    if (value === null || value === undefined || value === "") {
+      return null // Campo opzionale vuoto
+    }
+
+    switch (field.type) {
+      case "integer":
+      case "bigint":
+        if (isNaN(Number(value))) {
+          return "Deve essere un numero intero"
+        }
+        break
+      case "numeric":
+      case "real":
+      case "double precision":
+        if (isNaN(Number(value))) {
+          return "Deve essere un numero"
+        }
+        break
+      case "boolean":
+        // I boolean sono gestiti da checkbox, sempre validi
+        break
+      case "date":
+        if (value && isNaN(Date.parse(value))) {
+          return "Data non valida"
+        }
+        break
+      case "timestamp with time zone":
+      case "timestamp without time zone":
+        if (value && isNaN(Date.parse(value))) {
+          return "Data e ora non valide"
+        }
+        break
+      case "json":
+      case "jsonb":
+        if (value && typeof value === "string") {
+          try {
+            JSON.parse(value)
+          } catch {
+            return "JSON non valido"
+          }
+        }
+        break
+    }
+
+    return null
+  }
+
+  const handleConfigSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!supabase) return
+
+    // Validazione
+    const errors: Record<string, string> = {}
+    configFields.forEach((field) => {
+      const error = validateConfigField(field, configData[field.name])
+      if (error) {
+        errors[field.name] = error
+      }
+    })
+
+    if (Object.keys(errors).length > 0) {
+      setConfigErrors(errors)
+      return
+    }
+
+    setIsSavingConfig(true)
+    try {
+      // Prepara i dati per il salvataggio
+      const saveData: Record<string, any> = {}
+      configFields.forEach((field) => {
+        let value = configData[field.name]
+
+        // Converti i tipi appropriati
+        if (field.type === "integer" || field.type === "bigint") {
+          value = value ? Number.parseInt(value) : null
+        } else if (field.type === "numeric" || field.type === "real" || field.type === "double precision") {
+          value = value ? Number.parseFloat(value) : null
+        } else if (field.type === "boolean") {
+          value = Boolean(value)
+        } else if (field.type === "json" || field.type === "jsonb") {
+          if (typeof value === "string" && value.trim()) {
+            try {
+              value = JSON.parse(value)
+            } catch {
+              // Mantieni come stringa se non è JSON valido
+            }
+          }
+        }
+
+        saveData[field.name] = value
+      })
+
+      // Verifica se esiste già una riga
+      const { data: existingRow } = await supabase.from("configurazione").select("id").limit(1).maybeSingle()
+
+      let result
+      if (existingRow) {
+        // Aggiorna la riga esistente
+        result = await supabase.from("configurazione").update(saveData).eq("id", existingRow.id)
+      } else {
+        // Inserisci una nuova riga
+        result = await supabase.from("configurazione").insert(saveData)
+      }
+
+      if (result.error) {
+        throw result.error
+      }
+
+      // Ricarica i dati
+      await loadConfigurationData()
+
+      // Mostra messaggio di successo (potresti aggiungere un toast qui)
+      console.log("Configurazione salvata con successo")
+    } catch (error) {
+      console.error("Errore nel salvataggio della configurazione:", error)
+      // Mostra messaggio di errore (potresti aggiungere un toast qui)
+    } finally {
+      setIsSavingConfig(false)
+    }
+  }
+
+  const renderConfigField = (field: { name: string; type: string; nullable: boolean }) => {
+    const value = configData[field.name] || ""
+    const error = configErrors[field.name]
+
+    const commonProps = {
+      id: field.name,
+      name: field.name,
+      className: error ? "border-red-500" : "",
+    }
+
+    switch (field.type) {
+      case "boolean":
+        return (
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              {...commonProps}
+              checked={Boolean(value)}
+              onChange={(e) => handleConfigChange(field.name, e.target.checked)}
+              className="rounded"
+            />
+            <Label htmlFor={field.name}>{field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</Label>
+          </div>
+        )
+
+      case "integer":
+      case "bigint":
+        return (
+          <Input
+            type="number"
+            step="1"
+            {...commonProps}
+            value={value}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            placeholder={`Inserisci ${field.name}`}
+          />
+        )
+
+      case "numeric":
+      case "real":
+      case "double precision":
+        return (
+          <Input
+            type="number"
+            step="any"
+            {...commonProps}
+            value={value}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            placeholder={`Inserisci ${field.name}`}
+          />
+        )
+
+      case "date":
+        return (
+          <Input
+            type="date"
+            {...commonProps}
+            value={value ? new Date(value).toISOString().split("T")[0] : ""}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+          />
+        )
+
+      case "timestamp with time zone":
+      case "timestamp without time zone":
+        return (
+          <Input
+            type="datetime-local"
+            {...commonProps}
+            value={value ? new Date(value).toISOString().slice(0, 16) : ""}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+          />
+        )
+
+      case "json":
+      case "jsonb":
+        return (
+          <textarea
+            {...commonProps}
+            value={typeof value === "object" ? JSON.stringify(value, null, 2) : value}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            placeholder={`Inserisci JSON per ${field.name}`}
+            className={`min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500" : ""}`}
+          />
+        )
+
+      case "text":
+      case "character varying":
+      default:
+        if (field.name.toLowerCase().includes("descrizione") || field.name.toLowerCase().includes("note")) {
+          return (
+            <textarea
+              {...commonProps}
+              value={value}
+              onChange={(e) => handleConfigChange(field.name, e.target.value)}
+              placeholder={`Inserisci ${field.name}`}
+              className={`min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500" : ""}`}
+            />
+          )
+        }
+        return (
+          <Input
+            type="text"
+            {...commonProps}
+            value={value}
+            onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            placeholder={`Inserisci ${field.name}`}
+          />
+        )
+    }
+  }
 
   const adminCards = [
     {
@@ -154,18 +473,107 @@ const AdminDashboardContent = memo(() => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Grid responsive migliorata */}
-          <div ref={cardsRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {adminCards.map((card, index) => (
-              <AdminCard
-                key={card.href}
-                href={card.href}
-                icon={card.icon}
-                title={card.title}
-                description={card.description}
-                isVisible={card.isVisible}
-              />
-            ))}
+          {/* Tabs per Database e Configurazione */}
+          <div className="w-full">
+            <div className="flex space-x-1 mb-6 border-b">
+              <button
+                onClick={() => setActiveTab("database")}
+                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors ${
+                  activeTab === "database"
+                    ? "bg-primary text-primary-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Database className="h-4 w-4 inline mr-2" />
+                Database
+              </button>
+              <button
+                onClick={() => setActiveTab("configurazione")}
+                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors ${
+                  activeTab === "configurazione"
+                    ? "bg-primary text-primary-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <User className="h-4 w-4 inline mr-2" />
+                Configurazione
+              </button>
+            </div>
+
+            {/* Contenuto del tab Database */}
+            {activeTab === "database" && (
+              <div ref={cardsRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {adminCards.map((card, index) => (
+                  <AdminCard
+                    key={card.href}
+                    href={card.href}
+                    icon={card.icon}
+                    title={card.title}
+                    description={card.description}
+                    isVisible={card.isVisible}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Contenuto del tab Configurazione */}
+            {activeTab === "configurazione" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Configurazione Sistema</h3>
+                  <Button onClick={loadConfigurationData} variant="outline" size="sm" disabled={isLoadingConfig}>
+                    {isLoadingConfig ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Database className="h-4 w-4 mr-2" />
+                    )}
+                    Ricarica
+                  </Button>
+                </div>
+
+                {isLoadingConfig ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <form onSubmit={handleConfigSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {configFields.map((field) => (
+                        <div key={field.name} className="space-y-2">
+                          {field.type !== "boolean" && (
+                            <Label htmlFor={field.name} className="flex items-center gap-2">
+                              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                              {!field.nullable && <span className="text-red-500">*</span>}
+                              <span className="text-xs text-muted-foreground">({field.type})</span>
+                            </Label>
+                          )}
+                          {renderConfigField(field)}
+                          {configErrors[field.name] && (
+                            <p className="text-sm text-red-500">{configErrors[field.name]}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-end pt-6 border-t">
+                      <Button type="submit" disabled={isSavingConfig} className="flex items-center gap-2 min-w-[150px]">
+                        {isSavingConfig ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Salvataggio...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4" />
+                            Salva Configurazione
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
