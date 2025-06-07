@@ -139,96 +139,119 @@ const AdminDashboardContent = memo(() => {
     }
   }, [activeTab, supabase])
 
-  // Sostituisci la funzione loadConfigurationData con questa versione corretta
-  // che usa una query diretta invece di una RPC inesistente
-
+  // Funzione semplificata che usa solo la deduzione dai dati esistenti
   const loadConfigurationData = async () => {
     if (!supabase) return
 
     setIsLoadingConfig(true)
     try {
-      // Usa una query diretta a information_schema.columns invece della RPC
-      const { data: columns, error: columnsError } = await supabase
-        .from("information_schema.columns")
-        .select("column_name, data_type, is_nullable")
-        .eq("table_name", "configurazione")
-        .eq("table_schema", "public")
+      console.log("Caricamento configurazione...")
 
-      if (columnsError) {
-        console.error("Errore nel caricamento delle colonne:", columnsError)
+      // Carica i dati attuali dalla tabella configurazione
+      const { data: configRow, error: configError } = await supabase
+        .from("configurazione")
+        .select("*")
+        .limit(1)
+        .maybeSingle()
 
-        // Fallback: query diretta alla tabella per dedurre i tipi
-        const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
+      if (configError) {
+        console.error("Errore nel caricamento dei dati configurazione:", configError)
+        throw configError
+      }
 
-        if (configRow) {
-          const fields = Object.keys(configRow)
-            .filter((key) => key !== "id" && key !== "modifica") // Escludi campi non editabili
-            .map((key) => ({
-              name: key,
-              type: getFieldType(configRow[key]),
-              nullable: true,
-            }))
-          setConfigFields(fields)
-          setConfigData(configRow)
-        }
+      if (!configRow) {
+        console.log("Nessuna configurazione trovata, creazione campi di default...")
+        // Se non ci sono dati, crea una struttura di base
+        const defaultFields = [
+          { name: "nome_app", type: "text", nullable: true },
+          { name: "versione", type: "text", nullable: true },
+          { name: "debug", type: "boolean", nullable: true },
+          { name: "priorita", type: "json", nullable: true },
+          { name: "feed1", type: "text", nullable: true },
+          { name: "tema_default", type: "text", nullable: true },
+        ]
+        setConfigFields(defaultFields)
+        setConfigData({})
       } else {
-        const fields =
-          columns
-            ?.filter((col: any) => col.column_name !== "id" && col.column_name !== "modifica") // Escludi campi non editabili
-            .map((col: any) => ({
-              name: col.column_name,
-              type: col.data_type,
-              nullable: col.is_nullable === "YES",
-            })) || []
+        console.log("Dati configurazione caricati:", configRow)
+
+        // Deduce i tipi dai dati esistenti
+        const fields = Object.keys(configRow)
+          .filter((key) => key !== "id" && key !== "modifica") // Escludi campi non editabili
+          .map((key) => ({
+            name: key,
+            type: getFieldType(configRow[key]),
+            nullable: true, // Assumiamo che tutti i campi siano nullable per sicurezza
+          }))
+
+        console.log("Campi dedotti:", fields)
         setConfigFields(fields)
-
-        // Carica i dati attuali
-        const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
-
-        setConfigData(configRow || {})
+        setConfigData(configRow)
       }
     } catch (error) {
       console.error("Errore nel caricamento della configurazione:", error)
       toast({
         title: "Errore",
-        description: "Impossibile caricare la configurazione. Verifica i permessi del database.",
+        description: `Impossibile caricare la configurazione: ${error instanceof Error ? error.message : "Errore sconosciuto"}`,
         variant: "destructive",
       })
 
-      // Fallback finale: prova a caricare solo i dati senza metadati
-      try {
-        const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
-        if (configRow) {
-          const fields = Object.keys(configRow)
-            .filter((key) => key !== "id" && key !== "modifica")
-            .map((key) => ({
-              name: key,
-              type: getFieldType(configRow[key]),
-              nullable: true,
-            }))
-          setConfigFields(fields)
-          setConfigData(configRow)
-        }
-      } catch (innerError) {
-        console.error("Fallback fallito:", innerError)
-      }
+      // Fallback con campi di base
+      const fallbackFields = [
+        { name: "nome_app", type: "text", nullable: true },
+        { name: "versione", type: "text", nullable: true },
+        { name: "debug", type: "boolean", nullable: true },
+        { name: "priorita", type: "json", nullable: true },
+        { name: "feed1", type: "text", nullable: true },
+        { name: "tema_default", type: "text", nullable: true },
+      ]
+      setConfigFields(fallbackFields)
+      setConfigData({})
     } finally {
       setIsLoadingConfig(false)
     }
   }
 
-  // Funzione helper per determinare il tipo di campo
+  // Funzione helper migliorata per determinare il tipo di campo
   const getFieldType = (value: any): string => {
-    if (typeof value === "boolean") return "boolean"
+    console.log(`Determinazione tipo per valore:`, value, `(tipo: ${typeof value})`)
+
+    if (value === null || value === undefined) {
+      return "text" // Default per valori null
+    }
+
+    if (typeof value === "boolean") {
+      return "boolean"
+    }
+
     if (typeof value === "number") {
       return Number.isInteger(value) ? "integer" : "numeric"
     }
-    if (value && typeof value === "object") return "json"
-    if (typeof value === "string") {
-      // Controlla se è una data
-      if (value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) return "timestamp with time zone"
-      if (value.match(/^\d{4}-\d{2}-\d{2}$/)) return "date"
+
+    if (typeof value === "object") {
+      return "json"
     }
+
+    if (typeof value === "string") {
+      // Controlla se è una data ISO
+      if (value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+        return "timestamp with time zone"
+      }
+      // Controlla se è una data semplice
+      if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return "date"
+      }
+      // Controlla se sembra JSON
+      if ((value.startsWith("{") && value.endsWith("}")) || (value.startsWith("[") && value.endsWith("]"))) {
+        try {
+          JSON.parse(value)
+          return "json"
+        } catch {
+          // Non è JSON valido, tratta come testo
+        }
+      }
+    }
+
     return "text"
   }
 
@@ -356,21 +379,28 @@ const AdminDashboardContent = memo(() => {
       // Aggiungi automaticamente il campo modifica
       saveData.modifica = new Date().toISOString()
 
+      console.log("Dati da salvare:", saveData)
+
       // Verifica se esiste già una riga
       const { data: existingRow } = await supabase.from("configurazione").select("id").limit(1).maybeSingle()
 
       let result
       if (existingRow) {
+        console.log("Aggiornamento riga esistente con ID:", existingRow.id)
         // Aggiorna la riga esistente
         result = await supabase.from("configurazione").update(saveData).eq("id", existingRow.id)
       } else {
+        console.log("Inserimento nuova riga")
         // Inserisci una nuova riga
         result = await supabase.from("configurazione").insert(saveData)
       }
 
       if (result.error) {
+        console.error("Errore nel salvataggio:", result.error)
         throw result.error
       }
+
+      console.log("Salvataggio completato con successo")
 
       // Ricarica i dati
       await loadConfigurationData()
@@ -395,10 +425,6 @@ const AdminDashboardContent = memo(() => {
     const value = configData[field.name] || ""
     const error = configErrors[field.name]
     const jsonError = jsonValidation[field.name]
-
-    const commonInputClasses = `w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-      error || (jsonError && !jsonError.isValid) ? "border-red-500" : ""
-    }`
 
     switch (field.type) {
       case "boolean":
