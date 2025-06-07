@@ -443,16 +443,38 @@ export function KanbanWidget() {
   // Debug: aggiorna le colonne finali quando cambiano
   useEffect(() => {
     if (isDebugEnabled && debugInfo) {
-      setDebugInfo((prev) =>
-        prev
-          ? {
-              ...prev,
-              finalColumns: columns,
-            }
-          : null,
-      )
+      setDebugInfo((prev) => {
+        if (!prev) return null
+
+        // Evita aggiornamenti non necessari confrontando le colonne
+        const currentFinalColumns = columns.map((col) => ({
+          id: col.id,
+          title: col.title,
+          level: col.level,
+          itemCount: col.items?.length || 0,
+          isUncategorized: col.isUncategorized,
+        }))
+
+        const prevFinalColumns = prev.finalColumns.map((col) => ({
+          id: col.id,
+          title: col.title,
+          level: col.level,
+          itemCount: col.items?.length || 0,
+          isUncategorized: col.isUncategorized,
+        }))
+
+        // Solo aggiorna se le colonne sono effettivamente cambiate
+        if (JSON.stringify(currentFinalColumns) === JSON.stringify(prevFinalColumns)) {
+          return prev
+        }
+
+        return {
+          ...prev,
+          finalColumns: columns,
+        }
+      })
     }
-  }, [columns, isDebugEnabled, debugInfo])
+  }, [columns, isDebugEnabled]) // Rimosso debugInfo dalle dipendenze
 
   const handleDragEnd = async (result: DropResult) => {
     if (!supabase) {
