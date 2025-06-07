@@ -139,19 +139,25 @@ const AdminDashboardContent = memo(() => {
     }
   }, [activeTab, supabase])
 
+  // Sostituisci la funzione loadConfigurationData con questa versione corretta
+  // che usa una query diretta invece di una RPC inesistente
+
   const loadConfigurationData = async () => {
     if (!supabase) return
 
     setIsLoadingConfig(true)
     try {
-      // Carica la struttura della tabella usando la query corretta
-      const { data: columns, error: columnsError } = await supabase.rpc("get_table_columns", {
-        table_name: "configurazione",
-      })
+      // Usa una query diretta a information_schema.columns invece della RPC
+      const { data: columns, error: columnsError } = await supabase
+        .from("information_schema.columns")
+        .select("column_name, data_type, is_nullable")
+        .eq("table_name", "configurazione")
+        .eq("table_schema", "public")
 
       if (columnsError) {
-        console.error("Errore RPC get_table_columns:", columnsError)
-        // Fallback: usa una query diretta per ottenere i metadati
+        console.error("Errore nel caricamento delle colonne:", columnsError)
+
+        // Fallback: query diretta alla tabella per dedurre i tipi
         const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
 
         if (configRow) {
@@ -188,6 +194,24 @@ const AdminDashboardContent = memo(() => {
         description: "Impossibile caricare la configurazione. Verifica i permessi del database.",
         variant: "destructive",
       })
+
+      // Fallback finale: prova a caricare solo i dati senza metadati
+      try {
+        const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
+        if (configRow) {
+          const fields = Object.keys(configRow)
+            .filter((key) => key !== "id" && key !== "modifica")
+            .map((key) => ({
+              name: key,
+              type: getFieldType(configRow[key]),
+              nullable: true,
+            }))
+          setConfigFields(fields)
+          setConfigData(configRow)
+        }
+      } catch (innerError) {
+        console.error("Fallback fallito:", innerError)
+      }
     } finally {
       setIsLoadingConfig(false)
     }
