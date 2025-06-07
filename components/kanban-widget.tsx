@@ -71,6 +71,14 @@ export function KanbanWidget() {
 
   const { decodePriorities, createKanbanColumns } = useJsonDecoder()
 
+  const [debugInfo, setDebugInfo] = useState<{
+    rawPriorityConfig: string | null
+    decodedPriorities: any[]
+    createdColumns: any[]
+    finalColumns: any[]
+    configLoadError: string | null
+  } | null>(null)
+
   const loadConfigAndPriorities = useCallback(async () => {
     if (!supabase || supabaseIsInitializing) {
       return null
@@ -84,11 +92,25 @@ export function KanbanWidget() {
       if (configError) throw configError
       if (!configData) throw new Error("Configurazione non trovata.")
 
+      // Cattura info di debug
+      const rawPriorityConfig = configData.priorita
+
       // Use the JSON decoder hook to parse priorities
       const decodedPriorities = decodePriorities(configData.priorita)
 
       // Create Kanban columns configuration
       const columnsConfig = createKanbanColumns(decodedPriorities)
+
+      // Aggiorna le informazioni di debug
+      if (configData.debug === true) {
+        setDebugInfo({
+          rawPriorityConfig,
+          decodedPriorities,
+          createdColumns: columnsConfig,
+          finalColumns: [], // Sarà aggiornato dopo
+          configLoadError: null,
+        })
+      }
 
       if (columnsConfig.length === 0) {
         console.warn("KanbanWidget: Nessuna colonna di priorità valida trovata nella configurazione.")
@@ -97,6 +119,17 @@ export function KanbanWidget() {
       return { columnsConfig, isDebug: configData.debug === true }
     } catch (err: any) {
       console.error("KanbanWidget: Errore durante il caricamento della configurazione delle priorità:", err)
+
+      // Aggiorna debug con errore
+      setDebugInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              configLoadError: err.message,
+            }
+          : null,
+      )
+
       const specificError = new Error(`Errore caricamento configurazione priorità: ${err.message}`)
       ;(specificError as any).originalError = err
       throw specificError
@@ -259,6 +292,20 @@ export function KanbanWidget() {
     }
   }, [authUser, authIsLoading, supabase, supabaseIsInitializing, loadConfigAndPriorities, loadItems])
 
+  // Debug: aggiorna le colonne finali quando cambiano
+  useEffect(() => {
+    if (isDebugEnabled && debugInfo) {
+      setDebugInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              finalColumns: columns,
+            }
+          : null,
+      )
+    }
+  }, [columns, isDebugEnabled, debugInfo])
+
   const handleDragEnd = async (result: DropResult) => {
     if (!supabase) {
       toast({ title: "Errore", description: "Client Supabase non disponibile.", variant: "destructive" })
@@ -413,6 +460,74 @@ export function KanbanWidget() {
       <CardHeader>
         <CardTitle>Kanban Priorità</CardTitle>
       </CardHeader>
+
+      {/* Sezione Debug */}
+      {isDebugEnabled && debugInfo && (
+        <div className="mx-4 mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-3">🐛 Debug Configurazione Priorità</h4>
+
+          <div className="space-y-3 text-sm">
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">Raw Priority Config:</strong>
+              <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {debugInfo.rawPriorityConfig || "null"}
+              </pre>
+            </div>
+
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">
+                Decoded Priorities ({debugInfo.decodedPriorities.length}):
+              </strong>
+              <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {JSON.stringify(debugInfo.decodedPriorities, null, 2)}
+              </pre>
+            </div>
+
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">
+                Created Columns Config ({debugInfo.createdColumns.length}):
+              </strong>
+              <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {JSON.stringify(debugInfo.createdColumns, null, 2)}
+              </pre>
+            </div>
+
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">
+                Final Rendered Columns ({debugInfo.finalColumns.length}):
+              </strong>
+              <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {JSON.stringify(
+                  debugInfo.finalColumns.map((col) => ({
+                    id: col.id,
+                    title: col.title,
+                    level: col.level,
+                    itemCount: col.items.length,
+                    isUncategorized: col.isUncategorized,
+                  })),
+                  null,
+                  2,
+                )}
+              </pre>
+            </div>
+
+            {debugInfo.configLoadError && (
+              <div>
+                <strong className="text-red-700 dark:text-red-300">Config Load Error:</strong>
+                <pre className="mt-1 p-2 bg-red-100 dark:bg-red-900/40 rounded text-xs overflow-x-auto">
+                  {debugInfo.configLoadError}
+                </pre>
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-yellow-300 dark:border-yellow-700">
+              <strong className="text-yellow-700 dark:text-yellow-300">Kanban Columns Config:</strong>
+              <div className="mt-1 text-xs">Configurazione: {kanbanColumnsConfig.length} colonne definite</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CardContent className="p-0">
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px]">
