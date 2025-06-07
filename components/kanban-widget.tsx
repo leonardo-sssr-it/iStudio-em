@@ -855,132 +855,157 @@ export function KanbanWidget() {
 
       <CardContent className="p-0">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px]">
-            {columns.map((column) => (
-              <Droppable key={column.id} droppableId={column.id}>
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={cn(
-                      "flex-shrink-0 w-72 md:w-80 rounded-lg p-1 flex flex-col",
-                      snapshot.isDraggingOver ? "bg-primary/10 dark:bg-primary/20" : "bg-muted/50 dark:bg-muted/30",
-                    )}
-                  >
+          <div className="relative">
+            {/* Container principale con scorrimento orizzontale */}
+            <div
+              className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
+              style={{
+                // Calcola la larghezza minima in base al numero di colonne
+                minWidth: `${columns.length * (288 + 16)}px`, // 288px (w-72) + 16px gap
+              }}
+            >
+              {columns.map((column, index) => (
+                <Droppable key={column.id} droppableId={column.id}>
+                  {(provided, snapshot) => (
                     <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
                       className={cn(
-                        "px-3 py-2 rounded-t-md mb-2 sticky top-0 z-10",
-                        column.headerColor || "bg-gray-200 dark:bg-gray-800",
-                        "text-sm font-semibold text-foreground",
+                        "flex-shrink-0 rounded-lg p-1 flex flex-col",
+                        // Larghezza dinamica basata sul numero di colonne e spazio disponibile
+                        columns.length <= 3
+                          ? "flex-1 min-w-[280px] max-w-[400px]" // Se poche colonne, espandi
+                          : "w-72 md:w-80", // Se molte colonne, mantieni larghezza fissa
+                        snapshot.isDraggingOver ? "bg-primary/10 dark:bg-primary/20" : "bg-muted/50 dark:bg-muted/30",
                       )}
-                      title={column.description}
+                      style={{
+                        // Assicura che ogni colonna sia sempre visibile
+                        minWidth: columns.length <= 3 ? "280px" : "288px",
+                      }}
                     >
-                      <h3 className="truncate flex items-center justify-between">
-                        {column.title}
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          {column.items.length}
-                        </Badge>
-                      </h3>
-                    </div>
-                    <div className="flex-grow overflow-y-auto space-y-2 px-2 pb-2 custom-scrollbar">
-                      {column.items.length === 0 && (
-                        <div className="p-4 text-center text-xs text-muted-foreground bg-background/30 dark:bg-background/10 rounded-md border border-dashed mt-2">
-                          Nessun elemento
-                        </div>
-                      )}
-                      {column.items.map((item, index) => (
-                        <Draggable key={item.id} draggableId={item.id} index={index}>
-                          {(providedDraggable, snapshotDraggable) => (
-                            <Link
-                              href={`/data-explorer/${item.originalTable}/${item.originalRecordId}`}
-                              passHref
-                              legacyBehavior
-                            >
-                              <a
-                                ref={providedDraggable.innerRef}
-                                {...providedDraggable.draggableProps}
-                                className={cn(
-                                  "p-2.5 rounded-md border bg-card shadow-sm block cursor-pointer hover:shadow-md transition-shadow",
-                                  PASTEL_COLORS[item.originalTable],
-                                  snapshotDraggable.isDragging && "shadow-xl ring-2 ring-primary scale-105 opacity-95",
-                                )}
-                                onClick={(e) => {
-                                  if (snapshotDraggable.isDragging) {
-                                    e.preventDefault()
-                                  }
-                                }}
+                      <div
+                        className={cn(
+                          "px-3 py-2 rounded-t-md mb-2 sticky top-0 z-10",
+                          column.headerColor || "bg-gray-200 dark:bg-gray-800",
+                          "text-sm font-semibold text-foreground",
+                        )}
+                        title={column.description}
+                      >
+                        <h3 className="truncate flex items-center justify-between">
+                          {column.title}
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {column.items.length}
+                          </Badge>
+                        </h3>
+                      </div>
+                      <div className="flex-grow overflow-y-auto space-y-2 px-2 pb-2 custom-scrollbar">
+                        {column.items.length === 0 && (
+                          <div className="p-4 text-center text-xs text-muted-foreground bg-background/30 dark:bg-background/10 rounded-md border border-dashed mt-2">
+                            Nessun elemento
+                          </div>
+                        )}
+                        {column.items.map((item, index) => (
+                          <Draggable key={item.id} draggableId={item.id} index={index}>
+                            {(providedDraggable, snapshotDraggable) => (
+                              <Link
+                                href={`/data-explorer/${item.originalTable}/${item.originalRecordId}`}
+                                passHref
+                                legacyBehavior
                               >
-                                <div
-                                  {...providedDraggable.dragHandleProps}
-                                  className="flex items-start mb-1 cursor-grab active:cursor-grabbing"
-                                  onClick={(e) => e.stopPropagation()}
+                                <a
+                                  ref={providedDraggable.innerRef}
+                                  {...providedDraggable.draggableProps}
+                                  className={cn(
+                                    "p-2.5 rounded-md border bg-card shadow-sm block cursor-pointer hover:shadow-md transition-shadow",
+                                    PASTEL_COLORS[item.originalTable],
+                                    snapshotDraggable.isDragging &&
+                                      "shadow-xl ring-2 ring-primary scale-105 opacity-95",
+                                  )}
+                                  onClick={(e) => {
+                                    if (snapshotDraggable.isDragging) {
+                                      e.preventDefault()
+                                    }
+                                  }}
                                 >
-                                  <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground/70 flex-shrink-0 mt-0.5" />
-                                  <h4
-                                    className="font-medium text-sm leading-tight line-clamp-2 flex-grow"
-                                    title={item.title}
+                                  <div
+                                    {...providedDraggable.dragHandleProps}
+                                    className="flex items-start mb-1 cursor-grab active:cursor-grabbing"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    {item.title}
-                                  </h4>
-                                </div>
+                                    <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground/70 flex-shrink-0 mt-0.5" />
+                                    <h4
+                                      className="font-medium text-sm leading-tight line-clamp-2 flex-grow"
+                                      title={item.title}
+                                    >
+                                      {item.title}
+                                    </h4>
+                                  </div>
 
-                                {item.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-2 my-1.5 ml-5">
-                                    {item.description}
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs ml-5">
-                                  {item.stato && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30"
-                                    >
-                                      {item.stato}
-                                    </Badge>
-                                  )}
-                                  {item.avanzamento !== undefined && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30 flex items-center gap-1"
-                                    >
-                                      <CheckCircle className="h-3 w-3" /> {item.avanzamento}%
-                                    </Badge>
-                                  )}
-                                  {(item.scadenza || item.data_fine) && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30 flex items-center gap-1"
-                                    >
-                                      <Calendar className="h-3 w-3" /> {formatDate(item.scadenza || item.data_fine)}
-                                    </Badge>
-                                  )}
-                                  {item.data_inizio && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30 flex items-center gap-1"
-                                    >
-                                      <Clock className="h-3 w-3" /> {formatDate(item.data_inizio)}
-                                    </Badge>
-                                  )}
-                                </div>
-                                {isDebugEnabled &&
-                                  item.dbPriorityValue !== null &&
-                                  item.dbPriorityValue !== undefined && (
-                                    <p className="text-xs text-muted-foreground/80 mt-1.5 pt-1 border-t border-dashed ml-5">
-                                      Prio. DB: {safeStringify(item.dbPriorityValue)}
+                                  {item.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2 my-1.5 ml-5">
+                                      {item.description}
                                     </p>
                                   )}
-                              </a>
-                            </Link>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5 text-xs ml-5">
+                                    {item.stato && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30"
+                                      >
+                                        {item.stato}
+                                      </Badge>
+                                    )}
+                                    {item.avanzamento !== undefined && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30 flex items-center gap-1"
+                                      >
+                                        <CheckCircle className="h-3 w-3" /> {item.avanzamento}%
+                                      </Badge>
+                                    )}
+                                    {(item.scadenza || item.data_fine) && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30 flex items-center gap-1"
+                                      >
+                                        <Calendar className="h-3 w-3" /> {formatDate(item.scadenza || item.data_fine)}
+                                      </Badge>
+                                    )}
+                                    {item.data_inizio && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs py-0.5 px-1.5 bg-background/70 dark:bg-background/30 flex items-center gap-1"
+                                      >
+                                        <Clock className="h-3 w-3" /> {formatDate(item.data_inizio)}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {isDebugEnabled &&
+                                    item.dbPriorityValue !== null &&
+                                    item.dbPriorityValue !== undefined && (
+                                      <p className="text-xs text-muted-foreground/80 mt-1.5 pt-1 border-t border-dashed ml-5">
+                                        Prio. DB: {safeStringify(item.dbPriorityValue)}
+                                      </p>
+                                    )}
+                                </a>
+                              </Link>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </Droppable>
-            ))}
+                  )}
+                </Droppable>
+              ))}
+            </div>
+
+            {/* Indicatore di scorrimento se ci sono molte colonne */}
+            {columns.length > 3 && (
+              <div className="absolute bottom-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded-md pointer-events-none">
+                ← Scorri per vedere tutte le colonne →
+              </div>
+            )}
           </div>
         </DragDropContext>
       </CardContent>
