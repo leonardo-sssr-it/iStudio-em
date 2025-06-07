@@ -56,6 +56,14 @@ const PASTEL_COLORS: Record<KanbanItem["originalTable"], string> = {
 
 const UNCATEGORIZED_COLUMN_ID = "uncategorized"
 
+// Priorità di default se la configurazione è vuota o non valida
+const DEFAULT_PRIORITIES = [
+  { livello: 1, nome: "Bassa", descrizione: "Priorità bassa", colore: "bg-green-200 dark:bg-green-800" },
+  { livello: 2, nome: "Media", descrizione: "Priorità media", colore: "bg-yellow-200 dark:bg-yellow-800" },
+  { livello: 3, nome: "Alta", descrizione: "Priorità alta", colore: "bg-orange-200 dark:bg-orange-800" },
+  { livello: 4, nome: "Urgente", descrizione: "Priorità urgente", colore: "bg-red-200 dark:bg-red-800" },
+]
+
 export function KanbanWidget() {
   const { user: authUser, isLoading: authIsLoading } = useAuth()
   const { supabase, isInitializing: supabaseIsInitializing } = useSupabase()
@@ -77,6 +85,7 @@ export function KanbanWidget() {
     createdColumns: any[]
     finalColumns: any[]
     configLoadError: string | null
+    usingDefaults: boolean
   } | null>(null)
 
   const loadConfigAndPriorities = useCallback(async () => {
@@ -92,29 +101,42 @@ export function KanbanWidget() {
       if (configError) throw configError
       if (!configData) throw new Error("Configurazione non trovata.")
 
+      console.log("KanbanWidget: Raw configData:", configData)
+
       // Cattura info di debug - assicuriamoci che sia sempre una stringa
       const rawPriorityConfig =
         typeof configData.priorita === "string" ? configData.priorita : JSON.stringify(configData.priorita)
 
       // Parse del JSON delle priorità
       let parsedPriorities: any[] = []
+      let usingDefaults = false
+
       console.log("KanbanWidget: Raw configData.priorita:", configData.priorita, "Type:", typeof configData.priorita)
 
-      try {
-        if (typeof configData.priorita === "string") {
-          parsedPriorities = JSON.parse(configData.priorita)
-          console.log("KanbanWidget: Parsed from string:", parsedPriorities)
-        } else if (Array.isArray(configData.priorita)) {
-          parsedPriorities = configData.priorita
-          console.log("KanbanWidget: Already an array:", parsedPriorities)
-        } else if (configData.priorita && typeof configData.priorita === "object") {
-          // Potrebbe essere un oggetto invece di un array
-          console.log("KanbanWidget: Found object instead of array:", configData.priorita)
-          parsedPriorities = [configData.priorita]
+      // Se il campo priorita è null, undefined o vuoto, usa le priorità di default
+      if (!configData.priorita || configData.priorita === "" || configData.priorita === "null") {
+        console.log("KanbanWidget: Campo priorita vuoto o null, usando priorità di default")
+        parsedPriorities = DEFAULT_PRIORITIES
+        usingDefaults = true
+      } else {
+        try {
+          if (typeof configData.priorita === "string") {
+            parsedPriorities = JSON.parse(configData.priorita)
+            console.log("KanbanWidget: Parsed from string:", parsedPriorities)
+          } else if (Array.isArray(configData.priorita)) {
+            parsedPriorities = configData.priorita
+            console.log("KanbanWidget: Already an array:", parsedPriorities)
+          } else if (configData.priorita && typeof configData.priorita === "object") {
+            // Potrebbe essere un oggetto invece di un array
+            console.log("KanbanWidget: Found object instead of array:", configData.priorita)
+            parsedPriorities = [configData.priorita]
+          }
+        } catch (parseError) {
+          console.error("Errore nel parsing del JSON priorità:", parseError)
+          console.log("KanbanWidget: Errore nel parsing, usando priorità di default")
+          parsedPriorities = DEFAULT_PRIORITIES
+          usingDefaults = true
         }
-      } catch (parseError) {
-        console.error("Errore nel parsing del JSON priorità:", parseError)
-        throw new Error("Formato JSON priorità non valido")
       }
 
       console.log("KanbanWidget: Parsed priorities before validation:", parsedPriorities)
@@ -129,32 +151,52 @@ export function KanbanWidget() {
             return null
           }
 
-          if (typeof item.livello !== "number") {
-            console.log(`KanbanWidget: Item ${index} has invalid livello:`, item.livello, typeof item.livello)
+          // Controlla diversi possibili nomi per il campo livello
+          const level = item.livello ?? item.level ?? item.priority ?? item.priorita ?? null
+          if (typeof level !== "number") {
+            console.log(`KanbanWidget: Item ${index} has invalid level:`, level, typeof level)
             return null
           }
 
-          if (typeof item.nome !== "string" || item.nome.trim() === "") {
-            console.log(`KanbanWidget: Item ${index} has invalid nome:`, item.nome, typeof item.nome)
+          // Controlla diversi possibili nomi per il campo nome
+          const name = item.nome ?? item.name ?? item.title ?? item.titolo ?? null
+          if (typeof name !== "string" || name.trim() === "") {
+            console.log(`KanbanWidget: Item ${index} has invalid name:`, name, typeof name)
             return null
           }
 
-          console.log(`KanbanWidget: Item ${index} is valid:`, { livello: item.livello, nome: item.nome })
-          return item
+          // Normalizza l'oggetto
+          const normalizedItem = {
+            livello: level,
+            nome: name.trim(),
+            descrizione: item.descrizione ?? item.description ?? `Priorità livello ${level}`,
+            colore:
+              item.colore ??
+              item.color ??
+              `bg-blue-${Math.min(900, 100 + level * 100)} dark:bg-blue-${Math.min(900, 800 - level * 100)}`,
+          }
+
+          console.log(`KanbanWidget: Item ${index} is valid:`, normalizedItem)
+          return normalizedItem
         })
         .filter((item) => item !== null)
         .sort((a, b) => a.livello - b.livello) // Ordina per livello
 
       console.log("KanbanWidget: Valid priorities after filtering:", validPriorities)
 
+      // Se non ci sono priorità valide, usa quelle di default
+      if (validPriorities.length === 0) {
+        console.log("KanbanWidget: Nessuna priorità valida trovata, usando priorità di default")
+        validPriorities.push(...DEFAULT_PRIORITIES)
+        usingDefaults = true
+      }
+
       // Crea le colonne Kanban
       const columnsConfig: KanbanColumnConfig[] = validPriorities.map((priority) => ({
         id: String(priority.livello),
         title: priority.nome.trim(),
-        description: priority.descrizione || `Priorità livello ${priority.livello}`,
-        headerColor:
-          priority.colore ||
-          `bg-blue-${Math.min(900, 100 + priority.livello * 100)} dark:bg-blue-${Math.min(900, 800 - priority.livello * 100)}`,
+        description: priority.descrizione,
+        headerColor: priority.colore,
         level: priority.livello,
         isEmpty: true, // Sarà aggiornato quando vengono caricati gli elementi
       }))
@@ -167,12 +209,8 @@ export function KanbanWidget() {
           createdColumns: columnsConfig,
           finalColumns: [], // Sarà aggiornato dopo
           configLoadError: null,
+          usingDefaults,
         })
-      }
-
-      if (columnsConfig.length === 0) {
-        console.warn("KanbanWidget: Nessuna colonna di priorità valida trovata nella configurazione.")
-        throw new Error("Nessuna priorità valida trovata nella configurazione")
       }
 
       console.log("KanbanWidget: Colonne create:", columnsConfig)
@@ -181,19 +219,28 @@ export function KanbanWidget() {
     } catch (err: any) {
       console.error("KanbanWidget: Errore durante il caricamento della configurazione delle priorità:", err)
 
-      // Aggiorna debug con errore
-      setDebugInfo((prev) =>
-        prev
-          ? {
-              ...prev,
-              configLoadError: err.message,
-            }
-          : null,
-      )
+      // In caso di errore, usa le priorità di default
+      console.log("KanbanWidget: Errore nel caricamento configurazione, usando priorità di default")
+      const defaultColumnsConfig: KanbanColumnConfig[] = DEFAULT_PRIORITIES.map((priority) => ({
+        id: String(priority.livello),
+        title: priority.nome,
+        description: priority.descrizione,
+        headerColor: priority.colore,
+        level: priority.livello,
+        isEmpty: true,
+      }))
 
-      const specificError = new Error(`Errore caricamento configurazione priorità: ${err.message}`)
-      ;(specificError as any).originalError = err
-      throw specificError
+      // Aggiorna debug con errore
+      setDebugInfo((prev) => ({
+        rawPriorityConfig: "ERROR",
+        decodedPriorities: DEFAULT_PRIORITIES,
+        createdColumns: defaultColumnsConfig,
+        finalColumns: [],
+        configLoadError: err.message,
+        usingDefaults: true,
+      }))
+
+      return { columnsConfig: defaultColumnsConfig, isDebug: false }
     }
   }, [supabase, supabaseIsInitializing])
 
@@ -584,6 +631,15 @@ export function KanbanWidget() {
       {isDebugEnabled && debugInfo && (
         <div className="mx-4 mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-3">🐛 Debug Configurazione Priorità</h4>
+
+          {debugInfo.usingDefaults && (
+            <div className="mb-3 p-2 bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700 rounded">
+              <strong className="text-orange-700 dark:text-orange-300">⚠️ Usando priorità di default</strong>
+              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                La configurazione delle priorità non è valida o è vuota. Vengono utilizzate le priorità predefinite.
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3 text-sm">
             <div>
