@@ -81,11 +81,15 @@ export function KanbanWidget() {
 
   const [debugInfo, setDebugInfo] = useState<{
     rawPriorityConfig: string
+    rawStringContent: string
+    firstLevelParsing: any
+    secondLevelParsing: any
     decodedPriorities: any[]
     createdColumns: any[]
     finalColumns: any[]
     configLoadError: string | null
     usingDefaults: boolean
+    parsingSteps: string[]
   } | null>(null)
 
   const loadConfigAndPriorities = useCallback(async () => {
@@ -107,32 +111,101 @@ export function KanbanWidget() {
       const rawPriorityConfig =
         typeof configData.priorita === "string" ? configData.priorita : JSON.stringify(configData.priorita)
 
-      // Parse del JSON delle priorità
+      // Array per tracciare i passaggi di parsing
+      const parsingSteps: string[] = []
+
+      // Parse del JSON delle priorità con debug dettagliato
       let parsedPriorities: any[] = []
       let usingDefaults = false
+      let firstLevelParsing: any = null
+      let secondLevelParsing: any = null
 
       console.log("KanbanWidget: Raw configData.priorita:", configData.priorita, "Type:", typeof configData.priorita)
+      parsingSteps.push(`Raw data type: ${typeof configData.priorita}`)
+      parsingSteps.push(`Raw data content: ${JSON.stringify(configData.priorita)}`)
 
       // Se il campo priorita è null, undefined o vuoto, usa le priorità di default
       if (!configData.priorita || configData.priorita === "" || configData.priorita === "null") {
         console.log("KanbanWidget: Campo priorita vuoto o null, usando priorità di default")
+        parsingSteps.push("Campo priorita vuoto o null, usando priorità di default")
         parsedPriorities = DEFAULT_PRIORITIES
         usingDefaults = true
       } else {
         try {
+          // Primo livello di parsing
           if (typeof configData.priorita === "string") {
-            parsedPriorities = JSON.parse(configData.priorita)
-            console.log("KanbanWidget: Parsed from string:", parsedPriorities)
+            firstLevelParsing = JSON.parse(configData.priorita)
+            parsingSteps.push(`Primo parsing da stringa completato: ${JSON.stringify(firstLevelParsing)}`)
+            console.log("KanbanWidget: Primo parsing da stringa:", firstLevelParsing)
           } else if (Array.isArray(configData.priorita)) {
-            parsedPriorities = configData.priorita
-            console.log("KanbanWidget: Already an array:", parsedPriorities)
+            firstLevelParsing = configData.priorita
+            parsingSteps.push(`Già un array: ${JSON.stringify(firstLevelParsing)}`)
+            console.log("KanbanWidget: Già un array:", firstLevelParsing)
           } else if (configData.priorita && typeof configData.priorita === "object") {
-            // Potrebbe essere un oggetto invece di un array
-            console.log("KanbanWidget: Found object instead of array:", configData.priorita)
-            parsedPriorities = [configData.priorita]
+            firstLevelParsing = configData.priorita
+            parsingSteps.push(`Oggetto trovato: ${JSON.stringify(firstLevelParsing)}`)
+            console.log("KanbanWidget: Oggetto trovato:", firstLevelParsing)
+          }
+
+          // Secondo livello di parsing - cerca nel contenuto
+          if (firstLevelParsing) {
+            // Se il primo parsing ha restituito un oggetto con una proprietà che potrebbe contenere le priorità
+            if (typeof firstLevelParsing === "object" && !Array.isArray(firstLevelParsing)) {
+              // Cerca proprietà che potrebbero contenere le priorità
+              const possibleKeys = ["priorita", "priorities", "levels", "livelli", "data", "items"]
+              let foundKey = null
+
+              for (const key of possibleKeys) {
+                if (firstLevelParsing[key]) {
+                  foundKey = key
+                  secondLevelParsing = firstLevelParsing[key]
+                  parsingSteps.push(
+                    `Trovata proprietà '${key}' nel primo livello: ${JSON.stringify(secondLevelParsing)}`,
+                  )
+                  console.log(`KanbanWidget: Trovata proprietà '${key}' nel primo livello:`, secondLevelParsing)
+                  break
+                }
+              }
+
+              if (!foundKey) {
+                // Se non trova proprietà specifiche, prova a usare l'oggetto stesso
+                secondLevelParsing = firstLevelParsing
+                parsingSteps.push("Nessuna proprietà specifica trovata, usando l'oggetto stesso")
+              }
+            } else if (Array.isArray(firstLevelParsing)) {
+              secondLevelParsing = firstLevelParsing
+              parsingSteps.push("Primo livello è già un array, usando direttamente")
+            }
+
+            // Se il secondo livello è una stringa, prova a parsarla
+            if (typeof secondLevelParsing === "string") {
+              try {
+                const thirdLevelParsing = JSON.parse(secondLevelParsing)
+                secondLevelParsing = thirdLevelParsing
+                parsingSteps.push(`Terzo livello di parsing completato: ${JSON.stringify(secondLevelParsing)}`)
+                console.log("KanbanWidget: Terzo livello di parsing:", secondLevelParsing)
+              } catch (thirdParseError) {
+                parsingSteps.push(`Errore nel terzo livello di parsing: ${thirdParseError}`)
+                console.log("KanbanWidget: Errore nel terzo livello di parsing:", thirdParseError)
+              }
+            }
+
+            // Usa il risultato del secondo livello
+            if (Array.isArray(secondLevelParsing)) {
+              parsedPriorities = secondLevelParsing
+              parsingSteps.push(`Usando array dal secondo livello con ${parsedPriorities.length} elementi`)
+            } else if (secondLevelParsing && typeof secondLevelParsing === "object") {
+              parsedPriorities = [secondLevelParsing]
+              parsingSteps.push("Convertendo oggetto singolo in array")
+            } else {
+              throw new Error("Struttura dati non riconosciuta dopo il secondo livello di parsing")
+            }
+          } else {
+            throw new Error("Primo livello di parsing ha restituito null/undefined")
           }
         } catch (parseError) {
           console.error("Errore nel parsing del JSON priorità:", parseError)
+          parsingSteps.push(`Errore nel parsing: ${parseError}`)
           console.log("KanbanWidget: Errore nel parsing, usando priorità di default")
           parsedPriorities = DEFAULT_PRIORITIES
           usingDefaults = true
@@ -140,14 +213,17 @@ export function KanbanWidget() {
       }
 
       console.log("KanbanWidget: Parsed priorities before validation:", parsedPriorities)
+      parsingSteps.push(`Priorità parsate prima della validazione: ${JSON.stringify(parsedPriorities)}`)
 
       // Validazione e creazione delle colonne con logging dettagliato
       const validPriorities = parsedPriorities
         .map((item, index) => {
           console.log(`KanbanWidget: Validating item ${index}:`, item)
+          parsingSteps.push(`Validazione item ${index}: ${JSON.stringify(item)}`)
 
           if (typeof item !== "object" || item === null) {
             console.log(`KanbanWidget: Item ${index} is not an object:`, typeof item)
+            parsingSteps.push(`Item ${index} non è un oggetto: ${typeof item}`)
             return null
           }
 
@@ -155,6 +231,7 @@ export function KanbanWidget() {
           const level = item.livello ?? item.level ?? item.priority ?? item.priorita ?? null
           if (typeof level !== "number") {
             console.log(`KanbanWidget: Item ${index} has invalid level:`, level, typeof level)
+            parsingSteps.push(`Item ${index} ha livello non valido: ${level} (${typeof level})`)
             return null
           }
 
@@ -162,6 +239,7 @@ export function KanbanWidget() {
           const name = item.nome ?? item.name ?? item.title ?? item.titolo ?? null
           if (typeof name !== "string" || name.trim() === "") {
             console.log(`KanbanWidget: Item ${index} has invalid name:`, name, typeof name)
+            parsingSteps.push(`Item ${index} ha nome non valido: ${name} (${typeof name})`)
             return null
           }
 
@@ -177,16 +255,19 @@ export function KanbanWidget() {
           }
 
           console.log(`KanbanWidget: Item ${index} is valid:`, normalizedItem)
+          parsingSteps.push(`Item ${index} è valido: ${JSON.stringify(normalizedItem)}`)
           return normalizedItem
         })
         .filter((item) => item !== null)
         .sort((a, b) => a.livello - b.livello) // Ordina per livello
 
       console.log("KanbanWidget: Valid priorities after filtering:", validPriorities)
+      parsingSteps.push(`Priorità valide dopo filtraggio: ${JSON.stringify(validPriorities)}`)
 
       // Se non ci sono priorità valide, usa quelle di default
       if (validPriorities.length === 0) {
         console.log("KanbanWidget: Nessuna priorità valida trovata, usando priorità di default")
+        parsingSteps.push("Nessuna priorità valida trovata, usando priorità di default")
         validPriorities.push(...DEFAULT_PRIORITIES)
         usingDefaults = true
       }
@@ -205,11 +286,16 @@ export function KanbanWidget() {
       if (configData.debug === true) {
         setDebugInfo({
           rawPriorityConfig,
+          rawStringContent:
+            typeof configData.priorita === "string" ? configData.priorita : JSON.stringify(configData.priorita),
+          firstLevelParsing,
+          secondLevelParsing,
           decodedPriorities: validPriorities,
           createdColumns: columnsConfig,
           finalColumns: [], // Sarà aggiornato dopo
           configLoadError: null,
           usingDefaults,
+          parsingSteps,
         })
       }
 
@@ -233,11 +319,15 @@ export function KanbanWidget() {
       // Aggiorna debug con errore
       setDebugInfo((prev) => ({
         rawPriorityConfig: "ERROR",
+        rawStringContent: "ERROR",
+        firstLevelParsing: null,
+        secondLevelParsing: null,
         decodedPriorities: DEFAULT_PRIORITIES,
         createdColumns: defaultColumnsConfig,
         finalColumns: [],
         configLoadError: err.message,
         usingDefaults: true,
+        parsingSteps: [`Errore: ${err.message}`],
       }))
 
       return { columnsConfig: defaultColumnsConfig, isDebug: false }
@@ -384,18 +474,22 @@ export function KanbanWidget() {
 
         const newColumns: KanbanColumn[] = []
 
-        // Uncategorized column first
+        // Uncategorized column - solo se ci sono elementi non categorizzati
         const uncategorizedItems = allItems.filter((item) => item.assignedPriorityLevel === null)
-        newColumns.push({
-          id: UNCATEGORIZED_COLUMN_ID,
-          title: "Non Categorizzati",
-          description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
-          headerColor: "bg-slate-200 dark:bg-slate-700",
-          items: uncategorizedItems,
-          isUncategorized: true,
-        })
+        if (uncategorizedItems.length > 0) {
+          newColumns.push({
+            id: UNCATEGORIZED_COLUMN_ID,
+            title: "Non Categorizzati",
+            description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
+            headerColor: "bg-slate-200 dark:bg-slate-700",
+            items: uncategorizedItems,
+            isUncategorized: true,
+          })
 
-        console.log(`KanbanWidget: Colonna "Non Categorizzati" creata con ${uncategorizedItems.length} elementi`)
+          console.log(`KanbanWidget: Colonna "Non Categorizzati" creata con ${uncategorizedItems.length} elementi`)
+        } else {
+          console.log("KanbanWidget: Nessun elemento non categorizzato, colonna non creata")
+        }
 
         // Then, columns from configuration, sorted by level
         columnsConfig.forEach((columnConfig) => {
@@ -542,14 +636,20 @@ export function KanbanWidget() {
       if (currentUser) {
         loadItems(currentUser, kanbanColumnsConfig).then((allItems) => {
           const revertedCols: KanbanColumn[] = []
-          revertedCols.push({
-            id: UNCATEGORIZED_COLUMN_ID,
-            title: "Non Categorizzati",
-            description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
-            headerColor: "bg-slate-200 dark:bg-slate-700",
-            items: allItems.filter((item) => item.assignedPriorityLevel === null),
-            isUncategorized: true,
-          })
+
+          // Solo aggiungi la colonna non categorizzati se ci sono elementi
+          const uncategorizedItems = allItems.filter((item) => item.assignedPriorityLevel === null)
+          if (uncategorizedItems.length > 0) {
+            revertedCols.push({
+              id: UNCATEGORIZED_COLUMN_ID,
+              title: "Non Categorizzati",
+              description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
+              headerColor: "bg-slate-200 dark:bg-slate-700",
+              items: uncategorizedItems,
+              isUncategorized: true,
+            })
+          }
+
           kanbanColumnsConfig.forEach((columnConfig) => {
             const columnItems = allItems.filter((item) => item.assignedPriorityLevel === columnConfig.level)
             revertedCols.push({
@@ -665,9 +765,34 @@ export function KanbanWidget() {
 
           <div className="space-y-3 text-sm">
             <div>
-              <strong className="text-yellow-700 dark:text-yellow-300">Raw Priority Config:</strong>
+              <strong className="text-yellow-700 dark:text-yellow-300">Raw String Content:</strong>
               <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
-                {safeStringify(debugInfo.rawPriorityConfig)}
+                {safeStringify(debugInfo.rawStringContent)}
+              </pre>
+            </div>
+
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">Parsing Steps:</strong>
+              <div className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {debugInfo.parsingSteps.map((step, index) => (
+                  <div key={index} className="mb-1">
+                    <span className="text-yellow-600 dark:text-yellow-400">{index + 1}.</span> {step}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">First Level Parsing:</strong>
+              <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {safeStringify(debugInfo.firstLevelParsing)}
+              </pre>
+            </div>
+
+            <div>
+              <strong className="text-yellow-700 dark:text-yellow-300">Second Level Parsing:</strong>
+              <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
+                {safeStringify(debugInfo.secondLevelParsing)}
               </pre>
             </div>
 
