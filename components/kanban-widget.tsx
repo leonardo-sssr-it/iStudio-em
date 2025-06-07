@@ -98,31 +98,54 @@ export function KanbanWidget() {
 
       // Parse del JSON delle priorità
       let parsedPriorities: any[] = []
+      console.log("KanbanWidget: Raw configData.priorita:", configData.priorita, "Type:", typeof configData.priorita)
+
       try {
         if (typeof configData.priorita === "string") {
           parsedPriorities = JSON.parse(configData.priorita)
+          console.log("KanbanWidget: Parsed from string:", parsedPriorities)
         } else if (Array.isArray(configData.priorita)) {
           parsedPriorities = configData.priorita
+          console.log("KanbanWidget: Already an array:", parsedPriorities)
+        } else if (configData.priorita && typeof configData.priorita === "object") {
+          // Potrebbe essere un oggetto invece di un array
+          console.log("KanbanWidget: Found object instead of array:", configData.priorita)
+          parsedPriorities = [configData.priorita]
         }
       } catch (parseError) {
         console.error("Errore nel parsing del JSON priorità:", parseError)
         throw new Error("Formato JSON priorità non valido")
       }
 
-      // Validazione e creazione delle colonne
+      console.log("KanbanWidget: Parsed priorities before validation:", parsedPriorities)
+
+      // Validazione e creazione delle colonne con logging dettagliato
       const validPriorities = parsedPriorities
-        .filter((item) => {
-          return (
-            typeof item === "object" &&
-            item !== null &&
-            typeof item.livello === "number" &&
-            typeof item.nome === "string" &&
-            item.nome.trim() !== ""
-          )
+        .map((item, index) => {
+          console.log(`KanbanWidget: Validating item ${index}:`, item)
+
+          if (typeof item !== "object" || item === null) {
+            console.log(`KanbanWidget: Item ${index} is not an object:`, typeof item)
+            return null
+          }
+
+          if (typeof item.livello !== "number") {
+            console.log(`KanbanWidget: Item ${index} has invalid livello:`, item.livello, typeof item.livello)
+            return null
+          }
+
+          if (typeof item.nome !== "string" || item.nome.trim() === "") {
+            console.log(`KanbanWidget: Item ${index} has invalid nome:`, item.nome, typeof item.nome)
+            return null
+          }
+
+          console.log(`KanbanWidget: Item ${index} is valid:`, { livello: item.livello, nome: item.nome })
+          return item
         })
+        .filter((item) => item !== null)
         .sort((a, b) => a.livello - b.livello) // Ordina per livello
 
-      console.log("KanbanWidget: Priorità valide trovate:", validPriorities)
+      console.log("KanbanWidget: Valid priorities after filtering:", validPriorities)
 
       // Crea le colonne Kanban
       const columnsConfig: KanbanColumnConfig[] = validPriorities.map((priority) => ({
