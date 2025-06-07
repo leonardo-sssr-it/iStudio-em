@@ -96,17 +96,51 @@ export function KanbanWidget() {
       const rawPriorityConfig =
         typeof configData.priorita === "string" ? configData.priorita : JSON.stringify(configData.priorita)
 
-      // Use the JSON decoder hook to parse priorities
-      const decodedPriorities = decodePriorities(configData.priorita)
+      // Parse del JSON delle priorità
+      let parsedPriorities: any[] = []
+      try {
+        if (typeof configData.priorita === "string") {
+          parsedPriorities = JSON.parse(configData.priorita)
+        } else if (Array.isArray(configData.priorita)) {
+          parsedPriorities = configData.priorita
+        }
+      } catch (parseError) {
+        console.error("Errore nel parsing del JSON priorità:", parseError)
+        throw new Error("Formato JSON priorità non valido")
+      }
 
-      // Create Kanban columns configuration
-      const columnsConfig = createKanbanColumns(decodedPriorities)
+      // Validazione e creazione delle colonne
+      const validPriorities = parsedPriorities
+        .filter((item) => {
+          return (
+            typeof item === "object" &&
+            item !== null &&
+            typeof item.livello === "number" &&
+            typeof item.nome === "string" &&
+            item.nome.trim() !== ""
+          )
+        })
+        .sort((a, b) => a.livello - b.livello) // Ordina per livello
+
+      console.log("KanbanWidget: Priorità valide trovate:", validPriorities)
+
+      // Crea le colonne Kanban
+      const columnsConfig: KanbanColumnConfig[] = validPriorities.map((priority) => ({
+        id: String(priority.livello),
+        title: priority.nome.trim(),
+        description: priority.descrizione || `Priorità livello ${priority.livello}`,
+        headerColor:
+          priority.colore ||
+          `bg-blue-${Math.min(900, 100 + priority.livello * 100)} dark:bg-blue-${Math.min(900, 800 - priority.livello * 100)}`,
+        level: priority.livello,
+        isEmpty: true, // Sarà aggiornato quando vengono caricati gli elementi
+      }))
 
       // Aggiorna le informazioni di debug
       if (configData.debug === true) {
         setDebugInfo({
           rawPriorityConfig,
-          decodedPriorities,
+          decodedPriorities: validPriorities,
           createdColumns: columnsConfig,
           finalColumns: [], // Sarà aggiornato dopo
           configLoadError: null,
@@ -115,7 +149,10 @@ export function KanbanWidget() {
 
       if (columnsConfig.length === 0) {
         console.warn("KanbanWidget: Nessuna colonna di priorità valida trovata nella configurazione.")
+        throw new Error("Nessuna priorità valida trovata nella configurazione")
       }
+
+      console.log("KanbanWidget: Colonne create:", columnsConfig)
 
       return { columnsConfig, isDebug: configData.debug === true }
     } catch (err: any) {
@@ -135,26 +172,49 @@ export function KanbanWidget() {
       ;(specificError as any).originalError = err
       throw specificError
     }
-  }, [supabase, supabaseIsInitializing, decodePriorities, createKanbanColumns])
+  }, [supabase, supabaseIsInitializing])
 
   const getPriorityLevelFromDbItem = useCallback(
     (
       itemData: any,
       localColumnsConfig: KanbanColumnConfig[],
     ): { assignedLevel: number | null; rawValue: string | number | null | Record<string, any> } => {
-      const rawPriority = itemData.priorita ?? itemData.priorita_id ?? null
-      if (rawPriority === null || rawPriority === undefined) return { assignedLevel: null, rawValue: null }
+      // Cerca il campo priorità in diversi possibili nomi
+      const rawPriority = itemData.priorita ?? itemData.priorita_id ?? itemData.priority ?? null
+
+      console.log(`KanbanWidget: Analizzando priorità per item ${itemData.id}:`, {
+        rawPriority,
+        type: typeof rawPriority,
+        availableColumns: localColumnsConfig.map((c) => ({ id: c.id, level: c.level, title: c.title })),
+      })
+
+      if (rawPriority === null || rawPriority === undefined) {
+        return { assignedLevel: null, rawValue: null }
+      }
 
       let matchingLevel: number | null = null
 
+      // Prova a convertire in numero
+      let numericPriority: number | null = null
       if (typeof rawPriority === "number") {
-        const matchingConfig = localColumnsConfig.find((config) => config.level === rawPriority)
-        matchingLevel = matchingConfig ? rawPriority : null
+        numericPriority = rawPriority
       } else if (typeof rawPriority === "string") {
-        const numericValue = Number.parseInt(rawPriority, 10)
-        if (!isNaN(numericValue)) {
-          const matchingConfig = localColumnsConfig.find((config) => config.level === numericValue)
-          matchingLevel = matchingConfig ? numericValue : null
+        const parsed = Number.parseInt(rawPriority, 10)
+        if (!isNaN(parsed)) {
+          numericPriority = parsed
+        }
+      }
+
+      // Cerca una colonna corrispondente
+      if (numericPriority !== null) {
+        const matchingConfig = localColumnsConfig.find((config) => config.level === numericPriority)
+        if (matchingConfig) {
+          matchingLevel = numericPriority
+          console.log(
+            `KanbanWidget: Match trovato per priorità ${numericPriority} -> colonna "${matchingConfig.title}"`,
+          )
+        } else {
+          console.log(`KanbanWidget: Nessun match trovato per priorità ${numericPriority}`)
         }
       }
 
@@ -255,14 +315,17 @@ export function KanbanWidget() {
         const newColumns: KanbanColumn[] = []
 
         // Uncategorized column first
+        const uncategorizedItems = allItems.filter((item) => item.assignedPriorityLevel === null)
         newColumns.push({
           id: UNCATEGORIZED_COLUMN_ID,
           title: "Non Categorizzati",
           description: "Elementi senza priorità assegnata o con priorità non corrispondente alla configurazione.",
           headerColor: "bg-slate-200 dark:bg-slate-700",
-          items: allItems.filter((item) => item.assignedPriorityLevel === null),
+          items: uncategorizedItems,
           isUncategorized: true,
         })
+
+        console.log(`KanbanWidget: Colonna "Non Categorizzati" creata con ${uncategorizedItems.length} elementi`)
 
         // Then, columns from configuration, sorted by level
         columnsConfig.forEach((columnConfig) => {
@@ -275,7 +338,21 @@ export function KanbanWidget() {
             level: columnConfig.level,
             items: columnItems,
           })
+
+          console.log(
+            `KanbanWidget: Colonna "${columnConfig.title}" (livello ${columnConfig.level}) creata con ${columnItems.length} elementi`,
+          )
         })
+
+        console.log(
+          "KanbanWidget: Tutte le colonne create:",
+          newColumns.map((col) => ({
+            id: col.id,
+            title: col.title,
+            level: col.level,
+            itemCount: col.items.length,
+          })),
+        )
 
         if (isActive) setColumns(newColumns)
       } catch (err: any) {
@@ -539,7 +616,12 @@ export function KanbanWidget() {
 
             <div className="pt-2 border-t border-yellow-300 dark:border-yellow-700">
               <strong className="text-yellow-700 dark:text-yellow-300">Kanban Columns Config:</strong>
-              <div className="mt-1 text-xs">Configurazione: {kanbanColumnsConfig.length} colonne definite</div>
+              <div className="mt-1 text-xs">
+                <div>Configurazione: {kanbanColumnsConfig.length} colonne definite</div>
+                <div className="mt-1">
+                  Livelli configurati: {kanbanColumnsConfig.map((c) => `${c.level} (${c.title})`).join(", ")}
+                </div>
+              </div>
             </div>
           </div>
         </div>
