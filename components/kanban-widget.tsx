@@ -72,7 +72,7 @@ export function KanbanWidget() {
   const { decodePriorities, createKanbanColumns } = useJsonDecoder()
 
   const [debugInfo, setDebugInfo] = useState<{
-    rawPriorityConfig: string | null
+    rawPriorityConfig: string
     decodedPriorities: any[]
     createdColumns: any[]
     finalColumns: any[]
@@ -92,8 +92,9 @@ export function KanbanWidget() {
       if (configError) throw configError
       if (!configData) throw new Error("Configurazione non trovata.")
 
-      // Cattura info di debug
-      const rawPriorityConfig = configData.priorita
+      // Cattura info di debug - assicuriamoci che sia sempre una stringa
+      const rawPriorityConfig =
+        typeof configData.priorita === "string" ? configData.priorita : JSON.stringify(configData.priorita)
 
       // Use the JSON decoder hook to parse priorities
       const decodedPriorities = decodePriorities(configData.priorita)
@@ -406,6 +407,24 @@ export function KanbanWidget() {
     }
   }
 
+  // Funzione helper per convertire valori in stringhe sicure per il rendering
+  const safeStringify = (value: any): string => {
+    if (value === null || value === undefined) {
+      return "null"
+    }
+    if (typeof value === "string") {
+      return value
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value)
+    }
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch {
+      return String(value)
+    }
+  }
+
   if (isLoading) {
     return (
       <Card className="w-full">
@@ -470,7 +489,7 @@ export function KanbanWidget() {
             <div>
               <strong className="text-yellow-700 dark:text-yellow-300">Raw Priority Config:</strong>
               <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
-                {debugInfo.rawPriorityConfig || "null"}
+                {safeStringify(debugInfo.rawPriorityConfig)}
               </pre>
             </div>
 
@@ -479,7 +498,7 @@ export function KanbanWidget() {
                 Decoded Priorities ({debugInfo.decodedPriorities.length}):
               </strong>
               <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
-                {JSON.stringify(debugInfo.decodedPriorities, null, 2)}
+                {safeStringify(debugInfo.decodedPriorities)}
               </pre>
             </div>
 
@@ -488,7 +507,7 @@ export function KanbanWidget() {
                 Created Columns Config ({debugInfo.createdColumns.length}):
               </strong>
               <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
-                {JSON.stringify(debugInfo.createdColumns, null, 2)}
+                {safeStringify(debugInfo.createdColumns)}
               </pre>
             </div>
 
@@ -497,16 +516,14 @@ export function KanbanWidget() {
                 Final Rendered Columns ({debugInfo.finalColumns.length}):
               </strong>
               <pre className="mt-1 p-2 bg-yellow-100 dark:bg-yellow-900/40 rounded text-xs overflow-x-auto">
-                {JSON.stringify(
+                {safeStringify(
                   debugInfo.finalColumns.map((col) => ({
                     id: col.id,
                     title: col.title,
                     level: col.level,
-                    itemCount: col.items.length,
+                    itemCount: col.items?.length || 0,
                     isUncategorized: col.isUncategorized,
                   })),
-                  null,
-                  2,
                 )}
               </pre>
             </div>
@@ -515,7 +532,7 @@ export function KanbanWidget() {
               <div>
                 <strong className="text-red-700 dark:text-red-300">Config Load Error:</strong>
                 <pre className="mt-1 p-2 bg-red-100 dark:bg-red-900/40 rounded text-xs overflow-x-auto">
-                  {debugInfo.configLoadError}
+                  {safeStringify(debugInfo.configLoadError)}
                 </pre>
               </div>
             )}
@@ -642,10 +659,7 @@ export function KanbanWidget() {
                                   item.dbPriorityValue !== null &&
                                   item.dbPriorityValue !== undefined && (
                                     <p className="text-xs text-muted-foreground/80 mt-1.5 pt-1 border-t border-dashed ml-5">
-                                      Prio. DB:{" "}
-                                      {typeof item.dbPriorityValue === "object"
-                                        ? JSON.stringify(item.dbPriorityValue)
-                                        : String(item.dbPriorityValue)}
+                                      Prio. DB: {safeStringify(item.dbPriorityValue)}
                                     </p>
                                   )}
                               </a>
