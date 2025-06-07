@@ -1282,19 +1282,72 @@ export default function ItemDetailPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <Button variant="ghost" onClick={() => router.push(`/data-explorer?table=${tableName}`)} className="mb-2"><ArrowLeft size={16} className="mr-2" /> Torna alla lista</Button>
+              <Button variant="ghost" onClick={() => router.push(`/data-explorer?table=${tableName}`)} className="mb-2">
+                <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+              </Button>
               <CardTitle className="text-2xl">{getItemTitle()}</CardTitle>
-              <CardDescription>{getTableTitle()} {!isNewItem && (<Badge variant="outline" className="ml-2">ID: {itemId}</Badge>)}</CardDescription>
+              <CardDescription>
+                {getTableTitle()}{" "}
+                {!isNewItem && (
+                  <Badge variant="outline" className="ml-2">
+                    ID: {itemId}
+                  </Badge>
+                )}
+              </CardDescription>
             </div>
             <div className="flex space-x-2">
-              {isEditMode && (<><Button onClick={handleSave} disabled={saving} className="min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white">{saving ? "Salvataggio..." : "Salva modifiche"}{!saving && <Save size={16} className="ml-2" />}</Button><Button variant="outline" onClick={handleCancelEdit}><X size={16} className="mr-2" /> Annulla modifica</Button></>)}
-              {!isNewItem && !isEditMode && (<Button variant="outline" onClick={() => setIsEditMode(true)}><Edit size={16} className="mr-2" /> Modifica</Button>)}
-              {!isNewItem && (<AlertDialog><AlertDialogTrigger asChild><Button variant="destructive"><Trash2 size={16} className="mr-2" /> Elimina</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Sei sicuro?</AlertDialogTitle><AlertDialogDescription>Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annulla</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">{deleting ? "Eliminazione..." : "Elimina"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></AlertDialog>)}
+              {isEditMode && (
+                <>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {saving ? "Salvataggio..." : "Salva modifiche"}
+                    {!saving && <Save size={16} className="ml-2" />}
+                  </Button>
+                  <Button variant="outline" onClick={handleCancelEdit}>
+                    <X size={16} className="mr-2" /> Annulla modifica
+                  </Button>
+                </>
+              )}
+              {!isNewItem && !isEditMode && (
+                <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                  <Edit size={16} className="mr-2" /> Modifica
+                </Button>
+              )}
+              {!isNewItem && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">
+                      <Trash2 size={16} className="mr-2" /> Elimina
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        {deleting ? "Eliminazione..." : "Elimina"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>{editedItem && renderFieldGroups()}</CardContent>
       </Card>
-  </div>
+    </div>
   )
 }
