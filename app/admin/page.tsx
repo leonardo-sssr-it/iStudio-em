@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Database, List, Filter, LogOut, Loader2, Save } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { toast } from "@/components/ui/use-toast"
+import { User, Database, List, Filter, LogOut, Loader2, Save, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { memo, useRef, useEffect, useState } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
@@ -79,6 +82,23 @@ const useIntersectionObserver = (options = {}) => {
   return [ref, isVisible] as const
 }
 
+// Validatore JSON
+const validateJSON = (value: string): { isValid: boolean; error?: string; parsed?: any } => {
+  if (!value || value.trim() === "") {
+    return { isValid: true, parsed: null }
+  }
+
+  try {
+    const parsed = JSON.parse(value)
+    return { isValid: true, parsed }
+  } catch (error) {
+    return {
+      isValid: false,
+      error: error instanceof Error ? error.message : "JSON non valido",
+    }
+  }
+}
+
 // Componente principale memoizzato
 const AdminDashboardContent = memo(() => {
   const { user, logout } = useAuth()
@@ -95,6 +115,7 @@ const AdminDashboardContent = memo(() => {
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
   const [configErrors, setConfigErrors] = useState<Record<string, string>>({})
+  const [jsonValidation, setJsonValidation] = useState<Record<string, { isValid: boolean; error?: string }>>({})
 
   // Animazione sequenziale delle card
   useEffect(() => {
@@ -123,35 +144,36 @@ const AdminDashboardContent = memo(() => {
 
     setIsLoadingConfig(true)
     try {
-      // Carica la struttura della tabella
-      const { data: columns, error: columnsError } = await supabase
-        .from("information_schema.columns")
-        .select("column_name, data_type, is_nullable")
-        .eq("table_name", "configurazione")
-        .eq("table_schema", "public")
+      // Carica la struttura della tabella usando la query corretta
+      const { data: columns, error: columnsError } = await supabase.rpc("get_table_columns", {
+        table_name: "configurazione",
+      })
 
       if (columnsError) {
-        console.error("Errore nel caricamento delle colonne:", columnsError)
-        // Fallback: usa una query diretta
+        console.error("Errore RPC get_table_columns:", columnsError)
+        // Fallback: usa una query diretta per ottenere i metadati
         const { data: configRow } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
 
         if (configRow) {
-          const fields = Object.keys(configRow).map((key) => ({
-            name: key,
-            type:
-              typeof configRow[key] === "number" ? "integer" : typeof configRow[key] === "boolean" ? "boolean" : "text",
-            nullable: true,
-          }))
+          const fields = Object.keys(configRow)
+            .filter((key) => key !== "id" && key !== "modifica") // Escludi campi non editabili
+            .map((key) => ({
+              name: key,
+              type: getFieldType(configRow[key]),
+              nullable: true,
+            }))
           setConfigFields(fields)
           setConfigData(configRow)
         }
       } else {
         const fields =
-          columns?.map((col) => ({
-            name: col.column_name,
-            type: col.data_type,
-            nullable: col.is_nullable === "YES",
-          })) || []
+          columns
+            ?.filter((col: any) => col.column_name !== "id" && col.column_name !== "modifica") // Escludi campi non editabili
+            .map((col: any) => ({
+              name: col.column_name,
+              type: col.data_type,
+              nullable: col.is_nullable === "YES",
+            })) || []
         setConfigFields(fields)
 
         // Carica i dati attuali
@@ -161,9 +183,29 @@ const AdminDashboardContent = memo(() => {
       }
     } catch (error) {
       console.error("Errore nel caricamento della configurazione:", error)
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare la configurazione. Verifica i permessi del database.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoadingConfig(false)
     }
+  }
+
+  // Funzione helper per determinare il tipo di campo
+  const getFieldType = (value: any): string => {
+    if (typeof value === "boolean") return "boolean"
+    if (typeof value === "number") {
+      return Number.isInteger(value) ? "integer" : "numeric"
+    }
+    if (value && typeof value === "object") return "json"
+    if (typeof value === "string") {
+      // Controlla se è una data
+      if (value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) return "timestamp with time zone"
+      if (value.match(/^\d{4}-\d{2}-\d{2}$/)) return "date"
+    }
+    return "text"
   }
 
   const handleConfigChange = (fieldName: string, value: any) => {
@@ -176,6 +218,16 @@ const AdminDashboardContent = memo(() => {
         delete newErrors[fieldName]
         return newErrors
       })
+    }
+
+    // Validazione JSON in tempo reale
+    const field = configFields.find((f) => f.name === fieldName)
+    if (field && (field.type === "json" || field.type === "jsonb")) {
+      const validation = validateJSON(value)
+      setJsonValidation((prev) => ({
+        ...prev,
+        [fieldName]: validation,
+      }))
     }
   }
 
@@ -218,12 +270,9 @@ const AdminDashboardContent = memo(() => {
         break
       case "json":
       case "jsonb":
-        if (value && typeof value === "string") {
-          try {
-            JSON.parse(value)
-          } catch {
-            return "JSON non valido"
-          }
+        const validation = jsonValidation[field.name]
+        if (validation && !validation.isValid) {
+          return validation.error || "JSON non valido"
         }
         break
     }
@@ -246,6 +295,11 @@ const AdminDashboardContent = memo(() => {
 
     if (Object.keys(errors).length > 0) {
       setConfigErrors(errors)
+      toast({
+        title: "Errori di validazione",
+        description: "Correggi gli errori evidenziati prima di salvare",
+        variant: "destructive",
+      })
       return
     }
 
@@ -265,16 +319,18 @@ const AdminDashboardContent = memo(() => {
           value = Boolean(value)
         } else if (field.type === "json" || field.type === "jsonb") {
           if (typeof value === "string" && value.trim()) {
-            try {
-              value = JSON.parse(value)
-            } catch {
-              // Mantieni come stringa se non è JSON valido
+            const validation = validateJSON(value)
+            if (validation.isValid) {
+              value = validation.parsed
             }
           }
         }
 
         saveData[field.name] = value
       })
+
+      // Aggiungi automaticamente il campo modifica
+      saveData.modifica = new Date().toISOString()
 
       // Verifica se esiste già una riga
       const { data: existingRow } = await supabase.from("configurazione").select("id").limit(1).maybeSingle()
@@ -295,11 +351,17 @@ const AdminDashboardContent = memo(() => {
       // Ricarica i dati
       await loadConfigurationData()
 
-      // Mostra messaggio di successo (potresti aggiungere un toast qui)
-      console.log("Configurazione salvata con successo")
+      toast({
+        title: "Successo",
+        description: "Configurazione salvata con successo",
+      })
     } catch (error) {
       console.error("Errore nel salvataggio della configurazione:", error)
-      // Mostra messaggio di errore (potresti aggiungere un toast qui)
+      toast({
+        title: "Errore",
+        description: `Impossibile salvare la configurazione: ${error instanceof Error ? error.message : "Errore sconosciuto"}`,
+        variant: "destructive",
+      })
     } finally {
       setIsSavingConfig(false)
     }
@@ -308,25 +370,24 @@ const AdminDashboardContent = memo(() => {
   const renderConfigField = (field: { name: string; type: string; nullable: boolean }) => {
     const value = configData[field.name] || ""
     const error = configErrors[field.name]
+    const jsonError = jsonValidation[field.name]
 
-    const commonProps = {
-      id: field.name,
-      name: field.name,
-      className: error ? "border-red-500" : "",
-    }
+    const commonInputClasses = `w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+      error || (jsonError && !jsonError.isValid) ? "border-red-500" : ""
+    }`
 
     switch (field.type) {
       case "boolean":
         return (
           <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              {...commonProps}
+            <Checkbox
+              id={field.name}
               checked={Boolean(value)}
-              onChange={(e) => handleConfigChange(field.name, e.target.checked)}
-              className="rounded"
+              onCheckedChange={(checked) => handleConfigChange(field.name, checked)}
             />
-            <Label htmlFor={field.name}>{field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</Label>
+            <Label htmlFor={field.name} className="text-sm font-medium text-foreground">
+              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            </Label>
           </div>
         )
 
@@ -336,10 +397,12 @@ const AdminDashboardContent = memo(() => {
           <Input
             type="number"
             step="1"
-            {...commonProps}
+            id={field.name}
+            name={field.name}
             value={value}
             onChange={(e) => handleConfigChange(field.name, e.target.value)}
             placeholder={`Inserisci ${field.name}`}
+            className={error ? "border-red-500" : ""}
           />
         )
 
@@ -350,10 +413,12 @@ const AdminDashboardContent = memo(() => {
           <Input
             type="number"
             step="any"
-            {...commonProps}
+            id={field.name}
+            name={field.name}
             value={value}
             onChange={(e) => handleConfigChange(field.name, e.target.value)}
             placeholder={`Inserisci ${field.name}`}
+            className={error ? "border-red-500" : ""}
           />
         )
 
@@ -361,9 +426,11 @@ const AdminDashboardContent = memo(() => {
         return (
           <Input
             type="date"
-            {...commonProps}
+            id={field.name}
+            name={field.name}
             value={value ? new Date(value).toISOString().split("T")[0] : ""}
             onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            className={error ? "border-red-500" : ""}
           />
         )
 
@@ -372,22 +439,36 @@ const AdminDashboardContent = memo(() => {
         return (
           <Input
             type="datetime-local"
-            {...commonProps}
+            id={field.name}
+            name={field.name}
             value={value ? new Date(value).toISOString().slice(0, 16) : ""}
             onChange={(e) => handleConfigChange(field.name, e.target.value)}
+            className={error ? "border-red-500" : ""}
           />
         )
 
       case "json":
       case "jsonb":
         return (
-          <textarea
-            {...commonProps}
-            value={typeof value === "object" ? JSON.stringify(value, null, 2) : value}
-            onChange={(e) => handleConfigChange(field.name, e.target.value)}
-            placeholder={`Inserisci JSON per ${field.name}`}
-            className={`min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500" : ""}`}
-          />
+          <div className="space-y-2">
+            <Textarea
+              id={field.name}
+              name={field.name}
+              value={typeof value === "object" ? JSON.stringify(value, null, 2) : value}
+              onChange={(e) => handleConfigChange(field.name, e.target.value)}
+              placeholder={`Inserisci JSON per ${field.name}`}
+              className={`min-h-[120px] font-mono text-sm ${
+                error || (jsonError && !jsonError.isValid) ? "border-red-500" : ""
+              }`}
+            />
+            {jsonError && !jsonError.isValid && (
+              <div className="flex items-center gap-2 text-sm text-red-600">
+                <AlertCircle className="h-4 w-4" />
+                <span>{jsonError.error}</span>
+              </div>
+            )}
+            {jsonError && jsonError.isValid && <div className="text-sm text-green-600">✓ JSON valido</div>}
+          </div>
         )
 
       case "text":
@@ -395,22 +476,25 @@ const AdminDashboardContent = memo(() => {
       default:
         if (field.name.toLowerCase().includes("descrizione") || field.name.toLowerCase().includes("note")) {
           return (
-            <textarea
-              {...commonProps}
+            <Textarea
+              id={field.name}
+              name={field.name}
               value={value}
               onChange={(e) => handleConfigChange(field.name, e.target.value)}
               placeholder={`Inserisci ${field.name}`}
-              className={`min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${error ? "border-red-500" : ""}`}
+              className={`min-h-[80px] ${error ? "border-red-500" : ""}`}
             />
           )
         }
         return (
           <Input
             type="text"
-            {...commonProps}
+            id={field.name}
+            name={field.name}
             value={value}
             onChange={(e) => handleConfigChange(field.name, e.target.value)}
             placeholder={`Inserisci ${field.name}`}
+            className={error ? "border-red-500" : ""}
           />
         )
     }
@@ -541,7 +625,7 @@ const AdminDashboardContent = memo(() => {
                       {configFields.map((field) => (
                         <div key={field.name} className="space-y-2">
                           {field.type !== "boolean" && (
-                            <Label htmlFor={field.name} className="flex items-center gap-2">
+                            <Label htmlFor={field.name} className="flex items-center gap-2 text-foreground">
                               {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                               {!field.nullable && <span className="text-red-500">*</span>}
                               <span className="text-xs text-muted-foreground">({field.type})</span>
@@ -549,7 +633,10 @@ const AdminDashboardContent = memo(() => {
                           )}
                           {renderConfigField(field)}
                           {configErrors[field.name] && (
-                            <p className="text-sm text-red-500">{configErrors[field.name]}</p>
+                            <p className="text-sm text-red-500 flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4" />
+                              {configErrors[field.name]}
+                            </p>
                           )}
                         </div>
                       ))}
