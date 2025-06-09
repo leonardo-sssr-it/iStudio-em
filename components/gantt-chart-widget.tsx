@@ -53,14 +53,16 @@ export function GanttChartWidget() {
     appuntamenti: true,
   })
   const [dataInizio, setDataInizio] = useState<Date>(new Date())
-  const [dataFine, setDataFine] = useState<Date>(addDays(new Date(), 10)) // Default a 10 giorni
-  const [periodoSelezionato, setPeriodoSelezionato] = useState<number>(10) // Default a 10 giorni
+  // Imposta il periodo di default a 10 giorni, quindi la data di fine è 9 giorni dopo l'inizio
+  const [periodoSelezionato, setPeriodoSelezionato] = useState<number>(10)
+  const [dataFine, setDataFine] = useState<Date>(addDays(new Date(), periodoSelezionato - 1))
   const [error, setError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string>("")
   const [showDebug, setShowDebug] = useState(false)
 
   // Calcola il numero totale di giorni nel periodo selezionato
   const totalDays = useMemo(() => {
+    // Aggiungi +1 per includere sia il giorno di inizio che quello di fine
     return differenceInDays(dataFine, dataInizio) + 1
   }, [dataInizio, dataFine])
 
@@ -98,7 +100,8 @@ export function GanttChartWidget() {
   // Funzione per impostare il periodo di visualizzazione
   const setPeriodo = (giorni: number) => {
     setPeriodoSelezionato(giorni)
-    setDataFine(addDays(dataInizio, giorni))
+    // La data di fine è (giorni - 1) dopo la data di inizio per avere esattamente 'giorni' colonne
+    setDataFine(addDays(dataInizio, giorni - 1))
   }
 
   // Funzione per caricare i clienti
@@ -534,13 +537,14 @@ export function GanttChartWidget() {
     const dates = []
     const currentDate = new Date(dataInizio)
 
-    while (currentDate <= dataFine) {
+    // Usa totalDays per assicurarti di generare il numero corretto di date
+    for (let i = 0; i < totalDays; i++) {
       dates.push(new Date(currentDate))
       currentDate.setDate(currentDate.getDate() + 1)
     }
 
     return dates
-  }, [dataInizio, dataFine])
+  }, [dataInizio, totalDays])
 
   // Calcola la posizione e la larghezza di un elemento nel Gantt
   const calculateItemPosition = (item: GanttItem, index: number) => {
@@ -578,7 +582,8 @@ export function GanttChartWidget() {
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setDataInizio(date)
-      setDataFine(addDays(date, periodoSelezionato))
+      // Aggiorna la data di fine in base al nuovo inizio e al periodo selezionato
+      setDataFine(addDays(date, periodoSelezionato - 1))
     }
   }
 
