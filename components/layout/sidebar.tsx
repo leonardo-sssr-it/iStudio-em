@@ -117,7 +117,7 @@ export function Sidebar({ className }: SidebarProps) {
         className={cn(
           "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
           active
-            ? "bg-primary text-foreground outline outline-2 outline-offset-1 outline-border [&>svg]:text-foreground shadow-md"
+            ? "bg-primary text-primary-foreground outline outline-2 outline-offset-1 outline-border [&>svg]:text-primary-foreground shadow-md"
             : "hover:bg-accent hover:text-accent-foreground hover:scale-105",
           isCollapsed ? "justify-center" : "space-x-3",
         )}
