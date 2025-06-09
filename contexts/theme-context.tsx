@@ -63,67 +63,73 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
 
   const root = document.documentElement
 
-  console.log("Applicando tema personalizzato:", theme.nome, "Dark mode:", isDark)
+  console.log("=== APPLICANDO TEMA ===")
+  console.log("Nome tema:", theme.nome)
+  console.log("Dark mode:", isDark)
+  console.log("Dati tema:", theme)
 
-  // Applica le variabili CSS personalizzate se presenti
-  if (theme.css_variables && typeof theme.css_variables === "object") {
-    Object.entries(theme.css_variables).forEach(([key, value]) => {
-      if (value && typeof value === "string") {
-        root.style.setProperty(`--${key}`, value)
-        console.log(`Applicata variabile CSS: --${key} = ${value}`)
-      }
-    })
-  }
+  try {
+    // Applica le variabili CSS personalizzate se presenti
+    if (theme.css_variables && typeof theme.css_variables === "object") {
+      Object.entries(theme.css_variables).forEach(([key, value]) => {
+        if (value && typeof value === "string") {
+          root.style.setProperty(`--${key}`, value)
+          console.log(`✓ Variabile CSS applicata: --${key} = ${value}`)
+        }
+      })
+    }
 
-  // Applica i colori principali del tema
-  if (theme.primary_color) {
-    const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
-    root.style.setProperty("--primary", primaryHsl)
-    console.log(`Primary color applicato: ${primaryHsl}`)
-  }
+    // Applica i colori principali del tema
+    if (theme.primary_color) {
+      const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
+      root.style.setProperty("--primary", primaryHsl)
+      root.style.setProperty("--admin-tab-active-bg", primaryHsl)
+      root.style.setProperty("--admin-checkbox-checked", primaryHsl)
+      console.log(`✓ Primary color applicato: ${primaryHsl}`)
+    }
 
-  if (theme.secondary_color) {
-    const secondaryHsl = theme.secondary_color.startsWith("#") ? hexToHsl(theme.secondary_color) : theme.secondary_color
-    root.style.setProperty("--secondary", secondaryHsl)
-    console.log(`Secondary color applicato: ${secondaryHsl}`)
-  }
+    if (theme.secondary_color) {
+      const secondaryHsl = theme.secondary_color.startsWith("#")
+        ? hexToHsl(theme.secondary_color)
+        : theme.secondary_color
+      root.style.setProperty("--secondary", secondaryHsl)
+      console.log(`✓ Secondary color applicato: ${secondaryHsl}`)
+    }
 
-  if (theme.accent_color) {
-    const accentHsl = theme.accent_color.startsWith("#") ? hexToHsl(theme.accent_color) : theme.accent_color
-    root.style.setProperty("--accent", accentHsl)
-    console.log(`Accent color applicato: ${accentHsl}`)
-  }
+    if (theme.accent_color) {
+      const accentHsl = theme.accent_color.startsWith("#") ? hexToHsl(theme.accent_color) : theme.accent_color
+      root.style.setProperty("--accent", accentHsl)
+      console.log(`✓ Accent color applicato: ${accentHsl}`)
+    }
 
-  // Applica il background e foreground se specificati
-  if (theme.background_color) {
-    const bgHsl = theme.background_color.startsWith("#") ? hexToHsl(theme.background_color) : theme.background_color
-    root.style.setProperty("--background", bgHsl)
-    console.log(`Background color applicato: ${bgHsl}`)
-  }
+    // Applica il background e foreground se specificati
+    if (theme.background_color) {
+      const bgHsl = theme.background_color.startsWith("#") ? hexToHsl(theme.background_color) : theme.background_color
+      root.style.setProperty("--background", bgHsl)
+      console.log(`✓ Background color applicato: ${bgHsl}`)
+    }
 
-  if (theme.text_color) {
-    const textHsl = theme.text_color.startsWith("#") ? hexToHsl(theme.text_color) : theme.text_color
-    root.style.setProperty("--foreground", textHsl)
-    console.log(`Text color applicato: ${textHsl}`)
-  }
+    if (theme.text_color) {
+      const textHsl = theme.text_color.startsWith("#") ? hexToHsl(theme.text_color) : theme.text_color
+      root.style.setProperty("--foreground", textHsl)
+      console.log(`✓ Text color applicato: ${textHsl}`)
+    }
 
-  // Applica il font family
-  if (theme.font_family) {
-    document.body.style.fontFamily = theme.font_family
-    console.log(`Font family applicato: ${theme.font_family}`)
-  }
+    // Applica il font family
+    if (theme.font_family) {
+      document.body.style.fontFamily = theme.font_family
+      console.log(`✓ Font family applicato: ${theme.font_family}`)
+    }
 
-  // Applica il border radius
-  if (theme.border_radius) {
-    root.style.setProperty("--radius", theme.border_radius)
-    console.log(`Border radius applicato: ${theme.border_radius}`)
-  }
+    // Applica il border radius
+    if (theme.border_radius) {
+      root.style.setProperty("--radius", theme.border_radius)
+      console.log(`✓ Border radius applicato: ${theme.border_radius}`)
+    }
 
-  // Aggiorna le variabili admin per mantenere la visibilità
-  if (theme.primary_color) {
-    const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
-    root.style.setProperty("--admin-tab-active-bg", primaryHsl)
-    root.style.setProperty("--admin-checkbox-checked", primaryHsl)
+    console.log("=== TEMA APPLICATO CON SUCCESSO ===")
+  } catch (error) {
+    console.error("Errore nell'applicazione del tema:", error)
   }
 }
 
@@ -160,10 +166,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [currentTheme, theme])
 
   const toggleDarkMode = useCallback(() => {
+    console.log("=== TOGGLE DARK MODE ===")
+    console.log("Tema attuale:", theme)
+    console.log("isDarkMode attuale:", isDarkMode)
+
     const newTheme = theme === "dark" ? "light" : "dark"
+    console.log("Nuovo tema:", newTheme)
+
     setTheme(newTheme)
     setIsDarkMode(newTheme === "dark")
-  }, [theme, setTheme])
+
+    console.log("=== FINE TOGGLE DARK MODE ===")
+  }, [theme, setTheme, isDarkMode])
 
   return (
     <ThemeContext.Provider

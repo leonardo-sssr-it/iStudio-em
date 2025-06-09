@@ -97,3 +97,31 @@
     border: 2px solid hsl(var(--admin-checkbox-checked));
   }
 }
+
+/* Migliora la visibilità della dropdown dei temi */
+[data-radix-popper-content-wrapper] {
+  z-index: 50;
+}
+
+.theme-dropdown-content {
+  background-color: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.theme-dropdown-item {
+  color: hsl(var(--popover-foreground));
+}
+
+.theme-dropdown-item:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* Assicura che i colori dei temi siano visibili */
+.theme-color-preview {
+  border: 1px solid hsl(var(--border));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
