@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker" // Assicurati che sia importato correttamente
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/use-toast"
@@ -55,7 +55,7 @@ export function GanttChartWidget() {
   })
 
   const [dataInizioFiltro, setDataInizioFiltro] = useState<Date>(new Date())
-  const [periodoSelezionato, setPeriodoSelezionato] = useState<number>(10)
+  const [periodoSelezionato, setPeriodoSelezionato] = useState<number>(10) // Default a 10 giorni
   const [dataFineFiltro, setDataFineFiltro] = useState<Date>(addDays(new Date(), periodoSelezionato - 1))
 
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +73,11 @@ export function GanttChartWidget() {
       setIsLoading(true)
       setError(null)
       setDebugInfo("")
+      console.log(
+        "[Gantt] Inizio fetchData. Filtro date:",
+        dataInizioFiltro.toISOString(),
+        dataFineFiltro.toISOString(),
+      )
       try {
         await fetchClienti()
         await Promise.all([
@@ -80,8 +85,9 @@ export function GanttChartWidget() {
           fetchProgetti(dataInizioFiltro, dataFineFiltro),
           fetchAppuntamenti(dataInizioFiltro, dataFineFiltro),
         ])
+        console.log("[Gantt] Fine fetchData.")
       } catch (err) {
-        console.error("Errore nel caricamento dei dati:", err)
+        console.error("[Gantt] Errore nel caricamento dei dati:", err)
         setError("Si è verificato un errore nel caricamento dei dati")
         toast({
           title: "Errore",
@@ -93,7 +99,7 @@ export function GanttChartWidget() {
       }
     }
     fetchData()
-  }, [supabase, user, dataInizioFiltro, dataFineFiltro])
+  }, [supabase, user, dataInizioFiltro, dataFineFiltro]) // Dipendenze corrette
 
   const setPeriodo = (giorni: number) => {
     setPeriodoSelezionato(giorni)
@@ -107,13 +113,14 @@ export function GanttChartWidget() {
       if (error) throw error
       const clientiMap: Record<string, Cliente> = {}
       if (data) {
-        data.forEach((cliente: Cliente) => {
-          clientiMap[cliente.id] = cliente
+        data.forEach((cliente: any) => {
+          // any per flessibilità con i nomi delle colonne
+          clientiMap[cliente.id] = cliente as Cliente
         })
       }
       setClienti(clientiMap)
     } catch (err) {
-      console.error("Errore nel caricamento dei clienti:", err)
+      console.error("[Gantt] Errore nel caricamento dei clienti:", err)
     }
   }
 
@@ -124,28 +131,50 @@ export function GanttChartWidget() {
         .from("attivita")
         .select("*")
         .eq("id_utente", user.id)
-        .lte("data_inizio", endDate.toISOString())
-        .gte("data_fine", startDate.toISOString())
+        .lte("data_inizio", endDate.toISOString()) // Filtra attività che iniziano prima o durante la fine del periodo
+        .gte("data_fine", startDate.toISOString()) // Filtra attività che finiscono dopo o durante l'inizio del periodo
       if (error) throw error
       if (data) {
-        setAttivita(
-          data.map((item: any) => ({
-            id: item.id,
-            tipo: "attivita",
+        if (data.length > 0) {
+          console.log(
+            `[Gantt] Attività grezze da Supabase (ID: ${data[0].id}): Inizio: ${data[0].data_inizio}, Fine: ${data[0].data_fine}`,
+          )
+        }
+        const mappedAttivita = data.map((item: any) => {
+          const dataInizioParsed = parseISO(item.data_inizio)
+          const dataFineParsed = parseISO(item.data_fine)
+          if (item.id.toString() === "ID_APPUNTAMENTO_DA_VERIFICARE") {
+            // Sostituisci con l'ID effettivo
+            console.log(
+              `[Gantt DEBUG Attivita ${item.id}] Original DB: ${item.data_inizio} / ${item.data_fine}. Parsed: ${dataInizioParsed.toISOString()} / ${dataFineParsed.toISOString()}`,
+            )
+          }
+          return {
+            id: item.id.toString(),
+            tipo: "attivita" as const,
             titolo: item.titolo || "Attività senza titolo",
             descrizione: item.descrizione || "",
-            dataInizio: parseISO(item.data_inizio),
-            dataFine: parseISO(item.data_fine),
-            colore: "#ffcdd2",
+            dataInizio: dataInizioParsed,
+            dataFine: dataFineParsed,
+            colore: "#ffcdd2", // Rosso chiaro per attività
             priorita: item.priorita,
             stato: item.stato,
             id_utente: item.id_utente,
-            id_cliente: item.id_cliente,
-          })),
-        )
+            id_cliente: item.id_cliente ? item.id_cliente.toString() : undefined,
+          }
+        })
+        if (mappedAttivita.length > 0) {
+          console.log(
+            `[Gantt] Attività mappata (ID: ${mappedAttivita[0].id}): Inizio: ${mappedAttivita[0].dataInizio.toISOString()}, Fine: ${mappedAttivita[0].dataFine.toISOString()}`,
+          )
+        }
+        setAttivita(mappedAttivita)
+      } else {
+        setAttivita([])
       }
     } catch (err) {
-      console.error("Errore nel caricamento delle attività:", err)
+      console.error("[Gantt] Errore nel caricamento delle attività:", err)
+      setAttivita([])
     }
   }
 
@@ -160,31 +189,47 @@ export function GanttChartWidget() {
         .gte("data_fine", startDate.toISOString())
       if (error) throw error
       if (data) {
-        setProgetti(
-          data.map((item: any) => ({
-            id: item.id,
-            tipo: "progetto",
+        if (data.length > 0) {
+          console.log(
+            `[Gantt] Progetti grezzi da Supabase (ID: ${data[0].id}): Inizio: ${data[0].data_inizio}, Fine: ${data[0].data_fine}`,
+          )
+        }
+        const mappedProgetti = data.map((item: any) => {
+          const dataInizioParsed = parseISO(item.data_inizio)
+          const dataFineParsed = parseISO(item.data_fine)
+          return {
+            id: item.id.toString(),
+            tipo: "progetto" as const,
             titolo: item.titolo || "Progetto senza titolo",
             descrizione: item.descrizione || "",
-            dataInizio: parseISO(item.data_inizio),
-            dataFine: parseISO(item.data_fine),
-            colore: "#bbdefb",
+            dataInizio: dataInizioParsed,
+            dataFine: dataFineParsed,
+            colore: "#bbdefb", // Blu chiaro per progetti
             priorita: item.priorita,
             stato: item.stato,
             id_utente: item.id_utente,
-            id_cliente: item.id_cliente,
-          })),
-        )
+            id_cliente: item.id_cliente ? item.id_cliente.toString() : undefined,
+          }
+        })
+        if (mappedProgetti.length > 0) {
+          console.log(
+            `[Gantt] Progetti mappati (ID: ${mappedProgetti[0].id}): Inizio: ${mappedProgetti[0].dataInizio.toISOString()}, Fine: ${mappedProgetti[0].dataFine.toISOString()}`,
+          )
+        }
+        setProgetti(mappedProgetti)
+      } else {
+        setProgetti([])
       }
     } catch (err) {
-      console.error("Errore nel caricamento dei progetti:", err)
+      console.error("[Gantt] Errore nel caricamento dei progetti:", err)
+      setProgetti([])
     }
   }
 
   const fetchAppuntamenti = async (startDate: Date, endDate: Date) => {
     if (!supabase || !user) return
-    const startColumn = "data_inizio"
-    const endColumn = "data_fine"
+    const startColumn = "data_inizio" // Nome colonna corretto
+    const endColumn = "data_fine" // Nome colonna corretto
     try {
       const { data, error } = await supabase
         .from("appuntamenti")
@@ -194,41 +239,74 @@ export function GanttChartWidget() {
         .gte(endColumn, startDate.toISOString())
       if (error) throw error
       if (data) {
-        setAppuntamenti(
-          data.map((item: any) => ({
-            id: item.id,
-            tipo: "appuntamento",
+        if (data.length > 0 && data[0].id.toString() === "36") {
+          // Log specifico per ID 36
+          console.log(
+            `[Gantt DEBUG ID 36] Appuntamento grezzo da Supabase: Inizio: ${data[0][startColumn]}, Fine: ${data[0][endColumn]}`,
+          )
+        }
+        const mappedAppuntamenti = data.map((item: any) => {
+          const dataInizioParsed = parseISO(item[startColumn])
+          const dataFineParsed = parseISO(item[endColumn])
+          if (item.id.toString() === "36") {
+            // Log specifico per ID 36
+            console.log(
+              `[Gantt DEBUG ID 36] Appuntamento mappato: Inizio: ${dataInizioParsed.toISOString()}, Fine: ${dataFineParsed.toISOString()}`,
+            )
+          }
+          return {
+            id: item.id.toString(),
+            tipo: "appuntamento" as const,
             titolo: item.titolo || item.nome || `Appuntamento #${item.id}`,
             descrizione: item.descrizione || item.note || "",
-            dataInizio: parseISO(item[startColumn]),
-            dataFine: parseISO(item[endColumn]),
-            colore: "#c8e6c9",
+            dataInizio: dataInizioParsed,
+            dataFine: dataFineParsed,
+            colore: "#c8e6c9", // Verde chiaro per appuntamenti
             priorita: item.priorita,
             stato: item.stato,
             id_utente: item.id_utente,
-            id_cliente: item.id_cliente,
-          })),
-        )
+            id_cliente: item.id_cliente ? item.id_cliente.toString() : undefined,
+          }
+        })
+        if (mappedAppuntamenti.find((a) => a.id === "36")) {
+          const app36 = mappedAppuntamenti.find((a) => a.id === "36")
+          console.log(
+            `[Gantt DEBUG ID 36] Appuntamento ${app36?.id} nello stato finale: Inizio: ${app36?.dataInizio.toISOString()}, Fine: ${app36?.dataFine.toISOString()}`,
+          )
+        }
+        setAppuntamenti(mappedAppuntamenti)
+      } else {
+        setAppuntamenti([])
       }
     } catch (err) {
-      console.error("Errore nel caricamento degli appuntamenti:", err)
+      console.error("[Gantt] Errore nel caricamento degli appuntamenti:", err)
+      setAppuntamenti([])
     }
   }
 
   const getPriorityColor = (priorita?: string): string => {
-    switch (priorita?.toLowerCase()) {
+    // ... (invariato)
+    switch (
+      priorita
+        ?.toString()
+        .toLowerCase() // Aggiunto toString() per sicurezza
+    ) {
       case "alta":
-        return "#ef4444"
+      case "3": // Assumendo che priorità possa essere numerica
+        return "#ef4444" // Rosso
       case "media":
-        return "#f59e0b"
+      case "2":
+        return "#f59e0b" // Ambra
       case "bassa":
-        return "#3b82f6"
+      case "1":
+        return "#3b82f6" // Blu
       default:
-        return "#6b7280"
+        return "#6b7280" // Grigio
     }
   }
 
   const getIconByType = (tipo: string) => {
+    // ... (invariato)
     switch (tipo) {
       case "attivita":
         return <CheckSquare className="h-4 w-4" />
@@ -242,6 +320,7 @@ export function GanttChartWidget() {
   }
 
   const getClienteName = (id_cliente?: string): string => {
+    // ... (invariato)
     if (!id_cliente || !clienti[id_cliente]) return "Cliente non specificato"
     const cliente = clienti[id_cliente]
     return cliente.ragione_sociale || `${cliente.cognome} ${cliente.nome}`.trim()
@@ -252,37 +331,99 @@ export function GanttChartWidget() {
     if (filtroTipi.attivita) elementi = [...elementi, ...attivita]
     if (filtroTipi.progetti) elementi = [...elementi, ...progetti]
     if (filtroTipi.appuntamenti) elementi = [...elementi, ...appuntamenti]
-    return elementi
+
+    const filteredAndSorted = elementi
       .filter((item) => {
         const displayStart = max([item.dataInizio, dataInizioFiltro])
         const displayEnd = min([item.dataFine, dataFineFiltro])
-        return displayEnd >= displayStart
+        const isInDateRange = displayEnd >= displayStart
+        if (item.id === "36") {
+          console.log(
+            `[Gantt DEBUG ID 36 useMemo] Item Start: ${item.dataInizio.toISOString()}, Item End: ${item.dataFine.toISOString()}`,
+          )
+          console.log(
+            `[Gantt DEBUG ID 36 useMemo] Filtro Start: ${dataInizioFiltro.toISOString()}, Filtro End: ${dataFineFiltro.toISOString()}`,
+          )
+          console.log(
+            `[Gantt DEBUG ID 36 useMemo] Display Start: ${displayStart.toISOString()}, Display End: ${displayEnd.toISOString()}`,
+          )
+          console.log(`[Gantt DEBUG ID 36 useMemo] Is In Range: ${isInDateRange}`)
+        }
+        return isInDateRange
       })
       .sort((a, b) => a.dataInizio.getTime() - b.dataInizio.getTime())
+
+    if (filteredAndSorted.find((i) => i.id === "36")) {
+      console.log("[Gantt DEBUG ID 36 useMemo] L'elemento 36 è presente negli elementi filtrati e ordinati.")
+    } else if (elementi.find((i) => i.id === "36")) {
+      console.log("[Gantt DEBUG ID 36 useMemo] L'elemento 36 è presente negli elementi PRIMA del filtro ma NON DOPO.")
+    }
+
+    return filteredAndSorted
   }, [attivita, progetti, appuntamenti, filtroTipi, dataInizioFiltro, dataFineFiltro])
 
   const headerDates = useMemo(() => {
+    // ... (invariato)
     const dates = []
-    const currentDate = new Date(dataInizioFiltro)
+    const currentDate = new Date(dataInizioFiltro) // Crea una nuova istanza per evitare mutazioni
     for (let i = 0; i < totalDaysInView; i++) {
-      dates.push(new Date(currentDate))
+      dates.push(new Date(currentDate)) // Aggiungi una copia della data corrente
       currentDate.setDate(currentDate.getDate() + 1)
     }
     return dates
   }, [dataInizioFiltro, totalDaysInView])
 
   const calculateItemPosition = (item: GanttItem, index: number) => {
+    // ... (invariato, ma aggiungiamo log)
     const displayDataInizio = max([item.dataInizio, dataInizioFiltro])
     const displayDataFine = min([item.dataFine, dataFineFiltro])
-    const startDayOffset = differenceInDays(displayDataInizio, dataInizioFiltro)
-    const endDayOffset = differenceInDays(displayDataFine, dataInizioFiltro)
+
+    // Per il calcolo degli offset e della durata, consideriamo l'inizio del giorno per coerenza con la griglia
+    const startDayOfDisplay = new Date(
+      displayDataInizio.getFullYear(),
+      displayDataInizio.getMonth(),
+      displayDataInizio.getDate(),
+    )
+    const endDayOfDisplay = new Date(
+      displayDataFine.getFullYear(),
+      displayDataFine.getMonth(),
+      displayDataFine.getDate(),
+    )
+    const startDayOfFilter = new Date(
+      dataInizioFiltro.getFullYear(),
+      dataInizioFiltro.getMonth(),
+      dataInizioFiltro.getDate(),
+    )
+
+    const startDayOffset = differenceInDays(startDayOfDisplay, startDayOfFilter)
+    const endDayOffset = differenceInDays(endDayOfDisplay, startDayOfFilter)
+
     const durationInView = Math.max(1, endDayOffset - startDayOffset + 1)
+
     const leftPercentage = (startDayOffset / totalDaysInView) * 100
     const widthPercentage = (durationInView / totalDaysInView) * 100
+
+    // Log specifici per l'elemento problematico
+    if (item.id === "36") {
+      console.log(`[Gantt DEBUG ID 36 calculateItemPosition] Item: ${item.titolo}`)
+      console.log(`  Original Dates: ${item.dataInizio.toISOString()} - ${item.dataFine.toISOString()}`)
+      console.log(`  Filter Dates: ${dataInizioFiltro.toISOString()} - ${dataFineFiltro.toISOString()}`)
+      console.log(
+        `  Display Dates (actual portion shown): ${displayDataInizio.toISOString()} - ${displayDataFine.toISOString()}`,
+      )
+      console.log(
+        `  StartDayOfDisplay: ${startDayOfDisplay.toISOString()}, EndDayOfDisplay: ${endDayOfDisplay.toISOString()}`,
+      )
+      console.log(`  StartDayOffset: ${startDayOffset}, EndDayOffset: ${endDayOffset}`)
+      console.log(`  TotalDaysInView: ${totalDaysInView}, DurationInView (days): ${durationInView}`)
+      console.log(`  Left: ${leftPercentage}%, Width: ${widthPercentage}%`)
+    }
+
     const sameTypeItems = elementiGantt.filter(
       (el, i) => el.tipo === item.tipo && i < index && isSameDay(el.dataInizio, item.dataInizio),
     ).length
-    const verticalOffset = sameTypeItems * 2
+    const verticalOffset = sameTypeItems * 2 // Piccolo offset per item sovrapposti dello stesso tipo
+
     return {
       left: `${leftPercentage}%`,
       width: `${widthPercentage}%`,
@@ -291,36 +432,38 @@ export function GanttChartWidget() {
   }
 
   const handleCheckboxChange = (tipo: keyof typeof filtroTipi) => {
+    // ... (invariato)
     setFiltroTipi((prev) => ({ ...prev, [tipo]: !prev[tipo] }))
   }
 
-  const handleDateChange = (date: Date | undefined) => {
+  const handleDateChange = (date: Date | undefined | null) => {
+    // EnhancedDatePicker può restituire null
     if (date) {
       setDataInizioFiltro(date)
+      // Recalculate dataFineFiltro based on the new dataInizioFiltro and periodoSelezionato
       setDataFineFiltro(addDays(date, periodoSelezionato - 1))
     }
   }
 
-  // Calcola l'altezza del corpo del Gantt per evitare lo scroll verticale interno
-  const ganttBodyHeight = elementiGantt.length * 48 + 40 // 48px per riga + 40px padding
+  const ganttBodyHeight = Math.max(200, elementiGantt.length * 48 + 40) // Minimo 200px
 
   const getTableNameFromType = (type: GanttItem["tipo"]): string => {
+    // ... (invariato)
     switch (type) {
       case "attivita":
-        return "attivita" // La tabella si chiama 'attivita'
+        return "attivita"
       case "progetto":
         return "progetti"
       case "appuntamento":
-        return "appuntamenti" // Nome corretto della tabella
+        return "appuntamenti"
       default:
-        // In caso di un tipo non previsto, restituisce il tipo stesso.
-        // Potrebbe essere utile loggare un avviso qui se accade.
-        console.warn(`Tipo di elemento Gantt non riconosciuto: ${type}`)
+        console.warn(`[Gantt] Tipo di elemento Gantt non riconosciuto per link: ${type}`)
         return type
     }
   }
 
   if (isLoading) {
+    // ... (invariato)
     return (
       <Card>
         <CardHeader>
@@ -338,6 +481,7 @@ export function GanttChartWidget() {
   }
 
   if (error) {
+    // ... (invariato)
     return (
       <Card>
         <CardHeader>
@@ -364,13 +508,14 @@ export function GanttChartWidget() {
           <div className="flex flex-col space-y-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
-                <Label>Data inizio</Label>
+                <Label htmlFor="gantt-date-picker">Data inizio</Label>
                 <EnhancedDatePicker
-                  date={dataInizioFiltro}
-                  onDateChange={handleDateChange}
+                  id="gantt-date-picker" // Aggiunto ID per Label
+                  date={dataInizioFiltro} // Usa 'date' invece di 'value' se EnhancedDatePicker lo richiede
+                  onDateChange={handleDateChange} // Usa 'onDateChange'
                   placeholder="Seleziona data"
-                  locale="it"
-                  dateFormat="dd/MM/yyyy"
+                  locale="it" // Passa la locale se supportato
+                  dateFormat="dd/MM/yyyy" // Formato desiderato
                 />
               </div>
               <div className="flex flex-wrap gap-2">
@@ -387,35 +532,36 @@ export function GanttChartWidget() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-4 ml-auto">
+                {/* Checkboxes ... (invariate) */}
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="attivita"
+                    id="gantt-attivita"
                     checked={filtroTipi.attivita}
                     onCheckedChange={() => handleCheckboxChange("attivita")}
                   />
-                  <Label htmlFor="attivita" className="flex items-center gap-1">
+                  <Label htmlFor="gantt-attivita" className="flex items-center gap-1">
                     <CheckSquare className="h-4 w-4 text-red-300" />
                     Attività
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="progetti"
+                    id="gantt-progetti"
                     checked={filtroTipi.progetti}
                     onCheckedChange={() => handleCheckboxChange("progetti")}
                   />
-                  <Label htmlFor="progetti" className="flex items-center gap-1">
+                  <Label htmlFor="gantt-progetti" className="flex items-center gap-1">
                     <Briefcase className="h-4 w-4 text-blue-300" />
                     Progetti
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="appuntamenti"
+                    id="gantt-appuntamenti"
                     checked={filtroTipi.appuntamenti}
                     onCheckedChange={() => handleCheckboxChange("appuntamenti")}
                   />
-                  <Label htmlFor="appuntamenti" className="flex items-center gap-1">
+                  <Label htmlFor="gantt-appuntamenti" className="flex items-center gap-1">
                     <Calendar className="h-4 w-4 text-green-300" />
                     Appuntamenti
                   </Label>
@@ -433,37 +579,26 @@ export function GanttChartWidget() {
 
           <div className="border rounded-md overflow-hidden">
             <div className="overflow-x-auto">
+              {/* Header dates ... (invariato) */}
               <div className="flex border-b min-w-[800px]">
                 <div className="flex-1 flex">
                   {headerDates.map((date, index) => (
                     <div
                       key={index}
-                      className={`flex-1 p-1 text-center text-xs ${
-                        isSameDay(date, today)
-                          ? "bg-blue-100 font-bold"
-                          : date.getDay() === 0 || date.getDay() === 6
-                            ? "bg-gray-100"
-                            : ""
-                      }`}
+                      className={`flex-1 p-1 text-center text-xs ${isSameDay(date, today) ? "bg-blue-100 font-bold" : date.getDay() === 0 || date.getDay() === 6 ? "bg-gray-100" : ""}`}
                     >
                       {format(date, "dd/MM", { locale: it })}
                     </div>
                   ))}
                 </div>
               </div>
-
+              {/* Gantt body ... (invariato, ma con log in calculateItemPosition) */}
               <div className="min-w-[800px] relative" style={{ height: `${ganttBodyHeight}px` }}>
                 <div className="absolute inset-0 flex pointer-events-none">
                   {headerDates.map((date, index) => (
                     <div
                       key={index}
-                      className={`flex-1 border-r ${
-                        isSameDay(date, today)
-                          ? "bg-blue-100"
-                          : date.getDay() === 0 || date.getDay() === 6
-                            ? "bg-gray-100"
-                            : ""
-                      }`}
+                      className={`flex-1 border-r ${isSameDay(date, today) ? "bg-blue-100" : date.getDay() === 0 || date.getDay() === 6 ? "bg-gray-100" : ""}`}
                     ></div>
                   ))}
                 </div>
@@ -476,7 +611,6 @@ export function GanttChartWidget() {
                     }}
                   ></div>
                 )}
-
                 <div className="absolute inset-0 p-2">
                   {elementiGantt.length > 0 ? (
                     elementiGantt.map((item, index) => {
@@ -491,9 +625,9 @@ export function GanttChartWidget() {
                               style={{
                                 left,
                                 width,
-                                top: `${index * 48 + 10}px`,
+                                top: `${index * 48 + 10}px`, // 48px per riga + 10px padding top
                                 backgroundColor: item.colore,
-                                marginTop,
+                                marginTop, // Per piccoli offset verticali
                                 overflow: "hidden",
                               }}
                             >
@@ -505,11 +639,14 @@ export function GanttChartWidget() {
                                 <span className="truncate">{item.titolo}</span>
                               </div>
                               <div className="text-[10px] text-gray-600 truncate pl-[14px]">
+                                {" "}
+                                {/* Allinea con il testo sopra */}
                                 {format(item.dataInizio, "dd/MM")} - {format(item.dataFine, "dd/MM")}
                               </div>
                             </div>
                           </PopoverTrigger>
                           <PopoverContent className="w-[280px] sm:w-[350px]">
+                            {/* Popover content ... (invariato) */}
                             <div className="space-y-2">
                               <div className="font-medium flex items-center gap-2">
                                 {getIconByType(item.tipo)}
@@ -527,11 +664,11 @@ export function GanttChartWidget() {
                                 </div>
                                 <div>
                                   <span className="font-medium">Inizio Effettivo:</span>{" "}
-                                  {format(item.dataInizio, "dd/MM/yyyy")}
+                                  {format(item.dataInizio, "dd/MM/yyyy HH:mm")}
                                 </div>
                                 <div>
                                   <span className="font-medium">Fine Effettiva:</span>{" "}
-                                  {format(item.dataFine, "dd/MM/yyyy")}
+                                  {format(item.dataFine, "dd/MM/yyyy HH:mm")}
                                 </div>
                                 {item.priorita && (
                                   <div>
@@ -570,6 +707,7 @@ export function GanttChartWidget() {
             </div>
           </div>
 
+          {/* Legenda ... (invariata) */}
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-red-200"></div>
@@ -600,8 +738,12 @@ export function GanttChartWidget() {
             </div>
           </div>
         </div>
+        {/* Debug Panel ... (invariato) */}
+        <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)} className="mt-2">
+          {showDebug ? "Nascondi Debug" : "Mostra Debug"}
+        </Button>
         {showDebug && (
-          <div className="mt-4 p-2 border rounded bg-gray-50 text-xs font-mono">
+          <div className="mt-4 p-2 border rounded bg-gray-50 text-xs font-mono overflow-auto max-h-60">
             <div className="flex justify-between mb-2">
               <h4 className="font-bold">Debug Panel</h4>
               <button onClick={() => setShowDebug(false)} className="text-gray-500 hover:text-gray-700">
@@ -610,16 +752,17 @@ export function GanttChartWidget() {
             </div>
             <div className="space-y-1">
               <p>
-                Periodo Filtro: {dataInizioFiltro?.toISOString()} - {dataFineFiltro?.toISOString()}
+                Filtro: {dataInizioFiltro?.toISOString()} - {dataFineFiltro?.toISOString()}
               </p>
               <p>Altezza Gantt Body: {ganttBodyHeight}px</p>
-              <p>Elementi totali (dopo filtro visivo): {elementiGantt.length}</p>
+              <p>Elementi Gantt totali (dopo filtro visivo): {elementiGantt.length}</p>
+              <p>
+                Attività: {attivita.length}, Progetti: {progetti.length}, Appuntamenti: {appuntamenti.length}
+              </p>
+              <pre>{debugInfo}</pre>
             </div>
           </div>
         )}
-        <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)} className="mt-2">
-          {showDebug ? "Nascondi Debug" : "Mostra Debug"}
-        </Button>
       </CardContent>
     </Card>
   )
