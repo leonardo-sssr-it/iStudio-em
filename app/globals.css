@@ -24,6 +24,11 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+
+    /* Variabili personalizzate per admin */
+    --admin-tab-active-bg: 142 71% 45%;
+    --admin-tab-active-fg: 0 0% 100%;
+    --admin-checkbox-checked: 142 71% 45%;
   }
 
   .dark {
@@ -46,6 +51,11 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    /* Variabili personalizzate per admin in dark mode */
+    --admin-tab-active-bg: 142 71% 55%;
+    --admin-tab-active-fg: 0 0% 0%;
+    --admin-checkbox-checked: 142 71% 55%;
   }
 }
 
@@ -58,39 +68,32 @@
   }
 }
 
-/* Rimosso tutto il blocco @media print */
-
 /* Nasconde la X di default del DialogContent di shadcn/ui */
 .custom-feed-modal-dialog-content > button[class*="absolute"][class*="right-4"][class*="top-4"] {
   display: none !important;
 }
 
-/* Migliora la visibilità del tab attivo nella pagina admin */
-.bg-primary.text-primary-foreground {
-  background-color: #10b981 !important; /* Verde più visibile */
-  color: white !important;
-  font-weight: 600;
-}
+/* Stili per tab attivi nella pagina admin - usando variabili CSS invece di !important */
+@layer components {
+  .admin-tab-active {
+    background-color: hsl(var(--admin-tab-active-bg));
+    color: hsl(var(--admin-tab-active-fg));
+    font-weight: 600;
+  }
 
-/* Migliora la visibilità dei checkbox */
-[data-state="checked"] {
-  background-color: #10b981 !important;
-  border-color: #10b981 !important;
-}
+  /* Migliora la visibilità dei checkbox */
+  .admin-checkbox[data-state="checked"] {
+    background-color: hsl(var(--admin-checkbox-checked));
+    border-color: hsl(var(--admin-checkbox-checked));
+  }
 
-/* Aggiunge un outline ai checkbox per renderli più visibili anche quando non sono selezionati */
-.checkbox-outline {
-  border: 2px solid #10b981;
-}
+  .admin-checkbox[data-state="checked"] svg {
+    color: white;
+    stroke-width: 3px;
+  }
 
-/* Assicura che il segno di spunta sia visibile */
-[data-state="checked"] svg {
-  color: white !important;
-  stroke-width: 3px;
-}
-
-/* Migliora il contrasto per i checkbox in modalità dark */
-.dark [data-state="checked"] {
-  background-color: #34d399 !important;
-  border-color: #34d399 !important;
+  /* Outline per checkbox non selezionati */
+  .admin-checkbox {
+    border: 2px solid hsl(var(--admin-checkbox-checked));
+  }
 }

@@ -434,7 +434,7 @@ const AdminDashboardContent = memo(() => {
               id={field.name}
               checked={Boolean(value)}
               onCheckedChange={(checked) => handleConfigChange(field.name, checked)}
-              className="checkbox-outline"
+              className="admin-checkbox"
             />
             <Label htmlFor={field.name} className="text-sm font-medium text-foreground">
               {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
@@ -615,7 +615,7 @@ const AdminDashboardContent = memo(() => {
                 onClick={() => setActiveTab("database")}
                 className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors ${
                   activeTab === "database"
-                    ? "bg-primary text-primary-foreground border-b-2 border-primary"
+                    ? "admin-tab-active border-b-2 border-primary"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -626,7 +626,7 @@ const AdminDashboardContent = memo(() => {
                 onClick={() => setActiveTab("configurazione")}
                 className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors ${
                   activeTab === "configurazione"
-                    ? "bg-primary text-primary-foreground border-b-2 border-primary"
+                    ? "admin-tab-active border-b-2 border-primary"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >

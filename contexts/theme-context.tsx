@@ -20,21 +20,117 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-// Funzione di utilità per garantire un contrasto sufficiente
-function ensureContrast(backgroundColor: string, textColor: string, fallbackTextColor: string): string {
-  // Implementazione semplificata - in produzione usare una libreria come chroma.js
-  // per calcolare il contrasto effettivo
-  if (backgroundColor === textColor || !textColor) {
-    return fallbackTextColor
+// Funzione per convertire colori hex in HSL
+function hexToHsl(hex: string): string {
+  // Rimuovi il # se presente
+  hex = hex.replace("#", "")
+
+  // Converti hex in RGB
+  const r = Number.parseInt(hex.substr(0, 2), 16) / 255
+  const g = Number.parseInt(hex.substr(2, 2), 16) / 255
+  const b = Number.parseInt(hex.substr(4, 2), 16) / 255
+
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  let h = 0,
+    s = 0,
+    l = (max + min) / 2
+
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0)
+        break
+      case g:
+        h = (b - r) / d + 2
+        break
+      case b:
+        h = (r - g) / d + 4
+        break
+    }
+    h /= 6
   }
-  return textColor
+
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
+}
+
+// Funzione per applicare un tema personalizzato
+function applyCustomTheme(theme: Theme, isDark: boolean) {
+  if (typeof window === "undefined") return
+
+  const root = document.documentElement
+
+  console.log("Applicando tema personalizzato:", theme.nome, "Dark mode:", isDark)
+
+  // Applica le variabili CSS personalizzate se presenti
+  if (theme.css_variables && typeof theme.css_variables === "object") {
+    Object.entries(theme.css_variables).forEach(([key, value]) => {
+      if (value && typeof value === "string") {
+        root.style.setProperty(`--${key}`, value)
+        console.log(`Applicata variabile CSS: --${key} = ${value}`)
+      }
+    })
+  }
+
+  // Applica i colori principali del tema
+  if (theme.primary_color) {
+    const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
+    root.style.setProperty("--primary", primaryHsl)
+    console.log(`Primary color applicato: ${primaryHsl}`)
+  }
+
+  if (theme.secondary_color) {
+    const secondaryHsl = theme.secondary_color.startsWith("#") ? hexToHsl(theme.secondary_color) : theme.secondary_color
+    root.style.setProperty("--secondary", secondaryHsl)
+    console.log(`Secondary color applicato: ${secondaryHsl}`)
+  }
+
+  if (theme.accent_color) {
+    const accentHsl = theme.accent_color.startsWith("#") ? hexToHsl(theme.accent_color) : theme.accent_color
+    root.style.setProperty("--accent", accentHsl)
+    console.log(`Accent color applicato: ${accentHsl}`)
+  }
+
+  // Applica il background e foreground se specificati
+  if (theme.background_color) {
+    const bgHsl = theme.background_color.startsWith("#") ? hexToHsl(theme.background_color) : theme.background_color
+    root.style.setProperty("--background", bgHsl)
+    console.log(`Background color applicato: ${bgHsl}`)
+  }
+
+  if (theme.text_color) {
+    const textHsl = theme.text_color.startsWith("#") ? hexToHsl(theme.text_color) : theme.text_color
+    root.style.setProperty("--foreground", textHsl)
+    console.log(`Text color applicato: ${textHsl}`)
+  }
+
+  // Applica il font family
+  if (theme.font_family) {
+    document.body.style.fontFamily = theme.font_family
+    console.log(`Font family applicato: ${theme.font_family}`)
+  }
+
+  // Applica il border radius
+  if (theme.border_radius) {
+    root.style.setProperty("--radius", theme.border_radius)
+    console.log(`Border radius applicato: ${theme.border_radius}`)
+  }
+
+  // Aggiorna le variabili admin per mantenere la visibilità
+  if (theme.primary_color) {
+    const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
+    root.style.setProperty("--admin-tab-active-bg", primaryHsl)
+    root.style.setProperty("--admin-checkbox-checked", primaryHsl)
+  }
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { themes, currentTheme, applyTheme, isLoading } = useThemes()
   const { theme, setTheme } = useNextTheme()
   const [layout, setLayout] = useState<LayoutType>(() => {
-    // Recupera il layout salvato dal localStorage se disponibile
     if (typeof window !== "undefined") {
       const savedLayout = localStorage.getItem("preferredLayout")
       return (savedLayout as LayoutType) || "default"
@@ -55,63 +151,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setIsDarkMode(theme === "dark")
   }, [theme])
 
-  // Applichiamo le variabili CSS del tema corrente
+  // Applichiamo il tema personalizzato quando cambia
   useEffect(() => {
-    if (!currentTheme || typeof window === "undefined") return
-
-    const root = document.documentElement
-    const isDark = theme === "dark"
-
-    // Applichiamo le variabili CSS personalizzate
-    if (currentTheme.css_variables) {
-      Object.entries(currentTheme.css_variables).forEach(([key, value]) => {
-        if (value) {
-          root.style.setProperty(`--${key}`, value)
-        }
-      })
+    if (currentTheme && typeof window !== "undefined") {
+      console.log("Applicando tema:", currentTheme.nome, "isDark:", theme === "dark")
+      applyCustomTheme(currentTheme, theme === "dark")
     }
-
-    // Colori di base
-    const bgColor = isDark ? "#121212" : "#ffffff"
-    const textColor = isDark ? "#ffffff" : "#121212"
-
-    // Applichiamo i colori principali con controllo del contrasto
-    root.style.setProperty("--background", isDark ? "0 0% 7%" : "0 0% 100%")
-    root.style.setProperty("--foreground", isDark ? "0 0% 98%" : "0 0% 3.9%")
-
-    // Colori di base per shadcn/ui (assicurati che questi siano coerenti)
-    root.style.setProperty("--card", isDark ? "0 0% 7%" : "0 0% 100%") // Esempio, adatta se necessario
-    root.style.setProperty("--popover", isDark ? "0 0% 7%" : "0 0% 100%") // Esempio, adatta se necessario
-
-    // Definisci o aggiorna --border
-    // Precedentemente per il tema scuro era 0 0% 14.9% (hsl(0, 0%, 14.9%))
-    // Lo rendiamo leggermente più scuro per un miglior contrasto delle linee
-    root.style.setProperty("--border", isDark ? "0 0% 20%" : "0 0% 89.8%") // NUOVA RIGA per --border (20% invece di 14.9% per dark)
-    root.style.setProperty("--input", isDark ? "0 0% 20%" : "0 0% 89.8%") // Anche --input spesso usa lo stesso colore di --border
-    root.style.setProperty("--ring", isDark ? "0 0% 83.1%" : "0 0% 63.9%") // Esempio per --ring
-
-    // Applichiamo i colori del tema con controllo del contrasto
-    root.style.setProperty("--primary", currentTheme.primary_color || (isDark ? "0 0% 98%" : "0 0% 9%"))
-    root.style.setProperty("--secondary", currentTheme.secondary_color || (isDark ? "0 0% 14.9%" : "0 0% 96.1%"))
-    root.style.setProperty("--accent", currentTheme.accent_color || (isDark ? "0 0% 14.9%" : "0 0% 96.1%"))
-
-    // Applichiamo il font
-    if (currentTheme.font_family) {
-      document.body.style.fontFamily = currentTheme.font_family
-    }
-
-    // Applichiamo il border radius
-    if (currentTheme.border_radius) {
-      root.style.setProperty("--radius", currentTheme.border_radius)
-    }
-
-    // Assicuriamo che i colori di testo abbiano un buon contrasto
-    root.style.setProperty("--card-foreground", isDark ? "0 0% 98%" : "0 0% 3.9%")
-    root.style.setProperty("--popover-foreground", isDark ? "0 0% 98%" : "0 0% 3.9%")
-    root.style.setProperty("--primary-foreground", isDark ? "0 0% 9%" : "0 0% 98%")
-    root.style.setProperty("--secondary-foreground", isDark ? "0 0% 98%" : "0 0% 9%")
-    root.style.setProperty("--muted-foreground", isDark ? "0 0% 63.9%" : "0 0% 45.1%")
-    root.style.setProperty("--accent-foreground", isDark ? "0 0% 98%" : "0 0% 9%")
   }, [currentTheme, theme])
 
   const toggleDarkMode = useCallback(() => {
