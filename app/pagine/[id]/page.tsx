@@ -101,19 +101,38 @@ async function getPageData(
 }
 
 export default async function Page({ params }: { params: { id: string } }) {
-  const cookieStore = cookies()
-  const { page, activeSession } = await getPageData(params.id, cookieStore)
+  // Add this validation at the beginning of the Page component
+  const pageId = Number.parseInt(params.id, 10)
+  if (isNaN(pageId)) {
+    notFound()
+    return
+  }
 
+  const cookieStore = cookies()
+  console.log(`[PageId] Fetching page with ID: ${pageId}`)
+  const supabase = createServerClient()
+  const { data: page, error: pageError } = await supabase
+    .from("pagine")
+    .select("*, utente:id_utente ( username )")
+    .eq("id", pageId) // Use pageId instead of id
+    .single()
+
+  if (pageError) {
+    console.error(`[PageId] Database error for page ${pageId}:`, pageError)
+  }
   if (!page) {
+    console.log(`[PageId] No page found with ID: ${pageId}`)
     notFound() // Page itself not found
     return
   }
 
+  const { activeSession } = await getPageData(params.id, cookieStore)
+
   // Permission checks
   if (page.privato) {
-    console.log(`[PageId] Page ${page.id} is private. Checking permissions. Active session:`, activeSession)
+    console.log(`[PageId] Page ${page.id} is private. Checking permissions.`)
     if (!activeSession || !activeSession.userId) {
-      console.log(`[PageId] Page ${page.id} is private and no active session user ID. Denying access.`)
+      console.log(`[PageId] Page ${page.id} is private and no active session. Denying access.`)
       notFound()
       return
     }
@@ -134,6 +153,8 @@ export default async function Page({ params }: { params: { id: string } }) {
       return
     }
     console.log(`[PageId] Page ${page.id} is private. Access GRANTED to user ${activeSession.userId}.`)
+  } else {
+    console.log(`[PageId] Page ${page.id} is public. Allowing access.`)
   }
 
   // Determine which session object to pass to PageViewer.
