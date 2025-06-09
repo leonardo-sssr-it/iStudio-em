@@ -434,6 +434,7 @@ const AdminDashboardContent = memo(() => {
               id={field.name}
               checked={Boolean(value)}
               onCheckedChange={(checked) => handleConfigChange(field.name, checked)}
+              className="checkbox-outline"
             />
             <Label htmlFor={field.name} className="text-sm font-medium text-foreground">
               {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}

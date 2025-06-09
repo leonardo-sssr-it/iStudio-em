@@ -64,3 +64,33 @@
 .custom-feed-modal-dialog-content > button[class*="absolute"][class*="right-4"][class*="top-4"] {
   display: none !important;
 }
+
+/* Migliora la visibilità del tab attivo nella pagina admin */
+.bg-primary.text-primary-foreground {
+  background-color: #10b981 !important; /* Verde più visibile */
+  color: white !important;
+  font-weight: 600;
+}
+
+/* Migliora la visibilità dei checkbox */
+[data-state="checked"] {
+  background-color: #10b981 !important;
+  border-color: #10b981 !important;
+}
+
+/* Aggiunge un outline ai checkbox per renderli più visibili anche quando non sono selezionati */
+.checkbox-outline {
+  border: 2px solid #10b981;
+}
+
+/* Assicura che il segno di spunta sia visibile */
+[data-state="checked"] svg {
+  color: white !important;
+  stroke-width: 3px;
+}
+
+/* Migliora il contrasto per i checkbox in modalità dark */
+.dark [data-state="checked"] {
+  background-color: #34d399 !important;
+  border-color: #34d399 !important;
+}
