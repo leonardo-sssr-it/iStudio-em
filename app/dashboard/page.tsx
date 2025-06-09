@@ -6,12 +6,13 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, Database, LogOut, UserCircle, Calendar, ListTodo } from "lucide-react"
+import { User, Database, LogOut, UserCircle, Calendar, ListTodo, LayoutGrid } from "lucide-react"
 import Link from "next/link"
 import { UserProfileTab } from "@/components/user-profile-tab"
 import { UserTablesTab } from "@/components/user-tables-tab"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { AgendaWidget } from "@/components/agenda-widget"
+import { KanbanWidget } from "@/components/kanban-widget"
 
 export default function DashboardPage() {
   const { user, isAdmin, logout } = useAuth()
@@ -30,7 +31,7 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto p-2 sm:p-4 max-w-full lg:max-w-6xl">
+      <div className="w-full h-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2">
           <h1 className="text-xl sm:text-2xl font-bold">Dashboard Utente</h1>
           <div className="flex flex-wrap gap-2">
@@ -81,10 +82,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
             <Tabs defaultValue="agenda" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 sm:grid-cols-4 mb-4 sm:mb-6 w-full">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 sm:mb-6 w-full">
                 <TabsTrigger value="agenda" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                   <ListTodo className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="truncate">Agenda</span>
+                </TabsTrigger>
+                <TabsTrigger value="kanban" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Kanban</span>
                 </TabsTrigger>
                 <TabsTrigger value="gantt" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -115,6 +120,10 @@ export default function DashboardPage() {
 
                 <TabsContent value="agenda" className="space-y-4 min-w-full">
                   <AgendaWidget />
+                </TabsContent>
+
+                <TabsContent value="kanban" className="space-y-4 min-w-full">
+                  <KanbanWidget />
                 </TabsContent>
               </div>
             </Tabs>
