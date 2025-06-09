@@ -12,8 +12,20 @@ import { motion } from "framer-motion"
 // Migliorare il rendering condizionale nella landing page
 export default function Home() {
   const { user, isLoading } = useAuth()
-  const { layout, isDarkMode } = useCustomTheme()
   const [mounted, setMounted] = useState(false)
+
+  // Usa un try-catch per gestire l'errore del ThemeProvider
+  let layout = "default"
+  let isDarkMode = false
+  const themeContext = useCustomTheme()
+
+  try {
+    layout = themeContext.layout
+    isDarkMode = themeContext.isDarkMode
+  } catch (error) {
+    console.warn("ThemeProvider non ancora inizializzato:", error)
+    // Usa valori di default
+  }
 
   // Assicuriamoci che il componente sia montato solo lato client
   useEffect(() => {

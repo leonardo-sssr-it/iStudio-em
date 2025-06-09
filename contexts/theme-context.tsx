@@ -16,6 +16,7 @@ interface ThemeContextType {
   setLayout: (layout: LayoutType) => void
   toggleDarkMode: () => void
   isDarkMode: boolean
+  mounted: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
@@ -71,7 +72,6 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
   console.log("=== APPLICANDO TEMA ===")
   console.log("Nome tema:", theme.nome)
   console.log("Dark mode:", isDark)
-  console.log("Dati tema:", theme)
 
   try {
     // Prima applica i colori base del tema se specificati
@@ -210,26 +210,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     console.log("=== FINE TOGGLE DARK MODE ===")
   }, [theme, setTheme, isDarkMode, mounted])
 
-  if (!mounted) {
-    return <>{children}</>
+  const contextValue = {
+    currentTheme,
+    themes,
+    applyTheme,
+    isLoading,
+    layout,
+    setLayout,
+    toggleDarkMode,
+    isDarkMode,
+    mounted,
   }
 
-  return (
-    <ThemeContext.Provider
-      value={{
-        currentTheme,
-        themes,
-        applyTheme,
-        isLoading,
-        layout,
-        setLayout,
-        toggleDarkMode,
-        isDarkMode,
-      }}
-    >
-      {children}
-    </ThemeContext.Provider>
-  )
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
 }
 
 export function useCustomTheme() {
@@ -238,4 +231,42 @@ export function useCustomTheme() {
     throw new Error("useCustomTheme must be used within a ThemeProvider")
   }
   return context
+}
+
+// Hook sicuro che non genera errori se il provider non è disponibile
+export function useSafeCustomTheme() {
+  const [hasMounted, setHasMounted] = useState(false)
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  try {
+    const context = useCustomTheme()
+    return hasMounted
+      ? context
+      : {
+          currentTheme: null,
+          themes: [],
+          applyTheme: () => false,
+          isLoading: true,
+          layout: "default" as LayoutType,
+          setLayout: () => {},
+          toggleDarkMode: () => {},
+          isDarkMode: false,
+          mounted: false,
+        }
+  } catch {
+    return {
+      currentTheme: null,
+      themes: [],
+      applyTheme: () => false,
+      isLoading: true,
+      layout: "default" as LayoutType,
+      setLayout: () => {},
+      toggleDarkMode: () => {},
+      isDarkMode: false,
+      mounted: false,
+    }
+  }
 }
