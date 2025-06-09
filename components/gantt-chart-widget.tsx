@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
-import { Calendar, CheckSquare, Briefcase } from "lucide-react"
+import { Calendar, CheckSquare, Briefcase, ExternalLink } from "lucide-react"
 import { format, addDays, parseISO, differenceInDays, isSameDay, max, min } from "date-fns"
 import { it } from "date-fns/locale"
 
@@ -22,8 +23,8 @@ interface GanttItem {
   titolo: string
   descrizione?: string
   cliente?: string
-  dataInizio: Date // Data di inizio originale dell'item
-  dataFine: Date // Data di fine originale dell'item
+  dataInizio: Date
+  dataFine: Date
   colore: string
   priorita?: string
   stato?: string
@@ -53,7 +54,6 @@ export function GanttChartWidget() {
     appuntamenti: true,
   })
 
-  // dataInizioFiltro e dataFineFiltro rappresentano l'intervallo di visualizzazione del Gantt
   const [dataInizioFiltro, setDataInizioFiltro] = useState<Date>(new Date())
   const [periodoSelezionato, setPeriodoSelezionato] = useState<number>(10)
   const [dataFineFiltro, setDataFineFiltro] = useState<Date>(addDays(new Date(), periodoSelezionato - 1))
@@ -75,9 +75,6 @@ export function GanttChartWidget() {
       setDebugInfo("")
       try {
         await fetchClienti()
-        // Le funzioni di fetch dovrebbero usare dataInizioFiltro e dataFineFiltro
-        // per recuperare solo gli item che POTREBBERO essere visibili.
-        // Il "taglio" visivo avverrà dopo.
         await Promise.all([
           fetchAttivita(dataInizioFiltro, dataFineFiltro),
           fetchProgetti(dataInizioFiltro, dataFineFiltro),
@@ -105,25 +102,16 @@ export function GanttChartWidget() {
 
   const fetchClienti = async () => {
     if (!supabase) return
-    // ... (codice invariato)
     try {
       const { data, error } = await supabase.from("clienti").select("*")
-
-      if (error) {
-        console.error("Error fetching clienti:", error)
-        setDebugInfo((prev) => prev + `\nErrore clienti: ${error.message}`)
-        throw error
-      }
-
+      if (error) throw error
       const clientiMap: Record<string, Cliente> = {}
       if (data) {
         data.forEach((cliente: Cliente) => {
           clientiMap[cliente.id] = cliente
         })
       }
-
       setClienti(clientiMap)
-      console.log("Clienti caricati:", Object.keys(clientiMap).length)
     } catch (err) {
       console.error("Errore nel caricamento dei clienti:", err)
     }
@@ -131,34 +119,30 @@ export function GanttChartWidget() {
 
   const fetchAttivita = async (startDate: Date, endDate: Date) => {
     if (!supabase || !user) return
-    console.log("DEBUG GANTT: Inizio fetchAttivita con date:", { startDate, endDate, userId: user?.id })
     try {
       const { data, error } = await supabase
         .from("attivita")
         .select("*")
         .eq("id_utente", user.id)
-        // Filtra per gli item che si sovrappongono al periodo di visualizzazione
         .lte("data_inizio", endDate.toISOString())
         .gte("data_fine", startDate.toISOString())
-
       if (error) throw error
-      if (data && Array.isArray(data)) {
-        const attivitaItems: GanttItem[] = data.map((item: any) => ({
-          id: item.id,
-          tipo: "attivita",
-          titolo: item.titolo || "Attività senza titolo",
-          descrizione: item.descrizione || "",
-          dataInizio: parseISO(item.data_inizio), // Data originale
-          dataFine: parseISO(item.data_fine), // Data originale
-          colore: "#ffcdd2",
-          priorita: item.priorita,
-          stato: item.stato,
-          id_utente: item.id_utente,
-          id_cliente: item.id_cliente,
-        }))
-        setAttivita(attivitaItems)
-      } else {
-        setAttivita([])
+      if (data) {
+        setAttivita(
+          data.map((item: any) => ({
+            id: item.id,
+            tipo: "attivita",
+            titolo: item.titolo || "Attività senza titolo",
+            descrizione: item.descrizione || "",
+            dataInizio: parseISO(item.data_inizio),
+            dataFine: parseISO(item.data_fine),
+            colore: "#ffcdd2",
+            priorita: item.priorita,
+            stato: item.stato,
+            id_utente: item.id_utente,
+            id_cliente: item.id_cliente,
+          })),
+        )
       }
     } catch (err) {
       console.error("Errore nel caricamento delle attività:", err)
@@ -167,7 +151,6 @@ export function GanttChartWidget() {
 
   const fetchProgetti = async (startDate: Date, endDate: Date) => {
     if (!supabase || !user) return
-    console.log("DEBUG GANTT: Inizio fetchProgetti con date:", { startDate, endDate, userId: user?.id })
     try {
       const { data, error } = await supabase
         .from("progetti")
@@ -175,25 +158,23 @@ export function GanttChartWidget() {
         .eq("id_utente", user.id)
         .lte("data_inizio", endDate.toISOString())
         .gte("data_fine", startDate.toISOString())
-
       if (error) throw error
-      if (data && Array.isArray(data)) {
-        const progettiItems: GanttItem[] = data.map((item: any) => ({
-          id: item.id,
-          tipo: "progetto",
-          titolo: item.titolo || "Progetto senza titolo",
-          descrizione: item.descrizione || "",
-          dataInizio: parseISO(item.data_inizio),
-          dataFine: parseISO(item.data_fine),
-          colore: "#bbdefb",
-          priorita: item.priorita,
-          stato: item.stato,
-          id_utente: item.id_utente,
-          id_cliente: item.id_cliente,
-        }))
-        setProgetti(progettiItems)
-      } else {
-        setProgetti([])
+      if (data) {
+        setProgetti(
+          data.map((item: any) => ({
+            id: item.id,
+            tipo: "progetto",
+            titolo: item.titolo || "Progetto senza titolo",
+            descrizione: item.descrizione || "",
+            dataInizio: parseISO(item.data_inizio),
+            dataFine: parseISO(item.data_fine),
+            colore: "#bbdefb",
+            priorita: item.priorita,
+            stato: item.stato,
+            id_utente: item.id_utente,
+            id_cliente: item.id_cliente,
+          })),
+        )
       }
     } catch (err) {
       console.error("Errore nel caricamento dei progetti:", err)
@@ -202,17 +183,8 @@ export function GanttChartWidget() {
 
   const fetchAppuntamenti = async (startDate: Date, endDate: Date) => {
     if (!supabase || !user) return
-    console.log("DEBUG GANTT: Inizio fetchAppuntamenti con date:", { startDate, endDate, userId: user?.id })
-
-    // Logica per determinare i nomi delle colonne di data (startColumn, endColumn)
-    // ... (omessa per brevità, assumiamo che startColumn e endColumn siano definiti)
-    const possibleStartColumns = ["data_inizio", "data", "inizio", "start_date", "start"]
-    const possibleEndColumns = ["data_fine", "fine", "scadenza", "end_date", "end"]
-
-    // Esempio semplificato, dovresti adattare questa logica come prima
     const startColumn = "data_inizio"
     const endColumn = "data_fine"
-
     try {
       const { data, error } = await supabase
         .from("appuntamenti")
@@ -220,25 +192,23 @@ export function GanttChartWidget() {
         .eq("id_utente", user.id)
         .lte(startColumn, endDate.toISOString())
         .gte(endColumn, startDate.toISOString())
-
       if (error) throw error
-      if (data && Array.isArray(data)) {
-        const appuntamentiItems: GanttItem[] = data.map((item: any) => ({
-          id: item.id,
-          tipo: "appuntamento",
-          titolo: item.titolo || item.nome || item.descrizione || `Appuntamento #${item.id}`,
-          descrizione: item.descrizione || item.note || "",
-          dataInizio: parseISO(item[startColumn]),
-          dataFine: parseISO(item[endColumn]),
-          colore: "#c8e6c9",
-          priorita: item.priorita,
-          stato: item.stato,
-          id_utente: item.id_utente,
-          id_cliente: item.id_cliente,
-        }))
-        setAppuntamenti(appuntamentiItems)
-      } else {
-        setAppuntamenti([])
+      if (data) {
+        setAppuntamenti(
+          data.map((item: any) => ({
+            id: item.id,
+            tipo: "appuntamento",
+            titolo: item.titolo || item.nome || `Appuntamento #${item.id}`,
+            descrizione: item.descrizione || item.note || "",
+            dataInizio: parseISO(item[startColumn]),
+            dataFine: parseISO(item[endColumn]),
+            colore: "#c8e6c9",
+            priorita: item.priorita,
+            stato: item.stato,
+            id_utente: item.id_utente,
+            id_cliente: item.id_cliente,
+          })),
+        )
       }
     } catch (err) {
       console.error("Errore nel caricamento degli appuntamenti:", err)
@@ -246,21 +216,19 @@ export function GanttChartWidget() {
   }
 
   const getPriorityColor = (priorita?: string): string => {
-    // ... (codice invariato)
     switch (priorita?.toLowerCase()) {
       case "alta":
-        return "#ef4444" // Rosso
+        return "#ef4444"
       case "media":
-        return "#f59e0b" // Arancione
+        return "#f59e0b"
       case "bassa":
-        return "#3b82f6" // Blu
+        return "#3b82f6"
       default:
-        return "#6b7280" // Grigio
+        return "#6b7280"
     }
   }
 
   const getIconByType = (tipo: string) => {
-    // ... (codice invariato)
     switch (tipo) {
       case "attivita":
         return <CheckSquare className="h-4 w-4" />
@@ -274,12 +242,9 @@ export function GanttChartWidget() {
   }
 
   const getClienteName = (id_cliente?: string): string => {
-    // ... (codice invariato)
     if (!id_cliente || !clienti[id_cliente]) return "Cliente non specificato"
-
     const cliente = clienti[id_cliente]
-    if (cliente.ragione_sociale) return cliente.ragione_sociale
-    return `${cliente.cognome} ${cliente.nome}`.trim()
+    return cliente.ragione_sociale || `${cliente.cognome} ${cliente.nome}`.trim()
   }
 
   const elementiGantt = useMemo(() => {
@@ -289,25 +254,12 @@ export function GanttChartWidget() {
     if (filtroTipi.appuntamenti) elementi = [...elementi, ...appuntamenti]
     return elementi
       .filter((item) => {
-        // Filtra ulteriormente per assicurarsi che siano nel range
         const displayStart = max([item.dataInizio, dataInizioFiltro])
         const displayEnd = min([item.dataFine, dataFineFiltro])
-        return displayEnd >= displayStart // Solo se c'è sovrapposizione
+        return displayEnd >= displayStart
       })
       .sort((a, b) => a.dataInizio.getTime() - b.dataInizio.getTime())
   }, [attivita, progetti, appuntamenti, filtroTipi, dataInizioFiltro, dataFineFiltro])
-
-  useEffect(() => {
-    console.log("DEBUG GANTT: Elementi filtrati per visualizzazione:", {
-      totale: elementiGantt.length,
-      // ... (altri log)
-      periodoVisualizzato: {
-        inizio: dataInizioFiltro?.toISOString(),
-        fine: dataFineFiltro?.toISOString(),
-        giorni: totalDaysInView,
-      },
-    })
-  }, [elementiGantt, filtroTipi, dataInizioFiltro, dataFineFiltro, totalDaysInView])
 
   const headerDates = useMemo(() => {
     const dates = []
@@ -320,28 +272,17 @@ export function GanttChartWidget() {
   }, [dataInizioFiltro, totalDaysInView])
 
   const calculateItemPosition = (item: GanttItem, index: number) => {
-    // Date di visualizzazione effettive, limitate dal filtro
     const displayDataInizio = max([item.dataInizio, dataInizioFiltro])
     const displayDataFine = min([item.dataFine, dataFineFiltro])
-
-    // Se l'item è completamente fuori dal range dopo il clipping, non dovrebbe essere renderizzato
-    // (o avere larghezza 0). Questo è gestito dal filtro in `elementiGantt`.
-    // Qui calcoliamo la posizione basandoci sulle date "clippate".
-
     const startDayOffset = differenceInDays(displayDataInizio, dataInizioFiltro)
     const endDayOffset = differenceInDays(displayDataFine, dataInizioFiltro)
-
-    // La durata è basata sulle date clippate, ma deve essere almeno 1 giorno visivamente
     const durationInView = Math.max(1, endDayOffset - startDayOffset + 1)
-
     const leftPercentage = (startDayOffset / totalDaysInView) * 100
     const widthPercentage = (durationInView / totalDaysInView) * 100
-
     const sameTypeItems = elementiGantt.filter(
       (el, i) => el.tipo === item.tipo && i < index && isSameDay(el.dataInizio, item.dataInizio),
     ).length
     const verticalOffset = sameTypeItems * 2
-
     return {
       left: `${leftPercentage}%`,
       width: `${widthPercentage}%`,
@@ -360,8 +301,15 @@ export function GanttChartWidget() {
     }
   }
 
+  // Calcola l'altezza del corpo del Gantt per evitare lo scroll verticale interno
+  const ganttBodyHeight = elementiGantt.length * 48 + 40 // 48px per riga + 40px padding
+
+  const getTableNameFromType = (type: GanttItem["tipo"]): string => {
+    if (type === "attivita") return "attivita" // Già plurale
+    return `${type}s` // progetto -> progetti, appuntamento -> appuntamenti
+  }
+
   if (isLoading) {
-    // ... (Skeleton invariato)
     return (
       <Card>
         <CardHeader>
@@ -379,7 +327,6 @@ export function GanttChartWidget() {
   }
 
   if (error) {
-    // ... (Error UI invariata)
     return (
       <Card>
         <CardHeader>
@@ -388,9 +335,6 @@ export function GanttChartWidget() {
         </CardHeader>
         <CardContent>
           <div className="p-4 text-red-500">{error}</div>
-          {debugInfo && (
-            <div className="p-4 text-xs font-mono whitespace-pre-wrap bg-gray-100 rounded mt-2">{debugInfo}</div>
-          )}
         </CardContent>
       </Card>
     )
@@ -406,7 +350,6 @@ export function GanttChartWidget() {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {/* Filtri e selezione date */}
           <div className="flex flex-col space-y-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
@@ -426,14 +369,13 @@ export function GanttChartWidget() {
                     variant={periodoSelezionato === days ? "default" : "outline"}
                     size="sm"
                     onClick={() => setPeriodo(days)}
-                    className={periodoSelezionato === days ? "bg-primary text-primary-foreground" : ""}
+                    className={periodoSelezionato === days ? "bg-green-600 text-white hover:bg-green-700" : ""}
                   >
                     {days} giorni
                   </Button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-4 ml-auto">
-                {/* Checkboxes ... (invariati) */}
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="attivita"
@@ -473,19 +415,13 @@ export function GanttChartWidget() {
 
           <div className="text-xs text-muted-foreground">
             <p>
-              Elementi caricati: Attività ({attivita.length}), Progetti ({progetti.length}), Appuntamenti (
-              {appuntamenti.length})
-            </p>
-            <p>
               Periodo: {format(dataInizioFiltro, "dd/MM/yyyy")} - {format(dataFineFiltro, "dd/MM/yyyy")} (
               {totalDaysInView} giorni)
             </p>
           </div>
 
-          {/* Diagramma Gantt */}
           <div className="border rounded-md overflow-hidden">
             <div className="overflow-x-auto">
-              {/* Intestazione con le date */}
               <div className="flex border-b min-w-[800px]">
                 <div className="flex-1 flex">
                   {headerDates.map((date, index) => (
@@ -505,24 +441,21 @@ export function GanttChartWidget() {
                 </div>
               </div>
 
-              {/* Contenuto del Gantt */}
-              <div className="min-w-[800px] relative">
-                {/* Linee di griglia */}
+              <div className="min-w-[800px] relative" style={{ height: `${ganttBodyHeight}px` }}>
                 <div className="absolute inset-0 flex pointer-events-none">
                   {headerDates.map((date, index) => (
                     <div
                       key={index}
                       className={`flex-1 border-r ${
                         isSameDay(date, today)
-                          ? "bg-blue-100" // Evidenzia colonna oggi
+                          ? "bg-blue-100"
                           : date.getDay() === 0 || date.getDay() === 6
-                            ? "bg-gray-100" // Evidenzia weekend
+                            ? "bg-gray-100"
                             : ""
                       }`}
                     ></div>
                   ))}
                 </div>
-                {/* Linea oggi */}
                 {headerDates.some((date) => isSameDay(date, today)) && (
                   <div
                     className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10"
@@ -533,44 +466,39 @@ export function GanttChartWidget() {
                   ></div>
                 )}
 
-                {/* Elementi del Gantt */}
-                <div className="relative min-h-[300px] p-2">
+                <div className="absolute inset-0 p-2">
                   {elementiGantt.length > 0 ? (
                     elementiGantt.map((item, index) => {
                       const { left, width, marginTop } = calculateItemPosition(item, index)
-                      // Non renderizzare se la larghezza calcolata è 0 o negativa (completamente fuori vista)
                       if (Number.parseFloat(width) <= 0) return null
 
                       return (
                         <Popover key={`${item.tipo}-${item.id}`}>
                           <PopoverTrigger asChild>
                             <div
-                              className="absolute h-10 rounded cursor-pointer flex flex-col justify-center px-2 text-gray-700 text-xs" // Altezza aumentata
+                              className="absolute h-10 rounded cursor-pointer flex flex-col justify-center px-2 text-gray-700 text-xs"
                               style={{
                                 left,
                                 width,
-                                top: `${index * 48 + 10}px`, // Spaziatura verticale aumentata
+                                top: `${index * 48 + 10}px`,
                                 backgroundColor: item.colore,
                                 marginTop,
-                                overflow: "hidden", // Per gestire troncamento
+                                overflow: "hidden",
                               }}
                             >
                               <div className="flex items-center font-medium">
                                 <div
-                                  className="w-2.5 h-2.5 rounded-full mr-1.5 flex-shrink-0" // Dimensione pallino leggermente ridotta
+                                  className="w-2.5 h-2.5 rounded-full mr-1.5 flex-shrink-0"
                                   style={{ backgroundColor: getPriorityColor(item.priorita) }}
                                 ></div>
                                 <span className="truncate">{item.titolo}</span>
                               </div>
                               <div className="text-[10px] text-gray-600 truncate pl-[14px]">
-                                {" "}
-                                {/* Spazio per allineare con titolo dopo pallino */}
                                 {format(item.dataInizio, "dd/MM")} - {format(item.dataFine, "dd/MM")}
                               </div>
                             </div>
                           </PopoverTrigger>
                           <PopoverContent className="w-[280px] sm:w-[350px]">
-                            {/* Contenuto Popover invariato, mostra date originali complete */}
                             <div className="space-y-2">
                               <div className="font-medium flex items-center gap-2">
                                 {getIconByType(item.tipo)}
@@ -599,9 +527,18 @@ export function GanttChartWidget() {
                                     <span className="font-medium">Priorità:</span> {item.priorita}
                                   </div>
                                 )}
-                                <div>
-                                  <span className="font-medium">Tipo:</span>{" "}
-                                  {item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">Tipo:</span>
+                                  <span>{item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1)}</span>
+                                  <Link
+                                    href={`/data-explorer/${getTableNameFromType(item.tipo)}/${item.id}`}
+                                    className="text-blue-500 hover:text-blue-700"
+                                    title="Vedi dettagli"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Link>
                                 </div>
                               </div>
                             </div>
@@ -622,7 +559,6 @@ export function GanttChartWidget() {
             </div>
           </div>
 
-          {/* Legenda ... (invariata) */}
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-red-200"></div>
@@ -654,7 +590,6 @@ export function GanttChartWidget() {
           </div>
         </div>
         {showDebug && (
-          // ... (Debug UI invariata)
           <div className="mt-4 p-2 border rounded bg-gray-50 text-xs font-mono">
             <div className="flex justify-between mb-2">
               <h4 className="font-bold">Debug Panel</h4>
@@ -666,11 +601,8 @@ export function GanttChartWidget() {
               <p>
                 Periodo Filtro: {dataInizioFiltro?.toISOString()} - {dataFineFiltro?.toISOString()}
               </p>
+              <p>Altezza Gantt Body: {ganttBodyHeight}px</p>
               <p>Elementi totali (dopo filtro visivo): {elementiGantt.length}</p>
-              <p>Attività (raw): {attivita.length}</p>
-              <p>Progetti (raw): {progetti.length}</p>
-              <p>Appuntamenti (raw): {appuntamenti.length}</p>
-              <p>Filtri Tipo: {JSON.stringify(filtroTipi)}</p>
             </div>
           </div>
         )}
