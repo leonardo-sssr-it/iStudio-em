@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { AuthWidget } from "@/components/auth-widget"
 import { ImageGallery } from "@/components/image-gallery"
 import { useAuth } from "@/lib/auth-provider"
-import { useCustomTheme } from "@/contexts/theme-context"
+import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { BarChart, Database, Users, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
@@ -12,24 +12,12 @@ import { motion } from "framer-motion"
 // Migliorare il rendering condizionale nella landing page
 export default function Home() {
   const { user, isLoading } = useAuth()
-  const [mounted, setMounted] = useState(false)
-
-  // Usa un try-catch per gestire l'errore del ThemeProvider
-  let layout = "default"
-  let isDarkMode = false
-  const themeContext = useCustomTheme()
-
-  try {
-    layout = themeContext.layout
-    isDarkMode = themeContext.isDarkMode
-  } catch (error) {
-    console.warn("ThemeProvider non ancora inizializzato:", error)
-    // Usa valori di default
-  }
+  const { layout, isDarkMode, mounted } = useSafeCustomTheme()
+  const [componentMounted, setComponentMounted] = useState(false)
 
   // Assicuriamoci che il componente sia montato solo lato client
   useEffect(() => {
-    setMounted(true)
+    setComponentMounted(true)
   }, [])
 
   // Determiniamo le classi del container in base al layout
@@ -41,7 +29,7 @@ export default function Home() {
   )
 
   // Mostriamo un placeholder durante il caricamento per evitare flickering
-  if (!mounted) {
+  if (!componentMounted || !mounted) {
     return (
       <div className={containerClass}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
