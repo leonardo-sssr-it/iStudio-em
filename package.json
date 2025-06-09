@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@auth/core": "latest",
-    "@auth/supabase-adapter": "latest",
     "@emotion/is-prop-valid": "latest",
     "@hello-pangea/dnd": "latest",
     "@hookform/resolvers": "^3.9.1",

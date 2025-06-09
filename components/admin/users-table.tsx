@@ -60,7 +60,6 @@ export default function UsersTable() {
 
     try {
       const { error } = await supabase.from("utenti").delete().eq("id", userId)
-
       if (error) throw error
       await fetchUsers()
     } catch (err) {
