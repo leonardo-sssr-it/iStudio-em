@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useCustomTheme } from "@/contexts/theme-context"
+import { useState } from "react"
+import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -15,13 +15,9 @@ import { Palette, Moon, Sun, Layout, LayoutGrid, LayoutDashboard } from "lucide-
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export function ThemeSelector() {
-  const { themes, currentTheme, applyTheme, toggleDarkMode, isDarkMode, layout, setLayout } = useCustomTheme()
+  const { themes, currentTheme, applyTheme, toggleDarkMode, isDarkMode, layout, setLayout, mounted } =
+    useSafeCustomTheme()
   const [isOpen, setIsOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const handleThemeChange = (themeId: number) => {
     console.log("=== CAMBIO TEMA ===")
@@ -29,22 +25,12 @@ export function ThemeSelector() {
     const success = applyTheme(themeId)
     console.log("Tema applicato con successo:", success)
     setIsOpen(false)
-
-    // Forza il re-render della pagina per applicare il tema
-    setTimeout(() => {
-      window.dispatchEvent(new Event("theme-changed"))
-    }, 100)
   }
 
   const handleDarkModeToggle = () => {
     console.log("=== CLICK TOGGLE DARK MODE ===")
     console.log("Toggle dark mode, stato attuale:", isDarkMode)
     toggleDarkMode()
-
-    // Forza il re-render
-    setTimeout(() => {
-      window.dispatchEvent(new Event("theme-changed"))
-    }, 100)
   }
 
   if (!mounted) {
@@ -60,16 +46,25 @@ export function ThemeSelector() {
     <div className="flex items-center space-x-2">
       {/* Layout Selector */}
       <Tabs value={layout} className="hidden md:flex" onValueChange={(value) => setLayout(value as any)}>
-        <TabsList>
-          <TabsTrigger value="default" className="flex items-center gap-1">
+        <TabsList className="bg-transparent border">
+          <TabsTrigger
+            value="default"
+            className="flex items-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
             <Layout className="h-4 w-4" />
             <span className="hidden lg:inline">Standard</span>
           </TabsTrigger>
-          <TabsTrigger value="fullWidth" className="flex items-center gap-1">
+          <TabsTrigger
+            value="fullWidth"
+            className="flex items-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
             <LayoutGrid className="h-4 w-4" />
             <span className="hidden lg:inline">Full Width</span>
           </TabsTrigger>
-          <TabsTrigger value="sidebar" className="flex items-center gap-1">
+          <TabsTrigger
+            value="sidebar"
+            className="flex items-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden lg:inline">Sidebar</span>
           </TabsTrigger>
@@ -81,7 +76,7 @@ export function ThemeSelector() {
         variant="ghost"
         size="icon"
         onClick={handleDarkModeToggle}
-        className="h-9 w-9 transition-all duration-200 hover:bg-accent"
+        className="h-9 w-9 hover:bg-accent/50 focus:bg-accent/50 transition-colors duration-200"
         title={isDarkMode ? "Passa alla modalità chiara" : "Passa alla modalità scura"}
       >
         {isDarkMode ? <Sun className="h-4 w-4 text-yellow-500" /> : <Moon className="h-4 w-4 text-blue-600" />}
@@ -93,17 +88,19 @@ export function ThemeSelector() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 transition-all duration-200 hover:bg-accent"
+            className="h-9 w-9 hover:bg-accent/50 focus:bg-accent/50 transition-colors duration-200"
             title="Seleziona tema"
           >
             <Palette className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto">
-          <DropdownMenuLabel className="font-semibold">
+        <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto border bg-popover">
+          <DropdownMenuLabel className="font-semibold text-popover-foreground">
             Temi Disponibili
             {currentTheme && (
-              <div className="text-xs text-muted-foreground font-normal mt-1">Attuale: {currentTheme.nome}</div>
+              <div className="text-xs text-muted-foreground font-normal mt-1">
+                Attuale: {currentTheme.nome_tema || currentTheme.nome}
+              </div>
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -112,7 +109,7 @@ export function ThemeSelector() {
               <DropdownMenuItem
                 key={theme.id}
                 onClick={() => handleThemeChange(theme.id)}
-                className="flex items-center gap-3 cursor-pointer py-3 px-3"
+                className="flex items-center gap-3 cursor-pointer py-3 px-3 hover:bg-accent/50 focus:bg-accent/50"
               >
                 <div
                   className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
@@ -125,7 +122,9 @@ export function ThemeSelector() {
                   }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate text-sm">{theme.nome}</div>
+                  <div className="font-medium truncate text-sm text-popover-foreground">
+                    {theme.nome_tema || theme.nome}
+                  </div>
                   {theme.primary_color && (
                     <div className="text-xs text-muted-foreground truncate">{theme.primary_color}</div>
                   )}
