@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { AuthWidget } from "@/components/auth-widget"
 import { ImageGallery } from "@/components/image-gallery"
 import { useAuth } from "@/lib/auth-provider"
-import { useSafeCustomTheme } from "@/contexts/theme-context"
+import { useCustomTheme } from "@/contexts/theme-context"
 import { BarChart, Database, Users, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
@@ -12,12 +12,12 @@ import { motion } from "framer-motion"
 // Migliorare il rendering condizionale nella landing page
 export default function Home() {
   const { user, isLoading } = useAuth()
-  const { layout, isDarkMode, mounted } = useSafeCustomTheme()
-  const [componentMounted, setComponentMounted] = useState(false)
+  const { layout, isDarkMode } = useCustomTheme()
+  const [mounted, setMounted] = useState(false)
 
   // Assicuriamoci che il componente sia montato solo lato client
   useEffect(() => {
-    setComponentMounted(true)
+    setMounted(true)
   }, [])
 
   // Determiniamo le classi del container in base al layout
@@ -29,7 +29,7 @@ export default function Home() {
   )
 
   // Mostriamo un placeholder durante il caricamento per evitare flickering
-  if (!componentMounted || !mounted) {
+  if (!mounted) {
     return (
       <div className={containerClass}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">

@@ -80,10 +80,7 @@ export function Header() {
             <ThemeSelector />
             {user && (
               <div className="hidden md:flex items-center space-x-2">
-                <Link
-                  href="/profile"
-                  className="text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                >
+                <Link href="/profile" className="text-sm text-muted-foreground hover:text-primary transition-colors">
                   {user.nome || user.username}
                 </Link>
                 <Button
@@ -112,7 +109,7 @@ export function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex items-center space-x-2 px-2 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
+                  className="flex items-center space-x-2 px-2 py-2 text-sm font-medium rounded-md hover:bg-accent"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   <item.icon className="h-4 w-4" />
@@ -123,7 +120,7 @@ export function Header() {
                 <>
                   <Link
                     href="/profile"
-                    className="flex items-center space-x-2 px-2 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
+                    className="flex items-center space-x-2 px-2 py-2 text-sm font-medium rounded-md hover:bg-accent"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <User className="h-4 w-4" />

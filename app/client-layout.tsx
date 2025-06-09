@@ -9,11 +9,11 @@ import { AuthProvider } from "@/lib/auth-provider"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { SidebarProvider } from "@/contexts/sidebar-context"
 import { SidebarStateProvider } from "@/contexts/sidebar-state-context"
+import { LayoutWrapper } from "@/components/layout/layout-wrapper"
 import { Toaster } from "@/components/ui/toaster"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-is-mobile"
-import { LayoutWrapper } from "@/components/layout/layout-wrapper"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -48,23 +48,6 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [mounted, setMounted] = useState(false)
-
-  // Aspetta che il componente sia montato per evitare problemi di hydration
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return (
-      <html lang="it" suppressHydrationWarning>
-        <body className={inter.className}>
-          <div className="min-h-screen bg-background">{children}</div>
-        </body>
-      </html>
-    )
-  }
-
   return (
     <html lang="it" suppressHydrationWarning>
       <body className={inter.className}>

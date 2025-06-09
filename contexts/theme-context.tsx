@@ -16,20 +16,14 @@ interface ThemeContextType {
   setLayout: (layout: LayoutType) => void
   toggleDarkMode: () => void
   isDarkMode: boolean
-  mounted: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 // Funzione per convertire colori hex in HSL
 function hexToHsl(hex: string): string {
-  if (!hex || hex === "") return "0 0% 50%"
-
   // Rimuovi il # se presente
   hex = hex.replace("#", "")
-
-  // Se il colore è già in formato HSL, restituiscilo così com'è
-  if (hex.includes("%")) return hex
 
   // Converti hex in RGB
   const r = Number.parseInt(hex.substr(0, 2), 16) / 255
@@ -69,86 +63,73 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
 
   const root = document.documentElement
 
-  console.log("=== APPLICANDO TEMA ===")
-  console.log("Nome tema:", theme.nome)
-  console.log("Dark mode:", isDark)
+  console.log("Applicando tema personalizzato:", theme.nome, "Dark mode:", isDark)
 
-  try {
-    // Prima applica i colori base del tema se specificati
-    if (theme.primary_color) {
-      const primaryHsl = hexToHsl(theme.primary_color)
-      root.style.setProperty("--primary", primaryHsl)
-      root.style.setProperty("--admin-tab-active-bg", primaryHsl)
-      root.style.setProperty("--admin-checkbox-checked", primaryHsl)
-      console.log(`✓ Primary color applicato: ${primaryHsl}`)
-    }
+  // Applica le variabili CSS personalizzate se presenti
+  if (theme.css_variables && typeof theme.css_variables === "object") {
+    Object.entries(theme.css_variables).forEach(([key, value]) => {
+      if (value && typeof value === "string") {
+        root.style.setProperty(`--${key}`, value)
+        console.log(`Applicata variabile CSS: --${key} = ${value}`)
+      }
+    })
+  }
 
-    if (theme.secondary_color) {
-      const secondaryHsl = hexToHsl(theme.secondary_color)
-      root.style.setProperty("--secondary", secondaryHsl)
-      console.log(`✓ Secondary color applicato: ${secondaryHsl}`)
-    }
+  // Applica i colori principali del tema
+  if (theme.primary_color) {
+    const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
+    root.style.setProperty("--primary", primaryHsl)
+    console.log(`Primary color applicato: ${primaryHsl}`)
+  }
 
-    if (theme.accent_color) {
-      const accentHsl = hexToHsl(theme.accent_color)
-      root.style.setProperty("--accent", accentHsl)
-      console.log(`✓ Accent color applicato: ${accentHsl}`)
-    }
+  if (theme.secondary_color) {
+    const secondaryHsl = theme.secondary_color.startsWith("#") ? hexToHsl(theme.secondary_color) : theme.secondary_color
+    root.style.setProperty("--secondary", secondaryHsl)
+    console.log(`Secondary color applicato: ${secondaryHsl}`)
+  }
 
-    // Applica background e foreground con logica corretta per il contrasto
-    if (theme.background_color) {
-      const bgHsl = hexToHsl(theme.background_color)
-      root.style.setProperty("--background", bgHsl)
-      root.style.setProperty("--card", bgHsl)
-      root.style.setProperty("--popover", bgHsl)
-      console.log(`✓ Background color applicato: ${bgHsl}`)
-    }
+  if (theme.accent_color) {
+    const accentHsl = theme.accent_color.startsWith("#") ? hexToHsl(theme.accent_color) : theme.accent_color
+    root.style.setProperty("--accent", accentHsl)
+    console.log(`Accent color applicato: ${accentHsl}`)
+  }
 
-    if (theme.text_color) {
-      const textHsl = hexToHsl(theme.text_color)
-      root.style.setProperty("--foreground", textHsl)
-      root.style.setProperty("--card-foreground", textHsl)
-      root.style.setProperty("--popover-foreground", textHsl)
-      console.log(`✓ Text color applicato: ${textHsl}`)
-    }
+  // Applica il background e foreground se specificati
+  if (theme.background_color) {
+    const bgHsl = theme.background_color.startsWith("#") ? hexToHsl(theme.background_color) : theme.background_color
+    root.style.setProperty("--background", bgHsl)
+    console.log(`Background color applicato: ${bgHsl}`)
+  }
 
-    // Applica le variabili CSS personalizzate se presenti (queste hanno priorità)
-    if (theme.css_variables && typeof theme.css_variables === "object") {
-      Object.entries(theme.css_variables).forEach(([key, value]) => {
-        if (value && typeof value === "string") {
-          root.style.setProperty(`--${key}`, value)
-          console.log(`✓ Variabile CSS personalizzata applicata: --${key} = ${value}`)
-        }
-      })
-    }
+  if (theme.text_color) {
+    const textHsl = theme.text_color.startsWith("#") ? hexToHsl(theme.text_color) : theme.text_color
+    root.style.setProperty("--foreground", textHsl)
+    console.log(`Text color applicato: ${textHsl}`)
+  }
 
-    // Applica il font family
-    if (theme.font_family) {
-      document.body.style.fontFamily = theme.font_family
-      console.log(`✓ Font family applicato: ${theme.font_family}`)
-    }
+  // Applica il font family
+  if (theme.font_family) {
+    document.body.style.fontFamily = theme.font_family
+    console.log(`Font family applicato: ${theme.font_family}`)
+  }
 
-    // Applica il border radius
-    if (theme.border_radius) {
-      root.style.setProperty("--radius", theme.border_radius)
-      console.log(`✓ Border radius applicato: ${theme.border_radius}`)
-    }
+  // Applica il border radius
+  if (theme.border_radius) {
+    root.style.setProperty("--radius", theme.border_radius)
+    console.log(`Border radius applicato: ${theme.border_radius}`)
+  }
 
-    // Forza il re-render aggiungendo una classe temporanea
-    document.body.classList.add("theme-transition")
-    setTimeout(() => {
-      document.body.classList.remove("theme-transition")
-    }, 300)
-
-    console.log("=== TEMA APPLICATO CON SUCCESSO ===")
-  } catch (error) {
-    console.error("Errore nell'applicazione del tema:", error)
+  // Aggiorna le variabili admin per mantenere la visibilità
+  if (theme.primary_color) {
+    const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
+    root.style.setProperty("--admin-tab-active-bg", primaryHsl)
+    root.style.setProperty("--admin-checkbox-checked", primaryHsl)
   }
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { themes, currentTheme, applyTheme, isLoading } = useThemes()
-  const { theme, setTheme, systemTheme } = useNextTheme()
+  const { theme, setTheme } = useNextTheme()
   const [layout, setLayout] = useState<LayoutType>(() => {
     if (typeof window !== "undefined") {
       const savedLayout = localStorage.getItem("preferredLayout")
@@ -157,12 +138,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return "default"
   })
   const [isDarkMode, setIsDarkMode] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  // Aspetta che il componente sia montato
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Salva il layout nel localStorage quando cambia
   useEffect(() => {
@@ -173,56 +148,39 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Sincronizziamo il tema di sistema con il nostro stato
   useEffect(() => {
-    if (mounted) {
-      const resolvedTheme = theme === "system" ? systemTheme : theme
-      setIsDarkMode(resolvedTheme === "dark")
-      console.log("Tema risolto:", resolvedTheme, "isDark:", resolvedTheme === "dark")
-    }
-  }, [theme, systemTheme, mounted])
+    setIsDarkMode(theme === "dark")
+  }, [theme])
 
   // Applichiamo il tema personalizzato quando cambia
   useEffect(() => {
-    if (mounted && currentTheme && typeof window !== "undefined") {
-      const resolvedTheme = theme === "system" ? systemTheme : theme
-      console.log("Applicando tema personalizzato:", currentTheme.nome, "isDark:", resolvedTheme === "dark")
-      applyCustomTheme(currentTheme, resolvedTheme === "dark")
+    if (currentTheme && typeof window !== "undefined") {
+      console.log("Applicando tema:", currentTheme.nome, "isDark:", theme === "dark")
+      applyCustomTheme(currentTheme, theme === "dark")
     }
-  }, [currentTheme, theme, systemTheme, mounted])
+  }, [currentTheme, theme])
 
   const toggleDarkMode = useCallback(() => {
-    if (!mounted) return
-
-    console.log("=== TOGGLE DARK MODE ===")
-    console.log("Tema attuale:", theme)
-    console.log("isDarkMode attuale:", isDarkMode)
-
-    const newTheme = isDarkMode ? "light" : "dark"
-    console.log("Nuovo tema:", newTheme)
-
+    const newTheme = theme === "dark" ? "light" : "dark"
     setTheme(newTheme)
+    setIsDarkMode(newTheme === "dark")
+  }, [theme, setTheme])
 
-    // Forza l'aggiornamento immediato
-    setTimeout(() => {
-      setIsDarkMode(newTheme === "dark")
-      console.log("Stato aggiornato, isDarkMode:", newTheme === "dark")
-    }, 100)
-
-    console.log("=== FINE TOGGLE DARK MODE ===")
-  }, [theme, setTheme, isDarkMode, mounted])
-
-  const contextValue = {
-    currentTheme,
-    themes,
-    applyTheme,
-    isLoading,
-    layout,
-    setLayout,
-    toggleDarkMode,
-    isDarkMode,
-    mounted,
-  }
-
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
+  return (
+    <ThemeContext.Provider
+      value={{
+        currentTheme,
+        themes,
+        applyTheme,
+        isLoading,
+        layout,
+        setLayout,
+        toggleDarkMode,
+        isDarkMode,
+      }}
+    >
+      {children}
+    </ThemeContext.Provider>
+  )
 }
 
 export function useCustomTheme() {
@@ -231,42 +189,4 @@ export function useCustomTheme() {
     throw new Error("useCustomTheme must be used within a ThemeProvider")
   }
   return context
-}
-
-// Hook sicuro che non genera errori se il provider non è disponibile
-export function useSafeCustomTheme() {
-  const [hasMounted, setHasMounted] = useState(false)
-
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
-
-  try {
-    const context = useCustomTheme()
-    return hasMounted
-      ? context
-      : {
-          currentTheme: null,
-          themes: [],
-          applyTheme: () => false,
-          isLoading: true,
-          layout: "default" as LayoutType,
-          setLayout: () => {},
-          toggleDarkMode: () => {},
-          isDarkMode: false,
-          mounted: false,
-        }
-  } catch {
-    return {
-      currentTheme: null,
-      themes: [],
-      applyTheme: () => false,
-      isLoading: true,
-      layout: "default" as LayoutType,
-      setLayout: () => {},
-      toggleDarkMode: () => {},
-      isDarkMode: false,
-      mounted: false,
-    }
-  }
 }
