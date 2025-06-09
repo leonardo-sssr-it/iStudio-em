@@ -435,7 +435,9 @@ export default function DataExplorerPage() {
               className="text-center h-32"
             >
               <div className="flex flex-col items-center justify-center space-y-4">
-                <p className="text-gray-500">{searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}</p>
+                <p className="text-muted-foreground">
+                  {searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}
+                </p>
                 <Button variant="outline" onClick={handleCreateNew} size="sm">
                   <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
                 </Button>
@@ -455,7 +457,7 @@ export default function DataExplorerPage() {
         {filteredData.map((item) => (
           <TableRow
             key={item.id}
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className="cursor-pointer hover:bg-muted/50 transition-colors duration-200"
             onClick={() => handleRowClick(item.id)}
           >
             {fields.map((field) => (
@@ -523,7 +525,7 @@ export default function DataExplorerPage() {
     if (filteredData.length === 0) {
       return (
         <div className="flex flex-col justify-center items-center h-64 space-y-4">
-          <p className="text-gray-500 text-center">
+          <p className="text-muted-foreground text-center">
             {searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}
           </p>
           <Button variant="outline" onClick={handleCreateNew}>
@@ -567,7 +569,7 @@ export default function DataExplorerPage() {
 
               <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/50">
                 <span className="text-xs text-muted-foreground">ID: {item.id}</span>
-                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors duration-200">
                   Clicca per dettagli →
                 </span>
               </div>
@@ -701,7 +703,7 @@ export default function DataExplorerPage() {
                   <Button
                     key={table.id}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors duration-200"
                     onClick={() => setSelectedTable(table.id)}
                   >
                     <table.icon className="h-6 w-6" />

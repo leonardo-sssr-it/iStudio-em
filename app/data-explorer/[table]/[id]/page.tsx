@@ -374,14 +374,14 @@ const ProgressBar = ({
   if (readOnly) {
     return (
       <div className="w-full">
-        <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
+        <div className="relative w-full h-8 bg-muted rounded-lg overflow-hidden">
           <div
             className="h-full transition-all duration-300 ease-in-out"
             style={{ width: `${percentage}%`, backgroundColor: progressColor }}
           />
           <div
             className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
-              textInColoredPart ? "text-white" : "text-gray-700"
+              textInColoredPart ? "text-white" : "text-foreground"
             }`}
           >
             {percentage}%
@@ -392,14 +392,14 @@ const ProgressBar = ({
   }
   return (
     <div className="w-full space-y-3">
-      <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
+      <div className="relative w-full h-8 bg-muted rounded-lg overflow-hidden">
         <div
           className="h-full transition-all duration-300 ease-in-out"
           style={{ width: `${percentage}%`, backgroundColor: progressColor }}
         />
         <div
           className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
-            textInColoredPart ? "text-white" : "text-gray-700"
+            textInColoredPart ? "text-white" : "text-foreground"
           }`}
         >
           {percentage}%
@@ -413,12 +413,12 @@ const ProgressBar = ({
           step="1"
           value={localValue}
           onChange={(e) => handleSliderChange([Number.parseInt(e.target.value)])}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+          className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
           style={{
-            background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`,
+            background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, hsl(var(--muted)) ${percentage}%, hsl(var(--muted)) 100%)`,
           }}
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>0%</span> <span>50%</span> <span>100%</span>
         </div>
       </div>
@@ -743,7 +743,7 @@ export default function ItemDetailPage() {
       return (
         <div className="mb-4" key={field}>
           <Label className="text-sm font-medium">{label}</Label>
-          <div className={`mt-1 p-2 rounded-md ${readOnly ? "bg-gray-100" : ""}`}>{displayValue}</div>
+          <div className={`mt-1 p-2 rounded-md ${readOnly ? "bg-muted" : ""}`}>{displayValue}</div>
         </div>
       )
     }

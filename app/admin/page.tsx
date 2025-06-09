@@ -34,7 +34,7 @@ const AdminCard = memo(
     return (
       <Link href={href} prefetch={true}>
         <Card
-          className={`h-full hover:border-primary transition-all duration-300 cursor-pointer transform ${
+          className={`h-full hover:border-primary transition-colors duration-200 cursor-pointer transform ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
@@ -613,7 +613,7 @@ const AdminDashboardContent = memo(() => {
             <div className="flex space-x-1 mb-6 border-b">
               <button
                 onClick={() => setActiveTab("database")}
-                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors ${
+                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors duration-200 ${
                   activeTab === "database"
                     ? "admin-tab-active border-b-2 border-primary"
                     : "text-muted-foreground hover:text-foreground"
@@ -624,7 +624,7 @@ const AdminDashboardContent = memo(() => {
               </button>
               <button
                 onClick={() => setActiveTab("configurazione")}
-                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors ${
+                className={`px-4 py-2 font-medium text-sm rounded-t-lg transition-colors duration-200 ${
                   activeTab === "configurazione"
                     ? "admin-tab-active border-b-2 border-primary"
                     : "text-muted-foreground hover:text-foreground"
