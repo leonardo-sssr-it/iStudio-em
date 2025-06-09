@@ -22,8 +22,13 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 // Funzione per convertire colori hex in HSL
 function hexToHsl(hex: string): string {
+  if (!hex || hex === "") return "0 0% 50%"
+
   // Rimuovi il # se presente
   hex = hex.replace("#", "")
+
+  // Se il colore è già in formato HSL, restituiscilo così com'è
+  if (hex.includes("%")) return hex
 
   // Converti hex in RGB
   const r = Number.parseInt(hex.substr(0, 2), 16) / 255
@@ -69,19 +74,9 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
   console.log("Dati tema:", theme)
 
   try {
-    // Applica le variabili CSS personalizzate se presenti
-    if (theme.css_variables && typeof theme.css_variables === "object") {
-      Object.entries(theme.css_variables).forEach(([key, value]) => {
-        if (value && typeof value === "string") {
-          root.style.setProperty(`--${key}`, value)
-          console.log(`✓ Variabile CSS applicata: --${key} = ${value}`)
-        }
-      })
-    }
-
-    // Applica i colori principali del tema
+    // Prima applica i colori base del tema se specificati
     if (theme.primary_color) {
-      const primaryHsl = theme.primary_color.startsWith("#") ? hexToHsl(theme.primary_color) : theme.primary_color
+      const primaryHsl = hexToHsl(theme.primary_color)
       root.style.setProperty("--primary", primaryHsl)
       root.style.setProperty("--admin-tab-active-bg", primaryHsl)
       root.style.setProperty("--admin-checkbox-checked", primaryHsl)
@@ -89,30 +84,42 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
     }
 
     if (theme.secondary_color) {
-      const secondaryHsl = theme.secondary_color.startsWith("#")
-        ? hexToHsl(theme.secondary_color)
-        : theme.secondary_color
+      const secondaryHsl = hexToHsl(theme.secondary_color)
       root.style.setProperty("--secondary", secondaryHsl)
       console.log(`✓ Secondary color applicato: ${secondaryHsl}`)
     }
 
     if (theme.accent_color) {
-      const accentHsl = theme.accent_color.startsWith("#") ? hexToHsl(theme.accent_color) : theme.accent_color
+      const accentHsl = hexToHsl(theme.accent_color)
       root.style.setProperty("--accent", accentHsl)
       console.log(`✓ Accent color applicato: ${accentHsl}`)
     }
 
-    // Applica il background e foreground se specificati
+    // Applica background e foreground con logica corretta per il contrasto
     if (theme.background_color) {
-      const bgHsl = theme.background_color.startsWith("#") ? hexToHsl(theme.background_color) : theme.background_color
+      const bgHsl = hexToHsl(theme.background_color)
       root.style.setProperty("--background", bgHsl)
+      root.style.setProperty("--card", bgHsl)
+      root.style.setProperty("--popover", bgHsl)
       console.log(`✓ Background color applicato: ${bgHsl}`)
     }
 
     if (theme.text_color) {
-      const textHsl = theme.text_color.startsWith("#") ? hexToHsl(theme.text_color) : theme.text_color
+      const textHsl = hexToHsl(theme.text_color)
       root.style.setProperty("--foreground", textHsl)
+      root.style.setProperty("--card-foreground", textHsl)
+      root.style.setProperty("--popover-foreground", textHsl)
       console.log(`✓ Text color applicato: ${textHsl}`)
+    }
+
+    // Applica le variabili CSS personalizzate se presenti (queste hanno priorità)
+    if (theme.css_variables && typeof theme.css_variables === "object") {
+      Object.entries(theme.css_variables).forEach(([key, value]) => {
+        if (value && typeof value === "string") {
+          root.style.setProperty(`--${key}`, value)
+          console.log(`✓ Variabile CSS personalizzata applicata: --${key} = ${value}`)
+        }
+      })
     }
 
     // Applica il font family
@@ -127,6 +134,12 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
       console.log(`✓ Border radius applicato: ${theme.border_radius}`)
     }
 
+    // Forza il re-render aggiungendo una classe temporanea
+    document.body.classList.add("theme-transition")
+    setTimeout(() => {
+      document.body.classList.remove("theme-transition")
+    }, 300)
+
     console.log("=== TEMA APPLICATO CON SUCCESSO ===")
   } catch (error) {
     console.error("Errore nell'applicazione del tema:", error)
@@ -135,7 +148,7 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { themes, currentTheme, applyTheme, isLoading } = useThemes()
-  const { theme, setTheme } = useNextTheme()
+  const { theme, setTheme, systemTheme } = useNextTheme()
   const [layout, setLayout] = useState<LayoutType>(() => {
     if (typeof window !== "undefined") {
       const savedLayout = localStorage.getItem("preferredLayout")
@@ -144,6 +157,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return "default"
   })
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Aspetta che il componente sia montato
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Salva il layout nel localStorage quando cambia
   useEffect(() => {
@@ -154,30 +173,46 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Sincronizziamo il tema di sistema con il nostro stato
   useEffect(() => {
-    setIsDarkMode(theme === "dark")
-  }, [theme])
+    if (mounted) {
+      const resolvedTheme = theme === "system" ? systemTheme : theme
+      setIsDarkMode(resolvedTheme === "dark")
+      console.log("Tema risolto:", resolvedTheme, "isDark:", resolvedTheme === "dark")
+    }
+  }, [theme, systemTheme, mounted])
 
   // Applichiamo il tema personalizzato quando cambia
   useEffect(() => {
-    if (currentTheme && typeof window !== "undefined") {
-      console.log("Applicando tema:", currentTheme.nome, "isDark:", theme === "dark")
-      applyCustomTheme(currentTheme, theme === "dark")
+    if (mounted && currentTheme && typeof window !== "undefined") {
+      const resolvedTheme = theme === "system" ? systemTheme : theme
+      console.log("Applicando tema personalizzato:", currentTheme.nome, "isDark:", resolvedTheme === "dark")
+      applyCustomTheme(currentTheme, resolvedTheme === "dark")
     }
-  }, [currentTheme, theme])
+  }, [currentTheme, theme, systemTheme, mounted])
 
   const toggleDarkMode = useCallback(() => {
+    if (!mounted) return
+
     console.log("=== TOGGLE DARK MODE ===")
     console.log("Tema attuale:", theme)
     console.log("isDarkMode attuale:", isDarkMode)
 
-    const newTheme = theme === "dark" ? "light" : "dark"
+    const newTheme = isDarkMode ? "light" : "dark"
     console.log("Nuovo tema:", newTheme)
 
     setTheme(newTheme)
-    setIsDarkMode(newTheme === "dark")
+
+    // Forza l'aggiornamento immediato
+    setTimeout(() => {
+      setIsDarkMode(newTheme === "dark")
+      console.log("Stato aggiornato, isDarkMode:", newTheme === "dark")
+    }, 100)
 
     console.log("=== FINE TOGGLE DARK MODE ===")
-  }, [theme, setTheme, isDarkMode])
+  }, [theme, setTheme, isDarkMode, mounted])
+
+  if (!mounted) {
+    return <>{children}</>
+  }
 
   return (
     <ThemeContext.Provider
