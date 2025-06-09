@@ -305,8 +305,19 @@ export function GanttChartWidget() {
   const ganttBodyHeight = elementiGantt.length * 48 + 40 // 48px per riga + 40px padding
 
   const getTableNameFromType = (type: GanttItem["tipo"]): string => {
-    if (type === "attivita") return "attivita" // Già plurale
-    return `${type}s` // progetto -> progetti, appuntamento -> appuntamenti
+    switch (type) {
+      case "attivita":
+        return "attivita" // La tabella si chiama 'attivita'
+      case "progetto":
+        return "progetti"
+      case "appuntamento":
+        return "appuntamenti" // Nome corretto della tabella
+      default:
+        // In caso di un tipo non previsto, restituisce il tipo stesso.
+        // Potrebbe essere utile loggare un avviso qui se accade.
+        console.warn(`Tipo di elemento Gantt non riconosciuto: ${type}`)
+        return type
+    }
   }
 
   if (isLoading) {
