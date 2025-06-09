@@ -10,11 +10,45 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import type { Database } from "@/types/supabase"
 
+const AUTH_COOKIE_NAME = "auth_session" // Deve corrispondere a quello in AuthProvider
+
+// Helper function to get and validate the custom session from cookie
+async function getCustomSessionData(cookieStore: ReturnType<typeof cookies>) {
+  const sessionCookie = cookieStore.get(AUTH_COOKIE_NAME)
+
+  if (!sessionCookie || !sessionCookie.value) {
+    console.log("[PaginePage] Custom session cookie not found.")
+    return null
+  }
+
+  try {
+    const sessionData = JSON.parse(decodeURIComponent(sessionCookie.value))
+    // Basic validation: check for user_id and expiration
+    if (!sessionData.user_id || new Date(sessionData.expires_at) <= new Date()) {
+      console.log("[PaginePage] Custom session invalid or expired.")
+      // Optionally, you could clear the invalid cookie here, but it's complex in Server Components
+      return null
+    }
+    // You might want to add a check here to ensure the user_id still exists in your 'utenti' table
+    // For example:
+    // const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore });
+    // const { data: user, error } = await supabase.from('utenti').select('id').eq('id', sessionData.user_id).single();
+    // if (error || !user) {
+    //   console.log("[PaginePage] User from custom session not found in DB.");
+    //   return null;
+    // }
+    console.log("[PaginePage] Custom session valid for user_id:", sessionData.user_id)
+    return sessionData // Contains user_id, expires_at, token
+  } catch (error) {
+    console.error("[PaginePage] Error parsing custom session cookie:", error)
+    return null
+  }
+}
+
 // Helper function to format date strings safely
 const formatDate = (dateString: string | null) => {
   if (!dateString) return "Data non disponibile"
   try {
-    // Assuming the date is in ISO format
     return format(new Date(dateString), "dd/MM/yyyy HH:mm")
   } catch (error) {
     console.error("Error formatting date:", error)
@@ -26,14 +60,16 @@ export default async function PagineListPage() {
   const cookieStore = cookies()
   const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  const customSession = await getCustomSessionData(cookieStore)
 
-  if (!session) {
-    redirect("/") // Redirect to login if not authenticated
+  if (!customSession) {
+    console.log("[PaginePage] No valid custom session. Redirecting to /.")
+    redirect("/") // Redirect to login if not authenticated by custom session
   }
 
+  // User is authenticated via custom session, proceed to fetch pages
+  // You can use customSession.user_id if you need to filter pages by user,
+  // but the current query fetches all pages.
   const { data: pagine, error } = await supabase
     .from("pagine")
     .select("id, titolo, pubblicato")
