@@ -30,7 +30,8 @@ import { ArrowLeft, Save, Trash2, Edit, X, AlertCircle } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
-import { normalizeDate, formatDateDisplay } from "@/lib/date-utils" // Importa le nuove utility
+import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
+import { isValid, parseISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -55,8 +56,8 @@ const TABLE_FIELDS = {
       titolo: "string",
       descrizione: "text",
       luogo: "text",
-      data_inizio: "datetime",
-      data_fine: "datetime", // Campo da normalizzare a fine giornata
+      data_inizio: "datetime", // Preserva orario
+      data_fine: "datetime", // Preserva orario
       data_creazione: "datetime",
       stato: "select",
       priorita: "priority_select",
@@ -98,8 +99,8 @@ const TABLE_FIELDS = {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      data_inizio: "datetime",
-      data_fine: "datetime", // Campo da normalizzare a fine giornata
+      data_inizio: "datetime", // Preserva orario
+      data_fine: "datetime", // Preserva orario
       stato: "select",
       priorita: "priority_select",
       note: "text",
@@ -116,7 +117,7 @@ const TABLE_FIELDS = {
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
+      "Note e dettagli": ["note", "luogo", "tags", "notifica"], // Aggiunto luogo, tags, notifica se esistono
       "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
     },
   },
@@ -124,12 +125,12 @@ const TABLE_FIELDS = {
     listFields: ["id", "titolo", "scadenza", "stato", "priorita", "privato"],
     readOnlyFields: ["id", "id_utente", "modifica"],
     requiredFields: ["titolo"],
-    defaultSort: "data_scadenza", // Assumendo che il campo sia 'scadenza'
+    defaultSort: "scadenza",
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      scadenza: "datetime", // Campo da normalizzare a fine giornata
+      scadenza: "datetime", // Normalizza a fine giornata
       stato: "select",
       priorita: "priority_select",
       note: "text",
@@ -164,7 +165,7 @@ const TABLE_FIELDS = {
       descrizione: "text",
       completato: "boolean",
       priorita: "priority_select",
-      scadenza: "datetime", // Campo da normalizzare a fine giornata
+      scadenza: "datetime", // Normalizza a fine giornata
       notifica: "datetime",
       note: "text",
       tags: "json",
@@ -196,8 +197,8 @@ const TABLE_FIELDS = {
       descrizione: "text",
       stato: "select",
       priorita: "priority_select",
-      data_inizio: "datetime",
-      data_fine: "datetime", // Campo da normalizzare a fine giornata
+      data_inizio: "datetime", // Preserva orario
+      data_fine: "datetime", // Preserva orario
       budget: "number",
       note: "text",
       id_utente: "number",
@@ -285,6 +286,14 @@ const TABLE_FIELDS = {
       meta_description: "text",
       id_utente: "number",
       modifica: "datetime",
+      // Aggiunti campi mancanti dalla definizione della tabella utente
+      estratto: "text",
+      categoria: "string",
+      tags: "json",
+      immagine: "string", // Potrebbe essere un URL o un riferimento a un file
+      pubblicato: "datetime", // Preserva orario
+      privato: "boolean",
+      attivo: "boolean", // Assicurati che sia presente se usato
     },
     selectOptions: {
       stato: [
@@ -294,9 +303,9 @@ const TABLE_FIELDS = {
       ],
     },
     groups: {
-      "Informazioni principali": ["titolo", "slug", "stato"],
-      Contenuto: ["contenuto"],
-      SEO: ["meta_title", "meta_description"],
+      "Informazioni principali": ["titolo", "slug", "stato", "categoria", "pubblicato", "privato", "attivo"],
+      Contenuto: ["estratto", "contenuto", "immagine"],
+      SEO: ["meta_title", "meta_description", "tags"],
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
@@ -305,31 +314,17 @@ const TABLE_FIELDS = {
 // Funzione per pulire i dati prima del salvataggio
 function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   const cleaned = { ...data }
-
   readOnlyFields.forEach((field) => {
-    if (field !== "id_utente") {
-      delete cleaned[field]
-    }
+    if (field !== "id_utente") delete cleaned[field]
   })
-
   Object.keys(cleaned).forEach((key) => {
     const value = cleaned[key]
-    if (value === undefined) {
-      delete cleaned[key]
-      return
-    }
-    if (typeof value === "string" && value.trim() === "") {
-      cleaned[key] = null
-    }
-    if (typeof value === "number" && isNaN(value)) {
-      delete cleaned[key]
-    }
+    if (value === undefined) delete cleaned[key]
+    else if (typeof value === "string" && value.trim() === "") cleaned[key] = null
+    else if (typeof value === "number" && isNaN(value)) delete cleaned[key]
   })
   return cleaned
 }
-
-// Campi che rappresentano una data di fine o scadenza e devono essere normalizzati a fine giornata
-const END_OF_DAY_FIELDS = ["data_fine", "scadenza"]
 
 // Componente per il color picker
 const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
@@ -366,19 +361,12 @@ const ProgressBar = ({
   readOnly?: boolean
 }) => {
   const [localValue, setLocalValue] = useState(value || 0)
-
-  useEffect(() => {
-    setLocalValue(value || 0)
-  }, [value])
-
+  useEffect(() => setLocalValue(value || 0), [value])
   const handleSliderChange = (newValue: number[]) => {
     const val = newValue[0]
     setLocalValue(val)
-    if (onChange) {
-      onChange(val)
-    }
+    if (onChange) onChange(val)
   }
-
   const progressColor = color || "#3b82f6"
   const percentage = Math.min(Math.max(localValue, 0), 100)
   const textInColoredPart = percentage > 50
@@ -389,10 +377,7 @@ const ProgressBar = ({
         <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
           <div
             className="h-full transition-all duration-300 ease-in-out"
-            style={{
-              width: `${percentage}%`,
-              backgroundColor: progressColor,
-            }}
+            style={{ width: `${percentage}%`, backgroundColor: progressColor }}
           />
           <div
             className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
@@ -405,16 +390,12 @@ const ProgressBar = ({
       </div>
     )
   }
-
   return (
     <div className="w-full space-y-3">
       <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
         <div
           className="h-full transition-all duration-300 ease-in-out"
-          style={{
-            width: `${percentage}%`,
-            backgroundColor: progressColor,
-          }}
+          style={{ width: `${percentage}%`, backgroundColor: progressColor }}
         />
         <div
           className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
@@ -438,9 +419,7 @@ const ProgressBar = ({
           }}
         />
         <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>0%</span>
-          <span>50%</span>
-          <span>100%</span>
+          <span>0%</span> <span>50%</span> <span>100%</span>
         </div>
       </div>
     </div>
@@ -471,9 +450,7 @@ export default function ItemDetailPage() {
   const itemId = Array.isArray(params.id) ? params.id[0] : params.id
   const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
 
-  if (!isValidTable && tableName) {
-    console.error(`Tabella non valida: ${tableName}`)
-  }
+  if (!isValidTable && tableName) console.error(`Tabella non valida: ${tableName}`)
 
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
   const readOnlyFields = tableConfig?.readOnlyFields || []
@@ -569,7 +546,7 @@ export default function ItemDetailPage() {
           newItem.titolo = ""
           newItem.descrizione = ""
           newItem.completato = false
-          newItem.priorita = 1
+          newItem.priorita = 1 // Assumendo che 1 sia una priorità valida
         } else if (tableName === "clienti") {
           newItem.nome = ""
           newItem.cognome = ""
@@ -596,6 +573,8 @@ export default function ItemDetailPage() {
         } else if (tableName === "pagine") {
           newItem.titolo = ""
           newItem.stato = "bozza"
+          newItem.attivo = true
+          newItem.privato = false
         }
         setItem(newItem)
         setEditedItem(newItem)
@@ -626,29 +605,42 @@ export default function ItemDetailPage() {
   const handleFieldChange = (field: string, value: any) => {
     setEditedItem((prev: any) => {
       let processedValue = value
-      // Normalizza i campi datetime che rappresentano scadenze/fine giornata
-      if (fieldTypes[field] === "datetime" && END_OF_DAY_FIELDS.includes(field) && value) {
-        const normalized = normalizeDate(value, "end")
-        processedValue = normalized ? normalized.toISOString() : null
-      } else if (fieldTypes[field] === "datetime" && field === "data_inizio" && value) {
-        // Normalizza data_inizio a inizio giornata
-        const normalized = normalizeDate(value, "start")
-        processedValue = normalized ? normalized.toISOString() : null
-      }
 
-      const updated = { ...prev, [field]: processedValue }
+      if (fieldTypes[field] === "datetime" && value) {
+        let needsNormalization: "start" | "end" | null = null
+        if (tableName === "scadenze" && field === "scadenza") {
+          needsNormalization = "end"
+        } else if (tableName === "todolist" && field === "scadenza") {
+          needsNormalization = "end"
+        }
 
-      // Logica di auto-impostazione di data_fine basata su data_inizio
-      if (field === "data_inizio" && updated.data_inizio && !prev.data_fine) {
-        const startDate = normalizeDate(updated.data_inizio, "start") // data_inizio è già normalizzata
-        if (startDate) {
-          const endDate = normalizeDate(startDate, "end") // Imposta data_fine alla fine dello stesso giorno
-          if (endDate) {
-            updated.data_fine = endDate.toISOString()
+        if (needsNormalization) {
+          const normalized = normalizeDate(value, needsNormalization)
+          processedValue = normalized ? normalized.toISOString() : null
+        } else {
+          // Per tutti gli altri datetime, preserva l'orario.
+          // EnhancedDatePicker restituisce una stringa ISO o un oggetto Date.
+          // Converti in stringa ISO se è un oggetto Date.
+          if (value instanceof Date) {
+            processedValue = value.toISOString()
+          } else if (typeof value === "string") {
+            // Se è una stringa, prova a parsare e riformattare per consistenza,
+            // ma solo se è una data valida, altrimenti mantieni la stringa (es. per input parziali)
+            const parsedDate = parseISO(value)
+            if (isValid(parsedDate)) {
+              processedValue = parsedDate.toISOString()
+            } else {
+              processedValue = value // Mantieni stringa se non parsabile (es. input in corso)
+            }
+          } else {
+            processedValue = null // o gestisci come errore se non è né Date né stringa
           }
         }
       }
-      return updated
+      // Non c'è più la logica di auto-impostazione di data_fine basata su data_inizio qui
+      // per evitare normalizzazioni indesiderate.
+      // Se necessaria, andrà reimplementata con attenzione agli orari.
+      return { ...prev, [field]: processedValue }
     })
     setValidationErrors([])
   }
@@ -734,17 +726,17 @@ export default function ItemDetailPage() {
     if (!isEditMode || readOnly) {
       let displayValue = value
       if (type === "datetime") {
-        // Per la visualizzazione, normalizza le date di fine/scadenza
-        if (END_OF_DAY_FIELDS.includes(field)) {
+        let valueToFormat = value
+        // Applica normalizzazione solo per i campi specifici
+        if (tableName === "scadenze" && field === "scadenza") {
           const normalized = normalizeDate(value, "end")
-          displayValue = normalized ? formatDateDisplay(normalized) : formatDateDisplay(value)
-        } else if (field === "data_inizio") {
-          // Normalizza data_inizio a inizio giornata per visualizzazione
-          const normalized = normalizeDate(value, "start")
-          displayValue = normalized ? formatDateDisplay(normalized) : formatDateDisplay(value)
-        } else {
-          displayValue = formatDateDisplay(value)
+          valueToFormat = normalized || value
+        } else if (tableName === "todolist" && field === "scadenza") {
+          const normalized = normalizeDate(value, "end")
+          valueToFormat = normalized || value
         }
+        // Per tutti gli altri datetime, formatta il valore così com'è (preservando l'orario)
+        displayValue = formatDateDisplay(valueToFormat)
       } else {
         displayValue = renderFieldValue(value, type)
       }
@@ -792,11 +784,14 @@ export default function ItemDetailPage() {
             </Label>
             <EnhancedDatePicker
               id={field}
+              // EnhancedDatePicker si aspetta una stringa ISO o un oggetto Date.
+              // `value` qui dovrebbe essere una stringa ISO dal database o da una modifica precedente.
               value={value || ""}
-              onChange={(newValue) => handleFieldChange(field, newValue)}
+              onChange={(newValue) => handleFieldChange(field, newValue)} // newValue è stringa ISO o Date
               placeholder={`Seleziona ${label.toLowerCase()}`}
               className={`mt-1 ${hasError ? "border-red-500" : ""}`}
-              showCurrentTime={!value}
+              showTimeSelect // Abilita sempre la selezione dell'orario
+              dateFormat="dd/MM/yyyy HH:mm" // Mostra l'orario nel formato
             />
           </div>
         )
@@ -936,7 +931,7 @@ export default function ItemDetailPage() {
                   const parsed = JSON.parse(e.target.value)
                   handleFieldChange(field, parsed)
                 } catch {
-                  handleFieldChange(field, e.target.value)
+                  handleFieldChange(field, e.target.value) // Mantieni come stringa se non è JSON valido
                 }
               }}
               className="mt-1 font-mono text-sm"
@@ -961,7 +956,7 @@ export default function ItemDetailPage() {
             </div>
           </div>
         )
-      default:
+      default: // string
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
@@ -983,7 +978,8 @@ export default function ItemDetailPage() {
   const renderFieldValue = (value: any, type: string) => {
     if (value === null || value === undefined) return "-"
     switch (type) {
-      case "datetime": // Questa formattazione è ora gestita direttamente in renderField per la visualizzazione
+      case "datetime":
+        // La formattazione specifica per normalizzazione è gestita in renderField
         return formatDateDisplay(value)
       case "boolean":
         return value ? "✓" : "✗"
@@ -1072,7 +1068,7 @@ export default function ItemDetailPage() {
               <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
                 <div className="space-y-4">
                   {groupFields.map((field) => {
-                    if (!allFields.includes(field)) return null
+                    if (!allFields.includes(field) && !isNewItem) return null // Mostra tutti i campi per i nuovi item
                     const isReadOnly = readOnlyFields.includes(field)
                     const fieldType = fieldTypes[field as keyof typeof fieldTypes] || "string"
 
@@ -1080,22 +1076,18 @@ export default function ItemDetailPage() {
                     if (
                       field === "data_inizio" &&
                       groupFields.includes("data_fine") &&
-                      allFields.includes("data_fine")
+                      (allFields.includes("data_fine") || isNewItem)
                     ) {
                       if (!isEditMode) {
                         return (
                           <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <Label>Data inizio</Label>
-                              <div className="mt-1 p-2 rounded-md">
-                                {formatDateDisplay(normalizeDate(editedItem.data_inizio, "start"))}
-                              </div>
+                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.data_inizio)}</div>
                             </div>
                             <div>
                               <Label>Data fine</Label>
-                              <div className="mt-1 p-2 rounded-md">
-                                {formatDateDisplay(normalizeDate(editedItem.data_fine, "end"))}
-                              </div>
+                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.data_fine)}</div>
                             </div>
                           </div>
                         )
@@ -1110,7 +1102,8 @@ export default function ItemDetailPage() {
                               onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
                               placeholder="Seleziona data inizio"
                               className="mt-1"
-                              showCurrentTime={!editedItem.data_inizio}
+                              showTimeSelect
+                              dateFormat="dd/MM/yyyy HH:mm"
                             />
                           </div>
                           <div>
@@ -1121,14 +1114,19 @@ export default function ItemDetailPage() {
                               onChange={(newValue) => handleFieldChange("data_fine", newValue)}
                               placeholder="Seleziona data fine"
                               className="mt-1"
-                              showCurrentTime={!editedItem.data_fine}
+                              showTimeSelect
+                              dateFormat="dd/MM/yyyy HH:mm"
                             />
                           </div>
                         </div>
                       )
                     }
                     // Gestione speciale per priorita e scadenza sulla stessa riga
-                    if (field === "priorita" && groupFields.includes("scadenza") && allFields.includes("scadenza")) {
+                    if (
+                      field === "priorita" &&
+                      groupFields.includes("scadenza") &&
+                      (allFields.includes("scadenza") || isNewItem)
+                    ) {
                       if (!isEditMode) {
                         return (
                           <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1140,9 +1138,7 @@ export default function ItemDetailPage() {
                             </div>
                             <div>
                               <Label>Scadenza</Label>
-                              <div className="mt-1 p-2 rounded-md">
-                                {formatDateDisplay(normalizeDate(editedItem.scadenza, "end"))}
-                              </div>
+                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.scadenza)}</div>
                             </div>
                           </div>
                         )
@@ -1169,7 +1165,11 @@ export default function ItemDetailPage() {
                       )
                     }
                     // Gestione speciale per stato e colore sulla stessa riga
-                    if (field === "stato" && groupFields.includes("colore") && allFields.includes("colore")) {
+                    if (
+                      field === "stato" &&
+                      groupFields.includes("colore") &&
+                      (allFields.includes("colore") || isNewItem)
+                    ) {
                       if (!isEditMode) {
                         return (
                           <div key="status-color" className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1210,16 +1210,27 @@ export default function ItemDetailPage() {
                       )
                     }
 
+                    // Evita di renderizzare due volte i campi gestiti in coppia
                     if (
                       field === "data_fine" &&
                       groupFields.includes("data_inizio") &&
-                      allFields.includes("data_inizio")
+                      (allFields.includes("data_inizio") || isNewItem)
                     )
                       return null
-                    if (field === "scadenza" && groupFields.includes("priorita") && allFields.includes("priorita"))
+                    if (
+                      field === "scadenza" &&
+                      groupFields.includes("priorita") &&
+                      (allFields.includes("priorita") || isNewItem)
+                    )
                       return null
-                    if (field === "colore" && groupFields.includes("stato") && allFields.includes("stato")) return null
+                    if (
+                      field === "colore" &&
+                      groupFields.includes("stato") &&
+                      (allFields.includes("stato") || isNewItem)
+                    )
+                      return null
 
+                    // Renderizza il campo singolo se non è parte di una coppia o se la sua controparte non esiste
                     return renderField(field, editedItem[field], fieldType, isReadOnly)
                   })}
                 </div>
@@ -1246,8 +1257,10 @@ export default function ItemDetailPage() {
             <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/data-explorer?table=" + tableName)}>
-              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+            <Button onClick={() => router.push("/data-explorer")}>
+              {" "}
+              {/* Modificato per tornare a una pagina generica */}
+              <ArrowLeft size={16} className="mr-2" /> Torna a Data Explorer
             </Button>
           </CardContent>
         </Card>
