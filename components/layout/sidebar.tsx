@@ -25,7 +25,6 @@ import {
   FolderKanban,
   Smartphone,
   LayoutGrid,
-  BookOpen,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -81,11 +80,6 @@ export function Sidebar({ className }: SidebarProps) {
             icon: LayoutGrid,
           },
           { href: "/profile", label: "Profilo", icon: User },
-          {
-            href: "/pagine",
-            label: "Pagine",
-            icon: BookOpen,
-          },
           { href: "/calendar", label: "Calendario", icon: Calendar },
           { href: "/documents", label: "Documenti", icon: FileText },
         ]

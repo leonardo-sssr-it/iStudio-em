@@ -97,7 +97,7 @@ export default function Home() {
       {!user && !isLoading && (
         <div className="bg-muted/30 dark:bg-muted/10 py-16 mt-8">
           <div className={layout === "fullWidth" ? "w-full px-4 md:px-8" : "container mx-auto px-4 md:px-8"}>
-            <h2 className="text-3xl font-bold text-center mb-12">Cosa farà iStudio?</h2>
+            <h2 className="text-3xl font-bold text-center mb-12">Perché scegliere iStudio?</h2>
 
             {/* Grid di card con animazioni */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
