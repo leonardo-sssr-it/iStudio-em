@@ -29,6 +29,7 @@ const pathPermissions: Record<string, Permission> = {
   "/dashboard": "read",
   "/dashboard-u": "read", // Aggiungi autorizzazione per dashboard-u
   "/dashboard-mobile": "read", // Aggiungi autorizzazione per dashboard-mobile
+  "/dashboard-utente": "read", // Aggiungi autorizzazione per dashboard-mobile
   // Aggiungi altri percorsi secondo necessità
 }
 
