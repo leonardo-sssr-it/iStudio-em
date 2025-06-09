@@ -74,6 +74,11 @@ export function Sidebar({ className }: SidebarProps) {
             label: "Dashboard Mobile",
             icon: Smartphone,
           },
+          {
+            href: "/dashboard-utente",
+            label: "Dashboard Utente",
+            icon: LayoutGrid,
+          },
           { href: "/profile", label: "Profilo", icon: User },
           { href: "/calendar", label: "Calendario", icon: Calendar },
           { href: "/documents", label: "Documenti", icon: FileText },

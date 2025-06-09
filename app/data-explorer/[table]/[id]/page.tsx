@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
@@ -25,11 +26,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, Trash2, Edit, X } from "lucide-react" // Rinominato Calendar per evitare conflitti
+import { ArrowLeft, Save, Trash2, Edit, X, AlertCircle } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
-import { cn } from "@/lib/utils"
-import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker" // Assicurati sia importato
-import { TagInput } from "@/components/ui/tag-input" // Importa TagInput
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
+import { TagInput } from "@/components/ui/tag-input"
+import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
+import { isValid, parseISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -42,7 +44,289 @@ const AVAILABLE_TABLES = [
   { id: "pagine", label: "Pagine", icon: "📄" },
 ]
 
-// Componente ColorPicker (copiato da new/page.tsx per consistenza)
+// Definizione dei campi per ogni tabella
+const TABLE_FIELDS = {
+  appuntamenti: {
+    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
+    requiredFields: ["titolo"],
+    defaultSort: "data_inizio",
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      luogo: "text",
+      data_inizio: "datetime", // Preserva orario
+      data_fine: "datetime", // Preserva orario
+      data_creazione: "datetime",
+      stato: "select",
+      priorita: "priority_select",
+      note: "text",
+      tags: "json",
+      id_utente: "number",
+      modifica: "datetime",
+      notifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "pianificato", label: "Pianificato" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "annullato", label: "Annullato" },
+      ],
+    },
+    groups: {
+      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
+      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
+      "Informazioni di sistema": [
+        "id",
+        "id_utente",
+        "modifica",
+        "attivo",
+        "id_pro",
+        "id_att",
+        "id_cli",
+        "data_creazione",
+      ],
+    },
+  },
+  attivita: {
+    listFields: ["id", "titolo", "data_inizio", "stato", "priorita", "attivo"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    requiredFields: ["titolo"],
+    defaultSort: "data_inizio",
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      data_inizio: "datetime", // Preserva orario
+      data_fine: "datetime", // Preserva orario
+      stato: "select",
+      priorita: "priority_select",
+      note: "text",
+      id_utente: "number",
+      modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "da_fare", label: "Da fare" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "sospeso", label: "Sospeso" },
+      ],
+    },
+    groups: {
+      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
+      "Note e dettagli": ["note", "luogo", "tags", "notifica"], // Aggiunto luogo, tags, notifica se esistono
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    },
+  },
+  scadenze: {
+    listFields: ["id", "titolo", "scadenza", "stato", "priorita", "privato"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["titolo"],
+    defaultSort: "scadenza",
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      scadenza: "datetime", // Normalizza a fine giornata
+      stato: "select",
+      priorita: "priority_select",
+      note: "text",
+      id_utente: "number",
+      id_pro: "number",
+      modifica: "datetime",
+      notifica: "datetime",
+      privato: "boolean",
+      tags: "json",
+    },
+    selectOptions: {
+      stato: [
+        { value: "attivo", label: "Attivo" },
+        { value: "completato", label: "Completato" },
+        { value: "scaduto", label: "Scaduto" },
+      ],
+    },
+    groups: {
+      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "scadenza"],
+      Dettagli: ["note", "tags", "notifica", "privato", "id_pro"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    },
+  },
+  todolist: {
+    listFields: ["id", "titolo", "completato", "priorita", "scadenza"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["titolo", "descrizione"],
+    defaultSort: "priorita",
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      completato: "boolean",
+      priorita: "priority_select",
+      scadenza: "datetime", // Normalizza a fine giornata
+      notifica: "datetime",
+      note: "text",
+      tags: "json",
+      id_utente: "number",
+      modifica: "datetime",
+    },
+    groups: {
+      "Informazioni principali": [
+        "titolo",
+        "descrizione",
+        "completato",
+        "priorita",
+        "scadenza",
+        "note",
+        "notifica",
+        "tags",
+      ],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    },
+  },
+  progetti: {
+    listFields: ["id", "titolo", "stato", "data_inizio", "data_fine", "budget"],
+    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+    requiredFields: ["titolo", "stato"],
+    defaultSort: "data_inizio",
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      stato: "select",
+      priorita: "priority_select",
+      data_inizio: "datetime", // Preserva orario
+      data_fine: "datetime", // Preserva orario
+      budget: "number",
+      note: "text",
+      id_utente: "number",
+      modifica: "datetime",
+      colore: "color",
+      gruppo: "group_select",
+      avanzamento: "progress",
+      tags: "json",
+      allegati: "json",
+      notifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "da_pianificare", label: "Da pianificare" },
+        { value: "pianificato", label: "Pianificato" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "sospeso", label: "Sospeso" },
+      ],
+    },
+    groups: {
+      "Informazioni principali": [
+        "titolo",
+        "descrizione",
+        "stato",
+        "colore",
+        "priorita",
+        "gruppo",
+        "budget",
+        "data_inizio",
+        "data_fine",
+        "avanzamento",
+      ],
+      "Note e dettagli": ["note", "allegati", "notifica", "tags"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+    },
+  },
+  clienti: {
+    listFields: ["id", "nome", "cognome", "email", "societa", "citta"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["nome", "cognome", "email"],
+    defaultSort: "cognome",
+    types: {
+      id: "number",
+      nome: "string",
+      cognome: "string",
+      email: "string",
+      indirizzo: "string",
+      citta: "string",
+      cap: "string",
+      codicefiscale: "string",
+      rappresentante: "boolean",
+      societa: "string",
+      indirizzosocieta: "string",
+      cittasocieta: "string",
+      partitaiva: "string",
+      recapiti: "text",
+      note: "text",
+      attivo: "boolean",
+      qr: "string",
+      id_utente: "number",
+      modifica: "datetime",
+    },
+    groups: {
+      "Dati personali": ["nome", "cognome", "email", "codicefiscale", "rappresentante"],
+      "Indirizzo personale": ["indirizzo", "citta", "cap"],
+      "Dati azienda": ["societa", "partitaiva"],
+      "Indirizzo azienda": ["indirizzosocieta", "cittasocieta"],
+      "Contatti e note": ["recapiti", "note", "qr"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo"],
+    },
+  },
+  pagine: {
+    listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
+    readOnlyFields: ["id", "id_utente", "modifica"],
+    requiredFields: ["titolo"],
+    defaultSort: "data_creazione",
+    types: {
+      id: "number",
+      titolo: "string",
+      slug: "string",
+      contenuto: "text",
+      stato: "select",
+      meta_title: "string",
+      meta_description: "text",
+      id_utente: "number",
+      modifica: "datetime",
+      // Aggiunti campi mancanti dalla definizione della tabella utente
+      estratto: "text",
+      categoria: "string",
+      tags: "json",
+      immagine: "string", // Potrebbe essere un URL o un riferimento a un file
+      pubblicato: "datetime", // Preserva orario
+      privato: "boolean",
+      attivo: "boolean", // Assicurati che sia presente se usato
+    },
+    selectOptions: {
+      stato: [
+        { value: "bozza", label: "Bozza" },
+        { value: "pubblicato", label: "Pubblicato" },
+        { value: "archiviato", label: "Archiviato" },
+      ],
+    },
+    groups: {
+      "Informazioni principali": ["titolo", "slug", "stato", "categoria", "pubblicato", "privato", "attivo"],
+      Contenuto: ["estratto", "contenuto", "immagine"],
+      SEO: ["meta_title", "meta_description", "tags"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica"],
+    },
+  },
+}
+
+// Funzione per pulire i dati prima del salvataggio
+function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
+  const cleaned = { ...data }
+  readOnlyFields.forEach((field) => {
+    if (field !== "id_utente") delete cleaned[field]
+  })
+  Object.keys(cleaned).forEach((key) => {
+    const value = cleaned[key]
+    if (value === undefined) delete cleaned[key]
+    else if (typeof value === "string" && value.trim() === "") cleaned[key] = null
+    else if (typeof value === "number" && isNaN(value)) delete cleaned[key]
+  })
+  return cleaned
+}
+
+// Componente per il color picker
 const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
@@ -64,253 +348,82 @@ const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: str
   )
 }
 
-// Definizione dei campi per ogni tabella
-const TABLE_FIELDS = {
-  appuntamenti: {
-    listFields: ["id", "titolo", "data_inizio", "data_fine", "stato"], // Rimosso priorita
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
-    defaultSort: "data_inizio",
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      data_inizio: "datetime",
-      data_fine: "datetime",
-      stato: "string", // Cambiato in string per visualizzazione, ma potrebbe essere select in modifica
-      note: "text",
-      luogo: "string",
-      tags: "tags", // Aggiunto tipo tags
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "data_inizio", "data_fine"], // Rimosso priorita
-      "Note e dettagli": ["luogo", "note", "tags"], // Aggiunto tags
-      "Informazioni di sistema": [
-        "id",
-        "id_utente",
-        "data_creazione",
-        "modifica",
-        "attivo",
-        "id_pro",
-        "id_att",
-        "id_cli",
-      ],
-    },
-    selectOptions: {
-      // Aggiunto per coerenza con la pagina 'new' se si vuole usare Select in modifica
-      stato: [
-        { value: "pianificato", label: "Pianificato" },
-        { value: "in_corso", label: "In corso" },
-        { value: "completato", label: "Completato" },
-        { value: "annullato", label: "Annullato" },
-      ],
-    },
-  },
-  attivita: {
-    listFields: ["id", "titolo", "data_inizio", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli", "data_creazione"],
-    defaultSort: "data_inizio",
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      data_inizio: "datetime",
-      data_fine: "datetime",
-      stato: "string",
-      priorita: "number",
-      note: "text",
-      tags: "tags",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags"],
-      "Informazioni di sistema": [
-        "id",
-        "id_utente",
-        "data_creazione",
-        "modifica",
-        "attivo",
-        "id_pro",
-        "id_app",
-        "id_cli",
-      ],
-    },
-  },
-  scadenze: {
-    listFields: ["id", "titolo", "data_scadenza", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
-    defaultSort: "data_scadenza",
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      data_scadenza: "datetime",
-      stato: "string",
-      priorita: "number",
-      note: "text",
-      tags: "tags",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita"],
-      Date: ["data_scadenza"],
-      "Note e dettagli": ["note", "tags"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
-    },
-  },
-  todolist: {
-    listFields: ["id", "titolo", "completato", "priorita", "data_scadenza"],
-    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
-    defaultSort: "priorita",
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      completato: "boolean",
-      priorita: "number",
-      data_scadenza: "datetime",
-      note: "text",
-      tags: "tags",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "completato", "priorita"],
-      Date: ["data_scadenza"],
-      "Note e dettagli": ["note", "tags"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
-    },
-  },
-  progetti: {
-    listFields: ["id", "nome", "stato", "data_inizio", "data_fine", "budget"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca", "data_creazione"],
-    defaultSort: "data_inizio",
-    types: {
-      id: "number",
-      nome: "string",
-      descrizione: "text",
-      stato: "string",
-      colore: "color", // Aggiunto tipo color
-      gruppo: "string",
-      budget: "number",
-      data_inizio: "datetime",
-      data_fine: "datetime",
-      avanzamento: "number",
-      note: "text",
-      tags: "tags",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni principali": [
-        "nome",
-        "descrizione",
-        "stato",
-        "colore",
-        "gruppo",
-        "budget",
-        "data_inizio",
-        "data_fine",
-        "avanzamento",
-      ],
-      "Note e dettagli": ["note", "tags"],
-      "Informazioni di sistema": [
-        "id",
-        "id_utente",
-        "data_creazione",
-        "modifica",
-        "attivo",
-        "id_att",
-        "id_app",
-        "id_cli",
-        "id_sca",
-      ],
-    },
-  },
-  clienti: {
-    listFields: ["id", "nome", "cognome", "email", "telefono", "citta"],
-    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
-    defaultSort: "cognome",
-    types: {
-      id: "number",
-      nome: "string",
-      cognome: "string",
-      email: "email", // Usare 'email' per validazione input
-      telefono: "tel", // Usare 'tel' per validazione input
-      citta: "string",
-      indirizzo: "string",
-      cap: "string",
-      piva: "string",
-      codfisc: "string",
-      note: "text",
-      tags: "tags",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni personali": ["nome", "cognome", "email", "telefono"],
-      Indirizzo: ["citta", "indirizzo", "cap"],
-      "Informazioni fiscali": ["piva", "codfisc"],
-      "Note e dettagli": ["note", "tags"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
-    },
-  },
-  pagine: {
-    listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
-    readOnlyFields: ["id", "id_utente", "modifica", "data_creazione"],
-    defaultSort: "data_creazione",
-    types: {
-      id: "number",
-      titolo: "string",
-      slug: "string",
-      contenuto: "richtext", // Potrebbe richiedere un editor specifico
-      stato: "string",
-      meta_title: "string",
-      meta_description: "text",
-      tags: "tags",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    groups: {
-      "Informazioni principali": ["titolo", "slug", "stato"],
-      Contenuto: ["contenuto"],
-      SEO: ["meta_title", "meta_description"],
-      "Note e dettagli": ["tags"],
-      "Informazioni di sistema": ["id", "id_utente", "data_creazione", "modifica"],
-    },
-  },
-}
-
-// Funzione per formattare le date in italiano
-function formatDateIT(date: string | null | undefined): string {
-  if (!date) return ""
-  try {
-    const d = new Date(date)
-    if (isNaN(d.getTime())) return ""
-    return d.toLocaleString("it-IT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch (e) {
-    return ""
+// Componente per la barra di avanzamento
+const ProgressBar = ({
+  value,
+  color,
+  onChange,
+  readOnly = false,
+}: {
+  value: number
+  color: string
+  onChange?: (value: number) => void
+  readOnly?: boolean
+}) => {
+  const [localValue, setLocalValue] = useState(value || 0)
+  useEffect(() => setLocalValue(value || 0), [value])
+  const handleSliderChange = (newValue: number[]) => {
+    const val = newValue[0]
+    setLocalValue(val)
+    if (onChange) onChange(val)
   }
+  const progressColor = color || "#3b82f6"
+  const percentage = Math.min(Math.max(localValue, 0), 100)
+  const textInColoredPart = percentage > 50
+
+  if (readOnly) {
+    return (
+      <div className="w-full">
+        <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
+          <div
+            className="h-full transition-all duration-300 ease-in-out"
+            style={{ width: `${percentage}%`, backgroundColor: progressColor }}
+          />
+          <div
+            className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
+              textInColoredPart ? "text-white" : "text-gray-700"
+            }`}
+          >
+            {percentage}%
+          </div>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="w-full space-y-3">
+      <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
+        <div
+          className="h-full transition-all duration-300 ease-in-out"
+          style={{ width: `${percentage}%`, backgroundColor: progressColor }}
+        />
+        <div
+          className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
+            textInColoredPart ? "text-white" : "text-gray-700"
+          }`}
+        >
+          {percentage}%
+        </div>
+      </div>
+      <div className="px-2">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={localValue}
+          onChange={(e) => handleSliderChange([Number.parseInt(e.target.value)])}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+          style={{
+            background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`,
+          }}
+        />
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>0%</span> <span>50%</span> <span>100%</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Componente principale
@@ -329,132 +442,251 @@ export default function ItemDetailPage() {
   const [item, setItem] = useState<any>(null)
   const [editedItem, setEditedItem] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<string>("main")
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
+  const [groupOptions, setGroupOptions] = useState<any[]>([])
 
-  // Estrai e valida i parametri
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
   const itemId = Array.isArray(params.id) ? params.id[0] : params.id
-
   const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
+
+  if (!isValidTable && tableName) console.error(`Tabella non valida: ${tableName}`)
 
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
   const readOnlyFields = tableConfig?.readOnlyFields || []
+  const requiredFields = tableConfig?.requiredFields || []
   const fieldTypes = tableConfig?.types || {}
   const fieldGroups = tableConfig?.groups || {}
-  const selectOptions = tableConfig?.selectOptions || {} // Aggiunto per Select in modifica
+  const selectOptions = tableConfig?.selectOptions || {}
+
+  const loadPriorityOptions = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const { data, error } = await supabase.from("configurazione").select("priorita").single()
+      if (error) throw error
+      let priorityArray = null
+      if (data?.priorita) {
+        if (Array.isArray(data.priorita)) priorityArray = data.priorita
+        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
+        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
+      }
+      if (!priorityArray || priorityArray.length === 0) {
+        setPriorityOptions([])
+        return
+      }
+      const mappedPriorities = priorityArray.map((item: any) => ({
+        value: item.livello || item.value,
+        nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
+        descrizione: item.descrizione || item.description || "",
+      }))
+      setPriorityOptions(mappedPriorities)
+    } catch (error: any) {
+      console.error("Errore nel caricamento delle priorità:", error)
+      setPriorityOptions([])
+    }
+  }, [supabase])
+
+  const loadGroupOptions = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const { data, error } = await supabase.from("configurazione").select("gruppi").single()
+      if (error) throw error
+      let groupArray = null
+      if (data?.gruppi) {
+        if (Array.isArray(data.gruppi)) groupArray = data.gruppi
+        else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) groupArray = data.gruppi.gruppi
+      }
+      if (!groupArray || groupArray.length === 0) {
+        setGroupOptions([])
+        return
+      }
+      const mappedGroups = groupArray.map((item: any) => ({
+        value: item.id || item.value,
+        nome: item.gruppo || item.nome || item.label || `Gruppo ${item.id || item.value}`,
+        descrizione: item.descrizione || item.description || "",
+      }))
+      setGroupOptions(mappedGroups)
+    } catch (error: any) {
+      console.error("Errore nel caricamento dei gruppi:", error)
+      setGroupOptions([])
+    }
+  }, [supabase])
+
+  useEffect(() => {
+    if (supabase) {
+      loadPriorityOptions()
+      loadGroupOptions()
+    }
+  }, [supabase, loadPriorityOptions, loadGroupOptions])
+
+  const validateForm = (): string[] => {
+    const errors: string[] = []
+    if (!editedItem) return errors
+    requiredFields.forEach((field) => {
+      const value = editedItem[field]
+      if (!value || (typeof value === "string" && value.trim() === "")) {
+        const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+        errors.push(`Il campo "${label}" è obbligatorio`)
+      }
+    })
+    if (tableName === "todolist" && editedItem.descrizione && editedItem.descrizione.trim().length < 3) {
+      errors.push("La descrizione deve contenere almeno 3 caratteri")
+    }
+    return errors
+  }
 
   const loadItem = useCallback(async () => {
-    if (!supabase || !tableName || !user?.id || !isValidTable) {
-      return
-    }
-
+    if (!supabase || !tableName || !user?.id || !isValidTable) return
     setLoading(true)
     try {
       if (isNewItem) {
-        const newItemData: any = { id_utente: user.id }
-        // Inizializza i campi con i defaultValues dalla configurazione della pagina 'new'
-        const currentTableConfigForNew = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
-        if (currentTableConfigForNew && currentTableConfigForNew.defaultValues) {
-          Object.assign(newItemData, currentTableConfigForNew.defaultValues)
+        const newItem: any = { id_utente: user.id }
+        // Imposta valori di default specifici per tabella
+        if (tableName === "todolist") {
+          newItem.titolo = ""
+          newItem.descrizione = ""
+          newItem.completato = false
+          newItem.priorita = 1 // Assumendo che 1 sia una priorità valida
+        } else if (tableName === "clienti") {
+          newItem.nome = ""
+          newItem.cognome = ""
+          newItem.email = ""
+          newItem.attivo = true
+          newItem.rappresentante = false
+        } else if (tableName === "progetti") {
+          newItem.titolo = ""
+          newItem.stato = "da_pianificare"
+          newItem.avanzamento = 0
+        } else if (tableName === "attivita") {
+          newItem.titolo = ""
+          newItem.stato = "da_fare"
+          newItem.priorita = 1
+        } else if (tableName === "appuntamenti") {
+          newItem.titolo = ""
+          newItem.stato = "pianificato"
+          newItem.priorita = 1
+        } else if (tableName === "scadenze") {
+          newItem.titolo = ""
+          newItem.stato = "attivo"
+          newItem.priorita = 1
+          newItem.privato = false
+        } else if (tableName === "pagine") {
+          newItem.titolo = ""
+          newItem.stato = "bozza"
+          newItem.attivo = true
+          newItem.privato = false
         }
-        setItem(newItemData)
-        setEditedItem(newItemData)
+        setItem(newItem)
+        setEditedItem(newItem)
         setLoading(false)
         return
       }
-
       const { data, error } = await supabase
         .from(tableName)
         .select("*")
         .eq("id", itemId)
         .eq("id_utente", user.id)
         .single()
-
       if (error) throw error
       setItem(data)
       setEditedItem(data)
     } catch (error: any) {
-      toast({
-        title: "Errore",
-        description: `Impossibile caricare i dati: ${error.message}`,
-        variant: "destructive",
-      })
-      router.push(`/data-explorer`)
+      toast({ title: "Errore", description: `Impossibile caricare i dati: ${error.message}`, variant: "destructive" })
+      router.push(`/data-explorer?table=${tableName}`)
     } finally {
       setLoading(false)
     }
   }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable])
 
   useEffect(() => {
-    if (supabase && user?.id && tableName && isValidTable) {
-      loadItem()
-    }
+    if (supabase && user?.id && tableName && isValidTable) loadItem()
   }, [supabase, user?.id, loadItem, tableName, isValidTable])
 
   const handleFieldChange = (field: string, value: any) => {
-    setEditedItem((prev: any) => ({
-      ...prev,
-      [field]: value,
-    }))
+    setEditedItem((prev: any) => {
+      let processedValue = value
+
+      if (fieldTypes[field] === "datetime" && value) {
+        let needsNormalization: "start" | "end" | null = null
+        if (tableName === "scadenze" && field === "scadenza") {
+          needsNormalization = "end"
+        } else if (tableName === "todolist" && field === "scadenza") {
+          needsNormalization = "end"
+        }
+
+        if (needsNormalization) {
+          const normalized = normalizeDate(value, needsNormalization)
+          processedValue = normalized ? normalized.toISOString() : null
+        } else {
+          // Per tutti gli altri datetime, preserva l'orario.
+          // EnhancedDatePicker restituisce una stringa ISO o un oggetto Date.
+          // Converti in stringa ISO se è un oggetto Date.
+          if (value instanceof Date) {
+            processedValue = value.toISOString()
+          } else if (typeof value === "string") {
+            // Se è una stringa, prova a parsare e riformattare per consistenza,
+            // ma solo se è una data valida, altrimenti mantieni la stringa (es. per input parziali)
+            const parsedDate = parseISO(value)
+            if (isValid(parsedDate)) {
+              processedValue = parsedDate.toISOString()
+            } else {
+              processedValue = value // Mantieni stringa se non parsabile (es. input in corso)
+            }
+          } else {
+            processedValue = null // o gestisci come errore se non è né Date né stringa
+          }
+        }
+      }
+      // Non c'è più la logica di auto-impostazione di data_fine basata su data_inizio qui
+      // per evitare normalizzazioni indesiderate.
+      // Se necessaria, andrà reimplementata con attenzione agli orari.
+      return { ...prev, [field]: processedValue }
+    })
+    setValidationErrors([])
   }
 
   const handleSave = async () => {
     if (!supabase || !tableName || !user?.id || !editedItem || !isValidTable) return
-
+    const errors = validateForm()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      toast({
+        title: "Errori di validazione",
+        description: "Correggi gli errori evidenziati prima di salvare",
+        variant: "destructive",
+      })
+      return
+    }
     setSaving(true)
     try {
-      const updateData = { ...editedItem }
+      const updateData = cleanDataForSave(editedItem, isNewItem ? readOnlyFields : [])
       updateData.modifica = new Date().toISOString()
-
       if (isNewItem) {
         updateData.id_utente = user.id
-        if (!updateData.data_creazione) {
-          // Assicura che data_creazione sia impostata per i nuovi item
-          updateData.data_creazione = new Date().toISOString()
-        }
+        if (fieldTypes.data_creazione) updateData.data_creazione = new Date().toISOString()
       }
-
-      // Rimuovi i campi read-only che non dovrebbero essere inviati (eccetto id per l'update)
-      const dataToSend = { ...updateData }
-      if (!isNewItem) {
-        // Per gli update, non inviare id_utente o data_creazione se sono read-only
-        readOnlyFields.forEach((field) => {
-          if (field !== "id" && field !== "modifica") {
-            // 'id' e 'modifica' sono gestiti
-            delete dataToSend[field]
-          }
-        })
-      }
-
       let result
       if (isNewItem) {
-        // Rimuovi l'id se presente, sarà auto-generato
-        const { id, ...insertData } = dataToSend
-        result = await supabase.from(tableName).insert(insertData).select()
+        result = await supabase.from(tableName).insert(updateData).select()
       } else {
-        const { id, ...updatePayload } = dataToSend // L'ID è usato nell'eq, non nel payload
-        result = await supabase.from(tableName).update(updatePayload).eq("id", itemId).select()
+        result = await supabase.from(tableName).update(updateData).eq("id", itemId).select()
       }
-
-      if (result.error) throw result.error
-
-      toast({
-        title: "Salvato",
-        description: "I dati sono stati salvati con successo",
-      })
-
+      if (result.error) {
+        let errorMessage = result.error.message
+        if (result.error.message.includes("check constraint") && result.error.message.includes("descrizione_check")) {
+          errorMessage =
+            "La descrizione non rispetta i requisiti del database. Assicurati che sia compilata correttamente."
+        }
+        throw new Error(errorMessage)
+      }
+      toast({ title: "Salvato", description: "I dati sono stati salvati con successo" })
       setItem(result.data[0])
       setEditedItem(result.data[0])
       setIsEditMode(false)
-
-      if (isNewItem) {
-        router.push(`/data-explorer/${tableName}/${result.data[0].id}`)
-      }
+      setValidationErrors([])
+      if (isNewItem) router.push(`/data-explorer/${tableName}/${result.data[0].id}`)
     } catch (error: any) {
-      toast({
-        title: "Errore",
-        description: `Impossibile salvare i dati: ${error.message}`,
-        variant: "destructive",
-      })
+      toast({ title: "Errore", description: `Impossibile salvare i dati: ${error.message}`, variant: "destructive" })
     } finally {
       setSaving(false)
     }
@@ -463,23 +695,18 @@ export default function ItemDetailPage() {
   const handleCancelEdit = () => {
     setEditedItem(item)
     setIsEditMode(false)
-    if (isNewItem) {
-      router.push(`/data-explorer`)
-    }
+    setValidationErrors([])
+    if (isNewItem) router.push(`/data-explorer?table=${tableName}`)
   }
 
   const handleDelete = async () => {
     if (!supabase || !tableName || !itemId || !isValidTable) return
-
     setDeleting(true)
     try {
       const { error } = await supabase.from(tableName).delete().eq("id", itemId)
       if (error) throw error
-      toast({
-        title: "Eliminato",
-        description: "L'elemento è stato eliminato con successo",
-      })
-      router.push(`/data-explorer`)
+      toast({ title: "Eliminato", description: "L'elemento è stato eliminato con successo" })
+      router.push(`/data-explorer?table=${tableName}`)
     } catch (error: any) {
       toast({
         title: "Errore",
@@ -491,150 +718,257 @@ export default function ItemDetailPage() {
     }
   }
 
-  const renderField = (field: string, value: any, type: string, readOnlyField = false) => {
+  const renderField = (field: string, value: any, type: string, readOnly = false) => {
     const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
-    const isActuallyReadOnly = readOnlyField || readOnlyFields.includes(field)
+    const isRequired = requiredFields.includes(field)
+    const hasError = validationErrors.some((error) => error.includes(label))
 
-    if (!isEditMode || isActuallyReadOnly) {
+    if (!isEditMode || readOnly) {
+      let displayValue = value
+      if (type === "datetime") {
+        let valueToFormat = value
+        // Applica normalizzazione solo per i campi specifici
+        if (tableName === "scadenze" && field === "scadenza") {
+          const normalized = normalizeDate(value, "end")
+          valueToFormat = normalized || value
+        } else if (tableName === "todolist" && field === "scadenza") {
+          const normalized = normalizeDate(value, "end")
+          valueToFormat = normalized || value
+        }
+        // Per tutti gli altri datetime, formatta il valore così com'è (preservando l'orario)
+        displayValue = formatDateDisplay(valueToFormat)
+      } else {
+        displayValue = renderFieldValue(value, type)
+      }
       return (
         <div className="mb-4" key={field}>
           <Label className="text-sm font-medium">{label}</Label>
-          <div className={`mt-1 p-2 rounded-md ${isActuallyReadOnly ? "bg-gray-100 dark:bg-gray-800" : ""}`}>
-            {renderFieldValue(value, type)}
-          </div>
+          <div className={`mt-1 p-2 rounded-md ${readOnly ? "bg-gray-100" : ""}`}>{displayValue}</div>
         </div>
       )
     }
 
-    // Logica per la modalità modifica
     switch (type) {
       case "text":
-      case "richtext": // richtext potrebbe necessitare di un editor specifico
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Textarea
               id={field}
               value={value || ""}
               onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
-              rows={type === "richtext" ? 6 : 3}
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              rows={4}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
         )
       case "boolean":
         return (
           <div className="flex items-center space-x-2 mb-4" key={field}>
-            <Switch id={field} checked={!!value} onCheckedChange={(checked) => handleFieldChange(field, checked)} />
+            <Switch
+              id={field}
+              checked={value || false}
+              onCheckedChange={(checked) => handleFieldChange(field, checked)}
+            />
             <Label htmlFor={field}>{label}</Label>
           </div>
         )
       case "datetime":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <EnhancedDatePicker
               id={field}
+              // EnhancedDatePicker si aspetta una stringa ISO o un oggetto Date.
+              // `value` qui dovrebbe essere una stringa ISO dal database o da una modifica precedente.
               value={value || ""}
-              onChange={(val) => handleFieldChange(field, val)}
-              className="mt-1 w-full"
+              onChange={(newValue) => handleFieldChange(field, newValue)} // newValue è stringa ISO o Date
+              placeholder={`Seleziona ${label.toLowerCase()}`}
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              showTimeSelect // Abilita sempre la selezione dell'orario
+              dateFormat="dd/MM/yyyy HH:mm" // Mostra l'orario nel formato
             />
           </div>
         )
       case "number":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Input
               id={field}
               type="number"
               value={value || ""}
-              onChange={(e) =>
-                handleFieldChange(field, e.target.value === "" ? null : Number.parseFloat(e.target.value))
-              }
-              className="mt-1"
+              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value) || null)}
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
         )
-      case "tags":
+      case "priority_select":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <TagInput
-              id={field}
-              value={Array.isArray(value) ? value : value ? String(value).split(",") : []}
-              onChange={(tags) => handleFieldChange(field, tags)}
-              className="mt-1"
-              placeholder={`Aggiungi ${label.toLowerCase()}`}
-            />
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            {priorityOptions.length > 0 ? (
+              <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, Number(val))}>
+                <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
+                  <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2" onClick={loadPriorityOptions}>
+                  Riprova caricamento
+                </Button>
+              </div>
+            )}
+          </div>
+        )
+      case "group_select":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            {groupOptions.length > 0 ? (
+              <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, val)}>
+                <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
+                  <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {groupOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Impossibile caricare le opzioni di gruppo. Verificare la configurazione.</span>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2" onClick={loadGroupOptions}>
+                  Riprova caricamento
+                </Button>
+              </div>
+            )}
+          </div>
+        )
+      case "select":
+        const options = selectOptions[field] || []
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
+              <SelectTrigger className={`mt-1 ${hasError ? "border-red-500" : ""}`}>
+                <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((option: any) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )
       case "color":
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field}>{label}</Label>
-            <ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />
+            <div className="mt-1">
+              <ColorPicker value={value || "#000000"} onChange={(val) => handleFieldChange(field, val)} />
+            </div>
           </div>
         )
-      case "select": // Aggiunto per gestire i select in modifica
-        const options =
-          selectOptions && selectOptions[field as keyof typeof selectOptions]
-            ? selectOptions[field as keyof typeof selectOptions]
-            : []
+      case "json":
+        if (field === "tags") {
+          return (
+            <div className="mb-4" key={field}>
+              <Label htmlFor={field}>{label}</Label>
+              <TagInput
+                id={field}
+                value={Array.isArray(value) ? value : []}
+                onChange={(tags) => handleFieldChange(field, tags)}
+                placeholder="Aggiungi tag..."
+                className="mt-1"
+              />
+            </div>
+          )
+        }
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field}>{label}</Label>
-            <select
+            <Textarea
               id={field}
-              value={value || ""}
-              onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-              <option value="">Seleziona...</option>
-              {options.map((option: any) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )
-      case "email":
-        return (
-          <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Input
-              id={field}
-              type="email"
-              value={value || ""}
-              onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
+              value={typeof value === "object" ? JSON.stringify(value, null, 2) : value || ""}
+              onChange={(e) => {
+                try {
+                  const parsed = JSON.parse(e.target.value)
+                  handleFieldChange(field, parsed)
+                } catch {
+                  handleFieldChange(field, e.target.value) // Mantieni come stringa se non è JSON valido
+                }
+              }}
+              className="mt-1 font-mono text-sm"
+              rows={4}
+              placeholder="JSON valido..."
             />
           </div>
         )
-      case "tel":
+      case "progress":
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
-            <Input
-              id={field}
-              type="tel"
-              value={value || ""}
-              onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
-            />
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <div className="mt-1">
+              <ProgressBar
+                value={value || 0}
+                color={editedItem.colore || "#3b82f6"}
+                onChange={readOnly ? undefined : (val) => handleFieldChange(field, val)}
+                readOnly={readOnly || !isEditMode}
+              />
+            </div>
           </div>
         )
-      default: // string e altri non specificati
+      default: // string
         return (
           <div className="mb-4" key={field}>
-            <Label htmlFor={field}>{label}</Label>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
             <Input
               id={field}
               type="text"
               value={value || ""}
               onChange={(e) => handleFieldChange(field, e.target.value)}
-              className="mt-1"
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
         )
@@ -642,40 +976,46 @@ export default function ItemDetailPage() {
   }
 
   const renderFieldValue = (value: any, type: string) => {
-    if (value === null || value === undefined || value === "") return "-"
-
+    if (value === null || value === undefined) return "-"
     switch (type) {
       case "datetime":
-        return formatDateIT(value)
+        // La formattazione specifica per normalizzazione è gestita in renderField
+        return formatDateDisplay(value)
       case "boolean":
-        return value ? "Sì" : "No"
+        return value ? "✓" : "✗"
       case "number":
         return typeof value === "number" ? value.toLocaleString("it-IT") : value
+      case "priority_select":
+        if (priorityOptions.length === 0) return <span className="text-red-500">Errore configurazione</span>
+        const priorityOption = priorityOptions.find((option) => option.value === value)
+        return priorityOption ? priorityOption.nome : value
+      case "group_select":
+        if (groupOptions.length === 0) return <span className="text-red-500">Errore configurazione</span>
+        const groupOption = groupOptions.find((option) => option.value === value)
+        return groupOption ? groupOption.nome : value
       case "text":
-      case "richtext":
         return <div className="whitespace-pre-wrap">{value}</div>
-      case "tags":
-        if (Array.isArray(value)) {
-          return value.map((tag) => (
-            <Badge key={tag} variant="secondary" className="mr-1 mb-1">
-              {tag}
-            </Badge>
-          ))
-        }
-        return String(value)
-          .split(",")
-          .map((tag) => (
-            <Badge key={tag} variant="secondary" className="mr-1 mb-1">
-              {tag.trim()}
-            </Badge>
-          ))
+      case "json":
+        if (Array.isArray(value))
+          return (
+            <div className="flex flex-wrap gap-1">
+              {value.map((item, index) => (
+                <Badge key={index} variant="secondary">
+                  {String(item)}
+                </Badge>
+              ))}
+            </div>
+          )
+        return <pre className="text-sm">{JSON.stringify(value, null, 2)}</pre>
       case "color":
         return (
-          <div className="flex items-center space-x-2">
-            <div style={{ backgroundColor: value }} className="w-6 h-6 rounded border"></div>
-            <span>{value}</span>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md border" style={{ backgroundColor: value || "#ffffff" }} />
+            <span>{value || "-"}</span>
           </div>
         )
+      case "progress":
+        return <ProgressBar value={value} color={editedItem?.colore || "#3b82f6"} readOnly />
       default:
         return formatValue(value)
     }
@@ -696,65 +1036,215 @@ export default function ItemDetailPage() {
 
   const renderFieldGroups = () => {
     if (!editedItem) return null
-    const allFieldsInItem = Object.keys(editedItem)
-    const tabsToRender = Object.keys(fieldGroups).filter((groupName) =>
-      fieldGroups[groupName as keyof typeof fieldGroups].some((field) => allFieldsInItem.includes(field)),
-    )
+    const allFields = Object.keys(editedItem)
+    const tabs = Object.keys(fieldGroups)
 
     return (
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4 grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-none lg:flex">
-          {tabsToRender.map((group) => (
-            <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")} className="capitalize">
-              {group}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div>
+        {validationErrors.length > 0 && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-center mb-2">
+              <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
+              <h4 className="text-sm font-medium text-red-800">Errori di validazione:</h4>
+            </div>
+            <ul className="text-sm text-red-700 list-disc list-inside">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            {tabs.map((group) => (
+              <TabsTrigger key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
+                {group}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {tabs.map((group) => {
+            const groupFields = fieldGroups[group as keyof typeof fieldGroups] || []
+            return (
+              <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
+                <div className="space-y-4">
+                  {groupFields.map((field) => {
+                    if (!allFields.includes(field) && !isNewItem) return null // Mostra tutti i campi per i nuovi item
+                    const isReadOnly = readOnlyFields.includes(field)
+                    const fieldType = fieldTypes[field as keyof typeof fieldTypes] || "string"
 
-        {tabsToRender.map((group) => {
-          const groupFields = fieldGroups[group as keyof typeof fieldGroups] || []
-          return (
-            <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                {groupFields.map((field) => {
-                  if (!allFieldsInItem.includes(field) && !isNewItem) return null // Non renderizzare se il campo non è nei dati (per item esistenti)
-                  // Per i nuovi item, renderizza tutti i campi definiti nel gruppo, anche se non ancora in editedItem
-                  const fieldType = fieldTypes[field as keyof typeof fieldTypes] || "string"
-                  const fieldValue = editedItem[field]
+                    // Gestione speciale per data_inizio e data_fine sulla stessa riga
+                    if (
+                      field === "data_inizio" &&
+                      groupFields.includes("data_fine") &&
+                      (allFields.includes("data_fine") || isNewItem)
+                    ) {
+                      if (!isEditMode) {
+                        return (
+                          <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Data inizio</Label>
+                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.data_inizio)}</div>
+                            </div>
+                            <div>
+                              <Label>Data fine</Label>
+                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.data_fine)}</div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key="date-range" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="data_inizio">Data inizio</Label>
+                            <EnhancedDatePicker
+                              id="data_inizio"
+                              value={editedItem.data_inizio || ""}
+                              onChange={(newValue) => handleFieldChange("data_inizio", newValue)}
+                              placeholder="Seleziona data inizio"
+                              className="mt-1"
+                              showTimeSelect
+                              dateFormat="dd/MM/yyyy HH:mm"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="data_fine">Data fine</Label>
+                            <EnhancedDatePicker
+                              id="data_fine"
+                              value={editedItem.data_fine || ""}
+                              onChange={(newValue) => handleFieldChange("data_fine", newValue)}
+                              placeholder="Seleziona data fine"
+                              className="mt-1"
+                              showTimeSelect
+                              dateFormat="dd/MM/yyyy HH:mm"
+                            />
+                          </div>
+                        </div>
+                      )
+                    }
+                    // Gestione speciale per priorita e scadenza sulla stessa riga
+                    if (
+                      field === "priorita" &&
+                      groupFields.includes("scadenza") &&
+                      (allFields.includes("scadenza") || isNewItem)
+                    ) {
+                      if (!isEditMode) {
+                        return (
+                          <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Priorità</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.priorita, fieldTypes.priorita || "priority_select")}
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Scadenza</Label>
+                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.scadenza)}</div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            {renderField(
+                              "priorita",
+                              editedItem.priorita,
+                              fieldTypes.priorita || "priority_select",
+                              readOnlyFields.includes("priorita"),
+                            )}
+                          </div>
+                          <div>
+                            {renderField(
+                              "scadenza",
+                              editedItem.scadenza,
+                              fieldTypes.scadenza || "datetime",
+                              readOnlyFields.includes("scadenza"),
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
+                    // Gestione speciale per stato e colore sulla stessa riga
+                    if (
+                      field === "stato" &&
+                      groupFields.includes("colore") &&
+                      (allFields.includes("colore") || isNewItem)
+                    ) {
+                      if (!isEditMode) {
+                        return (
+                          <div key="status-color" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Stato</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.stato, fieldTypes.stato || "select")}
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Colore</Label>
+                              <div className="mt-1 p-2 rounded-md">
+                                {renderFieldValue(editedItem.colore, fieldTypes.colore || "color")}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div key="status-color" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            {renderField(
+                              "stato",
+                              editedItem.stato,
+                              fieldTypes.stato || "select",
+                              readOnlyFields.includes("stato"),
+                            )}
+                          </div>
+                          <div>
+                            {renderField(
+                              "colore",
+                              editedItem.colore,
+                              fieldTypes.colore || "color",
+                              readOnlyFields.includes("colore"),
+                            )}
+                          </div>
+                        </div>
+                      )
+                    }
 
-                  // Per i nuovi item, se il campo non è in editedItem ma ha un default value, usalo
-                  const valueToRender =
-                    isNewItem &&
-                    fieldValue === undefined &&
-                    tableConfig?.defaultValues?.[field as keyof typeof tableConfig.defaultValues] !== undefined
-                      ? tableConfig.defaultValues[field as keyof typeof tableConfig.defaultValues]
-                      : fieldValue
+                    // Evita di renderizzare due volte i campi gestiti in coppia
+                    if (
+                      field === "data_fine" &&
+                      groupFields.includes("data_inizio") &&
+                      (allFields.includes("data_inizio") || isNewItem)
+                    )
+                      return null
+                    if (
+                      field === "scadenza" &&
+                      groupFields.includes("priorita") &&
+                      (allFields.includes("priorita") || isNewItem)
+                    )
+                      return null
+                    if (
+                      field === "colore" &&
+                      groupFields.includes("stato") &&
+                      (allFields.includes("stato") || isNewItem)
+                    )
+                      return null
 
-                  return (
-                    <div
-                      key={field}
-                      className={cn(
-                        (fieldType === "text" || fieldType === "richtext" || fieldType === "tags") && "md:col-span-2",
-                      )}
-                    >
-                      {renderField(field, valueToRender, fieldType, readOnlyFields.includes(field))}
-                    </div>
-                  )
-                })}
-              </div>
-            </TabsContent>
-          )
-        })}
-      </Tabs>
+                    // Renderizza il campo singolo se non è parte di una coppia o se la sua controparte non esiste
+                    return renderField(field, editedItem[field], fieldType, isReadOnly)
+                  })}
+                </div>
+              </TabsContent>
+            )
+          })}
+        </Tabs>
+      </div>
     )
   }
 
   useEffect(() => {
     if (fieldGroups && Object.keys(fieldGroups).length > 0) {
-      const firstGroupKey = Object.keys(fieldGroups)[0]
-      if (firstGroupKey) {
-        setActiveTab(firstGroupKey.toLowerCase().replace(/\s+/g, "-"))
-      }
+      setActiveTab(Object.keys(fieldGroups)[0].toLowerCase().replace(/\s+/g, "-"))
     }
   }, [fieldGroups])
 
@@ -764,11 +1254,13 @@ export default function ItemDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl text-red-600">Errore</CardTitle>
-            <CardDescription>La tabella "{tableName}" non è disponibile.</CardDescription>
+            <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => router.push("/data-explorer")}>
-              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+              {" "}
+              {/* Modificato per tornare a una pagina generica */}
+              <ArrowLeft size={16} className="mr-2" /> Torna a Data Explorer
             </Button>
           </CardContent>
         </Card>
@@ -781,16 +1273,16 @@ export default function ItemDetailPage() {
       <div className="container mx-auto py-6">
         <Card>
           <CardHeader>
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="mt-2 h-4 w-1/2" />
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-32" />
           </CardHeader>
-          <CardContent className="space-y-6">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Skeleton className="h-10 w-full" /> <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-20 w-full md:col-span-2" />
-              </div>
-            ))}
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -801,63 +1293,63 @@ export default function ItemDetailPage() {
     <div className="container mx-auto py-6">
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center justify-between">
             <div>
-              <Button variant="ghost" onClick={() => router.push("/data-explorer")} className="mb-2 -ml-4 sm:ml-0">
+              <Button variant="ghost" onClick={() => router.push(`/data-explorer?table=${tableName}`)} className="mb-2">
                 <ArrowLeft size={16} className="mr-2" /> Torna alla lista
               </Button>
               <CardTitle className="text-2xl">{getItemTitle()}</CardTitle>
-              <CardDescription>
-                {getTableTitle()}{" "}
-                {!isNewItem && item?.id && (
+              <div className="flex items-center">
+                <CardDescription>{getTableTitle()}</CardDescription>
+                {!isNewItem && (
                   <Badge variant="outline" className="ml-2">
-                    ID: {item.id}
+                    ID: {itemId}
                   </Badge>
                 )}
-              </CardDescription>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              {isEditMode ? (
+            <div className="flex space-x-2">
+              {isEditMode && (
                 <>
                   <Button
                     onClick={handleSave}
                     disabled={saving}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                    className="min-w-[150px] bg-blue-600 hover:bg-blue-700 text-white"
                   >
-                    {saving ? (
-                      "Salvataggio..."
-                    ) : (
-                      <>
-                        <Save size={16} className="mr-2" /> Salva modifiche
-                      </>
-                    )}
+                    {saving ? "Salvataggio..." : "Salva modifiche"}
+                    {!saving && <Save size={16} className="ml-2" />}
                   </Button>
-                  <Button variant="outline" onClick={handleCancelEdit} className="w-full sm:w-auto">
-                    <X size={16} className="mr-2" /> Annulla
+                  <Button variant="outline" onClick={handleCancelEdit}>
+                    <X size={16} className="mr-2" /> Annulla modifica
                   </Button>
                 </>
-              ) : (
-                !isNewItem && (
-                  <Button variant="outline" onClick={() => setIsEditMode(true)} className="w-full sm:w-auto">
-                    <Edit size={16} className="mr-2" /> Modifica
-                  </Button>
-                )
+              )}
+              {!isNewItem && !isEditMode && (
+                <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                  <Edit size={16} className="mr-2" /> Modifica
+                </Button>
               )}
               {!isNewItem && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="w-full sm:w-auto">
+                    <Button variant="destructive">
                       <Trash2 size={16} className="mr-2" /> Elimina
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-                      <AlertDialogDescription>Questa azione non può essere annullata.</AlertDialogDescription>
+                      <AlertDialogDescription>
+                        Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.
+                      </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
                         {deleting ? "Eliminazione..." : "Elimina"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
