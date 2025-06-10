@@ -206,8 +206,7 @@ const AdminDashboardContent = memo(() => {
       setConfigFields(fallbackFields)
       setConfigData({})
     } finally {
-      \
-      set IsLoadingConfig(false)
+      setIsLoadingConfig(false)
     }
   }
 
