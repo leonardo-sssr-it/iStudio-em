@@ -1,8 +1,15 @@
 "use client"
 
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent } from "@/components/ui/card"
+import { ProtectedRoute } from "@/components/protected-route"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
+import { User, Database, List, Filter, LogOut, Loader2, Save, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { memo, useRef, useEffect, useState } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
@@ -199,4 +206,307 @@ const AdminDashboardContent = memo(() => {
       setConfigFields(fallbackFields)
       setConfigData({})
     } finally {
-      set
+      \
+      set IsLoadingConfig(false)
+    }
+  }
+
+  // Funzione per dedurre il tipo di un campo dal valore
+  const getFieldType = (value: any): string => {
+    if (value === null || value === undefined) return "text"
+    if (typeof value === "boolean") return "boolean"
+    if (typeof value === "number") return "number"
+    if (typeof value === "object") return "json"
+    return "text"
+  }
+
+  // Gestisce il cambiamento di un campo
+  const handleFieldChange = (fieldName: string, value: any, fieldType: string) => {
+    console.log(`Cambiamento campo ${fieldName}:`, value, `(tipo: ${fieldType})`)
+
+    // Validazione JSON
+    if (fieldType === "json") {
+      const validation = validateJSON(value)
+      setJsonValidation((prev) => ({
+        ...prev,
+        [fieldName]: validation,
+      }))
+
+      if (!validation.isValid) {
+        setConfigErrors((prev) => ({
+          ...prev,
+          [fieldName]: validation.error || "JSON non valido",
+        }))
+      } else {
+        setConfigErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[fieldName]
+          return newErrors
+        })
+      }
+    }
+
+    setConfigData((prev) => ({
+      ...prev,
+      [fieldName]: value,
+    }))
+  }
+
+  // Salva la configurazione
+  const saveConfiguration = async () => {
+    if (!supabase) return
+
+    // Verifica errori di validazione
+    if (Object.keys(configErrors).length > 0) {
+      toast({
+        title: "Errore di validazione",
+        description: "Correggi gli errori nei campi prima di salvare",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingConfig(true)
+    try {
+      console.log("Salvataggio configurazione:", configData)
+
+      // Prepara i dati per il salvataggio
+      const dataToSave = { ...configData }
+
+      // Converte i campi JSON da stringa a oggetto
+      configFields.forEach((field) => {
+        if (field.type === "json" && typeof dataToSave[field.name] === "string") {
+          const validation = jsonValidation[field.name]
+          if (validation?.isValid && validation.parsed !== undefined) {
+            dataToSave[field.name] = validation.parsed
+          }
+        }
+      })
+
+      // Verifica se esiste già una configurazione
+      const { data: existingConfig } = await supabase.from("configurazione").select("id").limit(1).maybeSingle()
+
+      let result
+      if (existingConfig) {
+        // Aggiorna la configurazione esistente
+        result = await supabase.from("configurazione").update(dataToSave).eq("id", existingConfig.id).select()
+      } else {
+        // Inserisci una nuova configurazione
+        result = await supabase.from("configurazione").insert([dataToSave]).select()
+      }
+
+      if (result.error) {
+        throw result.error
+      }
+
+      console.log("Configurazione salvata con successo:", result.data)
+      toast({
+        title: "Successo",
+        description: "Configurazione salvata con successo",
+      })
+    } catch (error) {
+      console.error("Errore nel salvataggio della configurazione:", error)
+      toast({
+        title: "Errore",
+        description: `Impossibile salvare la configurazione: ${error instanceof Error ? error.message : "Errore sconosciuto"}`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSavingConfig(false)
+    }
+  }
+
+  // Renderizza un campo di input basato sul tipo
+  const renderField = (field: { name: string; type: string; nullable: boolean }) => {
+    const value = configData[field.name] || ""
+    const hasError = configErrors[field.name]
+
+    switch (field.type) {
+      case "boolean":
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={field.name}
+              checked={Boolean(value)}
+              onCheckedChange={(checked) => handleFieldChange(field.name, checked, field.type)}
+              className="admin-checkbox"
+            />
+            <Label
+              htmlFor={field.name}
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            </Label>
+          </div>
+        )
+
+      case "json":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor={field.name} className="text-sm font-medium">
+              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            </Label>
+            <Textarea
+              id={field.name}
+              value={typeof value === "object" ? JSON.stringify(value, null, 2) : value}
+              onChange={(e) => handleFieldChange(field.name, e.target.value, field.type)}
+              placeholder={`Inserisci JSON valido per ${field.name}`}
+              className={`min-h-[100px] font-mono text-sm ${hasError ? "border-destructive" : ""}`}
+            />
+            {hasError && (
+              <div className="flex items-center text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 mr-1" />
+                {hasError}
+              </div>
+            )}
+          </div>
+        )
+
+      case "number":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor={field.name} className="text-sm font-medium">
+              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            </Label>
+            <Input
+              id={field.name}
+              type="number"
+              value={value}
+              onChange={(e) => handleFieldChange(field.name, Number(e.target.value), field.type)}
+              placeholder={`Inserisci ${field.name}`}
+            />
+          </div>
+        )
+
+      default:
+        return (
+          <div className="space-y-2">
+            <Label htmlFor={field.name} className="text-sm font-medium">
+              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            </Label>
+            <Input
+              id={field.name}
+              type="text"
+              value={value}
+              onChange={(e) => handleFieldChange(field.name, e.target.value, field.type)}
+              placeholder={`Inserisci ${field.name}`}
+            />
+          </div>
+        )
+    }
+  }
+
+  return (
+    <div className="container mx-auto py-6 space-y-6 content-inherit">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard Admin</h1>
+          <p className="text-muted-foreground">Benvenuto, {user?.nome || user?.username}. Gestisci il sistema.</p>
+        </div>
+        <Button variant="outline" onClick={() => logout()} className="flex items-center gap-2 w-full sm:w-auto">
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
+      </div>
+
+      {/* Tabs per navigazione */}
+      <div className="flex flex-wrap gap-2 border-b">
+        <Button
+          variant={activeTab === "database" ? "default" : "ghost"}
+          onClick={() => setActiveTab("database")}
+          className={activeTab === "database" ? "admin-tab-active" : ""}
+        >
+          <Database className="h-4 w-4 mr-2" />
+          Database
+        </Button>
+        <Button
+          variant={activeTab === "configurazione" ? "default" : "ghost"}
+          onClick={() => setActiveTab("configurazione")}
+          className={activeTab === "configurazione" ? "admin-tab-active" : ""}
+        >
+          <User className="h-4 w-4 mr-2" />
+          Configurazione
+        </Button>
+      </div>
+
+      {/* Contenuto Database */}
+      {activeTab === "database" && (
+        <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <AdminCard
+            href="/data-explorer"
+            icon={Database}
+            title="Esplora Database"
+            description="Visualizza e gestisci tutte le tabelle del database"
+            isVisible={card1Visible}
+          />
+          <AdminCard
+            href="/show-list"
+            icon={List}
+            title="Lista Tabelle"
+            description="Visualizza l'elenco completo delle tabelle disponibili"
+            isVisible={card2Visible}
+          />
+          <AdminCard
+            href="/user-filter"
+            icon={Filter}
+            title="Filtro Utenti"
+            description="Filtra e gestisci gli utenti del sistema"
+            isVisible={card3Visible}
+          />
+        </div>
+      )}
+
+      {/* Contenuto Configurazione */}
+      {activeTab === "configurazione" && (
+        <Card className="dashboard-card">
+          <CardHeader>
+            <CardTitle>Configurazione Sistema</CardTitle>
+            <CardDescription>Modifica le impostazioni globali dell'applicazione</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 dashboard-content">
+            {isLoadingConfig ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Caricamento configurazione...</span>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {configFields.map((field) => (
+                    <div key={field.name}>{renderField(field)}</div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end pt-4 border-t">
+                  <Button onClick={saveConfiguration} disabled={isSavingConfig || Object.keys(configErrors).length > 0}>
+                    {isSavingConfig ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Salvataggio...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Salva Configurazione
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+})
+
+AdminDashboardContent.displayName = "AdminDashboardContent"
+
+export default function AdminPage() {
+  return (
+    <ProtectedRoute requireAdmin>
+      <AdminDashboardContent />
+    </ProtectedRoute>
+  )
+}
