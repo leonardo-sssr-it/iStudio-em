@@ -14,13 +14,15 @@ import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
 import { GalleryManagerWidget } from "@/components/gallery-manager-widget"
 import { FeedReaderWidget } from "@/components/feed-reader-widget"
+import { TodoKanbanWidget } from "@/components/todo-kanban-widget" // Importa il nuovo widget
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
 
 const AVAILABLE_WIDGETS = [
   { id: "agenda", name: "Agenda", component: AgendaWidget },
   { id: "gantt", name: "Diagramma Gantt", component: GanttChartWidget },
-  { id: "kanban", name: "Kanban Board", component: KanbanWidget },
+  { id: "kanban", name: "Kanban Board Generico", component: KanbanWidget },
+  { id: "todo_kanban", name: "Kanban Todolist", component: TodoKanbanWidget }, // Aggiungi il nuovo widget qui
   { id: "gallery", name: "Gestione Galleria", component: GalleryManagerWidget },
   {
     id: "feed1",
@@ -36,7 +38,7 @@ const AVAILABLE_WIDGETS = [
 
 export default function UserDashboardPage() {
   const { user } = useAuth()
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("feed1") // Default to feed1 for testing
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("todo_kanban") // Default al nuovo widget per test
   const [key, setKey] = useState(0)
 
   const selectedWidget = AVAILABLE_WIDGETS.find((widget) => widget.id === selectedWidgetId)
