@@ -20,23 +20,26 @@ export function ThemeSelector() {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleThemeChange = (themeId: number) => {
-    console.log("=== CAMBIO TEMA ===")
-    console.log("Cambiando tema a ID:", themeId)
+    // Rimuovi questi console.log che causano rumore nella console
+    // console.log("=== CAMBIO TEMA ===")
+    // console.log("Cambiando tema a ID:", themeId)
     const success = applyTheme(themeId)
-    console.log("Tema applicato con successo:", success)
+    // console.log("Tema applicato con successo:", success)
     setIsOpen(false)
   }
 
   const handleResetToDefault = () => {
-    console.log("=== RESET AL TEMA PREDEFINITO ===")
+    // Rimuovi questi console.log che causano rumore nella console
+    // console.log("=== RESET AL TEMA PREDEFINITO ===")
     const success = resetToDefault()
-    console.log("Reset completato:", success)
+    // console.log("Reset completato:", success)
     setIsOpen(false)
   }
 
   const handleDarkModeToggle = () => {
-    console.log("=== CLICK TOGGLE DARK MODE ===")
-    console.log("Toggle dark mode, stato attuale:", isDarkMode)
+    // Rimuovi questi console.log che causano rumore nella console
+    // console.log("=== CLICK TOGGLE DARK MODE ===")
+    // console.log("Toggle dark mode, stato attuale:", isDarkMode)
     toggleDarkMode()
   }
 

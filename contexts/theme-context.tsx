@@ -70,7 +70,8 @@ function resetToDefaultTheme() {
 
   const root = document.documentElement
 
-  console.log("=== RESETTANDO AL TEMA PREDEFINITO ===")
+  // Rimuovi questo console.log che causa rumore nella console
+  // console.log("=== RESETTANDO AL TEMA PREDEFINITO ===")
 
   try {
     // Rimuovi tutte le variabili CSS personalizzate
@@ -119,9 +120,10 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
 
   const root = document.documentElement
 
-  console.log("=== APPLICANDO TEMA ===")
-  console.log("Nome tema:", theme.nome_tema)
-  console.log("Dark mode:", isDark)
+  // Rimuovi questo console.log che causa rumore nella console
+  // console.log("=== APPLICANDO TEMA ===")
+  // console.log("Nome tema:", theme.nome_tema)
+  // console.log("Dark mode:", isDark)
 
   try {
     // Applica i colori principali
@@ -271,7 +273,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (mounted) {
       const resolvedTheme = theme === "system" ? systemTheme : theme
       setIsDarkMode(resolvedTheme === "dark")
-      console.log("Tema risolto:", resolvedTheme, "isDark:", resolvedTheme === "dark")
+
+      // Rimuovi questo console.log che causa rumore nella console
+      // console.log("Tema risolto:", resolvedTheme, "isDark:", resolvedTheme === "dark")
     }
   }, [theme, systemTheme, mounted])
 
@@ -279,8 +283,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (mounted && currentTheme && typeof window !== "undefined") {
       const resolvedTheme = theme === "system" ? systemTheme : theme
-      console.log("Applicando tema personalizzato:", currentTheme.nome_tema, "isDark:", resolvedTheme === "dark")
-      applyCustomTheme(currentTheme, resolvedTheme === "dark")
+      // Rimuovi questo console.log che causa rumore nella console
+      // console.log("Applicando tema personalizzato:", currentTheme.nome_tema, "isDark:", resolvedTheme === "dark")
+
+      // Aggiungi una verifica per evitare reset inutili del tema predefinito
+      const lastAppliedTheme = window.localStorage.getItem("lastAppliedThemeId")
+      const currentThemeId = currentTheme.id.toString()
+
+      if (lastAppliedTheme !== currentThemeId) {
+        applyCustomTheme(currentTheme, resolvedTheme === "dark")
+        window.localStorage.setItem("lastAppliedThemeId", currentThemeId)
+      }
     }
   }, [currentTheme, theme, systemTheme, mounted])
 

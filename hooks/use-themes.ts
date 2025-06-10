@@ -69,6 +69,19 @@ export function useThemes() {
       }
 
       try {
+        // Aggiungi una verifica per evitare chiamate inutili
+        const cachedThemes = sessionStorage.getItem("cachedThemes")
+        const lastFetch = sessionStorage.getItem("themesFetchTime")
+        const now = Date.now()
+
+        // Usa la cache se è stata aggiornata negli ultimi 5 minuti
+        if (cachedThemes && lastFetch && now - Number.parseInt(lastFetch) < 300000) {
+          const parsedThemes = JSON.parse(cachedThemes)
+          setThemes([defaultTheme, ...parsedThemes])
+          setIsLoading(false)
+          return
+        }
+
         const { data, error } = await supabase.from("temi").select("*").order("id", { ascending: true })
 
         if (error) {
@@ -92,6 +105,10 @@ export function useThemes() {
               isDefault: false,
             }))
           : []
+
+        // Salva nella cache
+        sessionStorage.setItem("cachedThemes", JSON.stringify(supabaseThemes))
+        sessionStorage.setItem("themesFetchTime", now.toString())
 
         // Combina il tema predefinito con i temi da Supabase
         const allThemes = [defaultTheme, ...supabaseThemes]
