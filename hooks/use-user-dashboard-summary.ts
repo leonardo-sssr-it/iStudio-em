@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-provider"
 import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO } from "date-fns"
 import type { LucideIcon } from "lucide-react"
 import { CalendarDays, ClipboardCheck, AlarmClock, ListChecks, Briefcase, Users } from "lucide-react"
+import { normalizeDeadlineDate, isDeadlineField } from "@/lib/date-utils"
 
 export interface SummaryCount {
   type: string
@@ -79,12 +80,26 @@ const mapRawItemToUpcoming = (
   if (Array.isArray(dateField)) {
     for (const field of dateField) {
       if (raw[field]) {
-        dateValue = parseISO(raw[field])
+        // Normalizza le date di scadenza per scadenze e todolist
+        if (isDeadlineField(table, field)) {
+          // Se è una scadenza, assicuriamoci che sia normalizzata a fine giornata
+          const normalizedDate = normalizeDeadlineDate(raw[field])
+          dateValue = normalizedDate ? parseISO(normalizedDate) : undefined
+        } else {
+          dateValue = parseISO(raw[field])
+        }
         break
       }
     }
   } else if (raw[dateField]) {
-    dateValue = parseISO(raw[dateField])
+    // Normalizza le date di scadenza per scadenze e todolist
+    if (isDeadlineField(table, dateField)) {
+      // Se è una scadenza, assicuriamoci che sia normalizzata a fine giornata
+      const normalizedDate = normalizeDeadlineDate(raw[dateField])
+      dateValue = normalizedDate ? parseISO(normalizedDate) : undefined
+    } else {
+      dateValue = parseISO(raw[dateField])
+    }
   }
 
   if (!dateValue) return null
