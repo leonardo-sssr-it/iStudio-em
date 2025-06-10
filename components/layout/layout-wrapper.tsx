@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useCustomTheme } from "@/contexts/theme-context"
+import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { useSidebarState } from "@/contexts/sidebar-state-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
@@ -29,7 +29,7 @@ export function LayoutWrapper({
   children: React.ReactNode
   layoutConfig?: LayoutConfig
 }) {
-  const { layout: themeLayoutChoice } = useCustomTheme()
+  const { layout: themeLayoutChoice } = useSafeCustomTheme()
   const { user } = useAuth()
   const { isCollapsed, setIsCollapsed, isMobile } = useSidebarState()
 
