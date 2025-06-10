@@ -11,11 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Palette, Moon, Sun, Layout, LayoutGrid, LayoutDashboard } from "lucide-react"
+import { Palette, Moon, Sun, Layout, LayoutGrid, LayoutDashboard, RotateCcw } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export function ThemeSelector() {
-  const { themes, currentTheme, applyTheme, toggleDarkMode, isDarkMode, layout, setLayout, mounted } =
+  const { themes, currentTheme, applyTheme, resetToDefault, toggleDarkMode, isDarkMode, layout, setLayout, mounted } =
     useSafeCustomTheme()
   const [isOpen, setIsOpen] = useState(false)
 
@@ -24,6 +24,13 @@ export function ThemeSelector() {
     console.log("Cambiando tema a ID:", themeId)
     const success = applyTheme(themeId)
     console.log("Tema applicato con successo:", success)
+    setIsOpen(false)
+  }
+
+  const handleResetToDefault = () => {
+    console.log("=== RESET AL TEMA PREDEFINITO ===")
+    const success = resetToDefault()
+    console.log("Reset completato:", success)
     setIsOpen(false)
   }
 
@@ -98,9 +105,7 @@ export function ThemeSelector() {
           <DropdownMenuLabel className="font-semibold text-popover-foreground">
             Temi Disponibili
             {currentTheme && (
-              <div className="text-xs text-muted-foreground font-normal mt-1">
-                Attuale: {currentTheme.nome_tema || currentTheme.nome}
-              </div>
+              <div className="text-xs text-muted-foreground font-normal mt-1">Attuale: {currentTheme.nome_tema}</div>
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -111,19 +116,26 @@ export function ThemeSelector() {
                 onClick={() => handleThemeChange(theme.id)}
                 className="flex items-center gap-3 cursor-pointer py-3 px-3 hover:bg-accent/50 focus:bg-accent/50"
               >
-                <div
-                  className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
-                  style={{
-                    backgroundColor: theme.primary_color?.startsWith("#")
-                      ? theme.primary_color
-                      : theme.primary_color?.includes("%")
-                        ? `hsl(${theme.primary_color})`
-                        : "#6366f1",
-                  }}
-                />
+                {theme.isDefault ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                    <RotateCcw className="h-3 w-3 text-white" />
+                  </div>
+                ) : (
+                  <div
+                    className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
+                    style={{
+                      backgroundColor: theme.colore_titolo?.startsWith("#")
+                        ? theme.colore_titolo
+                        : theme.colore_titolo?.includes("%")
+                          ? `hsl(${theme.colore_titolo})`
+                          : "#6366f1",
+                    }}
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate text-sm text-popover-foreground">
-                    {theme.nome_tema || theme.nome}
+                    {theme.nome_tema}
+                    {theme.isDefault && <span className="ml-2 text-xs text-muted-foreground">(Sistema)</span>}
                   </div>
                 </div>
                 {currentTheme?.id === theme.id && <span className="text-primary font-bold text-lg">✓</span>}

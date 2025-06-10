@@ -11,6 +11,7 @@ interface ThemeContextType {
   currentTheme: Theme | null
   themes: Theme[]
   applyTheme: (themeId: number) => boolean
+  resetToDefault: () => boolean
   isLoading: boolean
   layout: LayoutType
   setLayout: (layout: LayoutType) => void
@@ -25,11 +26,11 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 function hexToHsl(hex: string): string {
   if (!hex || hex === "") return "0 0% 50%"
 
+  // Se il colore è già in formato HSL, restituiscilo così com'è
+  if (hex.includes("hsl") || hex.includes("%")) return hex.replace("hsl(", "").replace(")", "")
+
   // Rimuovi il # se presente
   hex = hex.replace("#", "")
-
-  // Se il colore è già in formato HSL, restituiscilo così com'è
-  if (hex.includes("%")) return hex
 
   // Converti hex in RGB
   const r = Number.parseInt(hex.substr(0, 2), 16) / 255
@@ -63,9 +64,58 @@ function hexToHsl(hex: string): string {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
 }
 
+// Funzione per resettare al tema predefinito
+function resetToDefaultTheme() {
+  if (typeof window === "undefined") return
+
+  const root = document.documentElement
+
+  console.log("=== RESETTANDO AL TEMA PREDEFINITO ===")
+
+  try {
+    // Rimuovi tutte le variabili CSS personalizzate
+    const customProperties = [
+      "--primary",
+      "--secondary",
+      "--accent",
+      "--background",
+      "--foreground",
+      "--card",
+      "--card-foreground",
+      "--popover",
+      "--popover-foreground",
+      "--header",
+      "--footer",
+      "--div",
+      "--admin-tab-active-bg",
+      "--admin-checkbox-checked",
+    ]
+
+    customProperties.forEach((prop) => {
+      root.style.removeProperty(prop)
+    })
+
+    // Resetta il font family al valore predefinito
+    document.body.style.fontFamily = ""
+
+    // Resetta il border radius
+    root.style.removeProperty("--radius")
+
+    console.log("✓ Tema predefinito ripristinato")
+  } catch (error) {
+    console.error("Errore nel reset del tema:", error)
+  }
+}
+
 // Funzione per applicare un tema personalizzato
 function applyCustomTheme(theme: Theme, isDark: boolean) {
   if (typeof window === "undefined") return
+
+  // Se è il tema predefinito, resetta tutto
+  if (theme.isDefault) {
+    resetToDefaultTheme()
+    return
+  }
 
   const root = document.documentElement
 
@@ -182,6 +232,7 @@ const defaultThemeContext: ThemeContextType = {
   currentTheme: null,
   themes: [],
   applyTheme: () => false,
+  resetToDefault: () => false,
   isLoading: true,
   layout: "default",
   setLayout: () => {},
@@ -191,7 +242,7 @@ const defaultThemeContext: ThemeContextType = {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { themes, currentTheme, applyTheme, isLoading } = useThemes()
+  const { themes, currentTheme, applyTheme, resetToDefault, isLoading } = useThemes()
   const { theme, setTheme, systemTheme } = useNextTheme()
   const [layout, setLayout] = useState<LayoutType>(() => {
     if (typeof window !== "undefined") {
@@ -254,6 +305,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       currentTheme,
       themes,
       applyTheme,
+      resetToDefault,
       isLoading,
       layout,
       setLayout,
@@ -261,7 +313,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       isDarkMode,
       mounted,
     }),
-    [currentTheme, themes, applyTheme, isLoading, layout, toggleDarkMode, isDarkMode, mounted],
+    [currentTheme, themes, applyTheme, resetToDefault, isLoading, layout, toggleDarkMode, isDarkMode, mounted],
   )
 
   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
