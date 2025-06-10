@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { format, isPast, isToday, isFuture, startOfDay, addDays } from "date-fns"
 import { it } from "date-fns/locale"
 import { cn } from "@/lib/utils"
+import { normalizeDeadlineDate } from "@/lib/date-utils"
 
 // --- Tipi Definiti ---
 interface TodoItem {
@@ -221,17 +222,21 @@ export function TodoKanbanWidget() {
 
     // Preparazione dell'aggiornamento per Supabase
     let updatePayload: Partial<any> = { modifica: new Date().toISOString() }
-    const today = startOfDay(new Date())
+    const today = new Date()
 
     if (destColId === "completati") {
       // Regola 3: Qualsiasi colonna -> Completati
       updatePayload = { ...updatePayload, completato: true }
     } else if (destColId === "oggi") {
       // Regola 1: Qualsiasi colonna -> Oggi
-      updatePayload = { ...updatePayload, completato: false, scadenza: today.toISOString() }
+      // Normalizza la data di oggi alle 23:59:59
+      const todayEndOfDay = normalizeDeadlineDate(today)
+      updatePayload = { ...updatePayload, completato: false, scadenza: todayEndOfDay }
     } else if (destColId === "futuri" && (sourceColId === "scaduti" || sourceColId === "oggi")) {
       // Regola 2: Scaduti/Oggi -> Futuri
-      updatePayload = { ...updatePayload, completato: false, scadenza: addDays(today, 1).toISOString() }
+      // Normalizza la data di domani alle 23:59:59
+      const tomorrowEndOfDay = normalizeDeadlineDate(addDays(today, 1))
+      updatePayload = { ...updatePayload, completato: false, scadenza: tomorrowEndOfDay }
     }
 
     try {
