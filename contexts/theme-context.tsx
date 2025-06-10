@@ -70,51 +70,82 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
   const root = document.documentElement
 
   console.log("=== APPLICANDO TEMA ===")
-  console.log("Nome tema:", theme.nome_tema || theme.nome)
+  console.log("Nome tema:", theme.nome_tema)
   console.log("Dark mode:", isDark)
 
   try {
-    // Prima applica i colori base del tema se specificati
-    if (theme.primary_color) {
-      const primaryHsl = hexToHsl(theme.primary_color)
-      root.style.setProperty("--primary", primaryHsl)
-      root.style.setProperty("--admin-tab-active-bg", primaryHsl)
-      root.style.setProperty("--admin-checkbox-checked", primaryHsl)
-      console.log(`✓ Primary color applicato: ${primaryHsl}`)
+    // Applica i colori principali
+    if (theme.colore_titolo) {
+      const titleHsl = hexToHsl(theme.colore_titolo)
+      root.style.setProperty("--primary", titleHsl)
+      root.style.setProperty("--admin-tab-active-bg", titleHsl)
+      root.style.setProperty("--admin-checkbox-checked", titleHsl)
+      console.log(`✓ Primary color applicato: ${titleHsl}`)
     }
 
-    if (theme.secondary_color) {
-      const secondaryHsl = hexToHsl(theme.secondary_color)
-      root.style.setProperty("--secondary", secondaryHsl)
-      console.log(`✓ Secondary color applicato: ${secondaryHsl}`)
+    if (theme.colore_card) {
+      const cardHsl = hexToHsl(theme.colore_card)
+      root.style.setProperty("--secondary", cardHsl)
+      console.log(`✓ Secondary color applicato: ${cardHsl}`)
     }
 
-    if (theme.accent_color) {
-      const accentHsl = hexToHsl(theme.accent_color)
-      root.style.setProperty("--accent", accentHsl)
-      console.log(`✓ Accent color applicato: ${accentHsl}`)
+    if (theme.colore_tabs) {
+      const tabsHsl = hexToHsl(theme.colore_tabs)
+      root.style.setProperty("--accent", tabsHsl)
+      console.log(`✓ Accent color applicato: ${tabsHsl}`)
     }
 
-    // Applica background e foreground con logica corretta per il contrasto
-    if (theme.background_color) {
-      const bgHsl = hexToHsl(theme.background_color)
+    // Applica background e foreground
+    if (theme.colore_background) {
+      const bgHsl = hexToHsl(theme.colore_background)
       root.style.setProperty("--background", bgHsl)
       root.style.setProperty("--card", bgHsl)
       root.style.setProperty("--popover", bgHsl)
       console.log(`✓ Background color applicato: ${bgHsl}`)
     }
 
-    if (theme.text_color) {
-      const textHsl = hexToHsl(theme.text_color)
+    if (theme.carattere_colore) {
+      const textHsl = hexToHsl(theme.carattere_colore)
       root.style.setProperty("--foreground", textHsl)
       root.style.setProperty("--card-foreground", textHsl)
       root.style.setProperty("--popover-foreground", textHsl)
       console.log(`✓ Text color applicato: ${textHsl}`)
     }
 
-    // Applica le variabili CSS personalizzate se presenti (queste hanno priorità)
-    if (theme.css_variables && typeof theme.css_variables === "object") {
-      Object.entries(theme.css_variables).forEach(([key, value]) => {
+    // Applica colori specifici
+    if (theme.colore_header) {
+      const headerHsl = hexToHsl(theme.colore_header)
+      root.style.setProperty("--header", headerHsl)
+      console.log(`✓ Header color applicato: ${headerHsl}`)
+    }
+
+    if (theme.colore_footer) {
+      const footerHsl = hexToHsl(theme.colore_footer)
+      root.style.setProperty("--footer", footerHsl)
+      console.log(`✓ Footer color applicato: ${footerHsl}`)
+    }
+
+    if (theme.colore_div) {
+      const divHsl = hexToHsl(theme.colore_div)
+      root.style.setProperty("--div", divHsl)
+      console.log(`✓ Div color applicato: ${divHsl}`)
+    }
+
+    // Applica le variabili CSS personalizzate se presenti
+    if (theme.css_variables) {
+      let cssVars: Record<string, string> = {}
+
+      if (typeof theme.css_variables === "string") {
+        try {
+          cssVars = JSON.parse(theme.css_variables)
+        } catch (e) {
+          console.error("Errore nel parsing delle CSS variables:", e)
+        }
+      } else if (typeof theme.css_variables === "object") {
+        cssVars = theme.css_variables
+      }
+
+      Object.entries(cssVars).forEach(([key, value]) => {
         if (value && typeof value === "string") {
           root.style.setProperty(`--${key}`, value)
           console.log(`✓ Variabile CSS personalizzata applicata: --${key} = ${value}`)
@@ -123,9 +154,9 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
     }
 
     // Applica il font family
-    if (theme.font_family) {
-      document.body.style.fontFamily = theme.font_family
-      console.log(`✓ Font family applicato: ${theme.font_family}`)
+    if (theme.carattere_tipo) {
+      document.body.style.fontFamily = theme.carattere_tipo
+      console.log(`✓ Font family applicato: ${theme.carattere_tipo}`)
     }
 
     // Applica il border radius
@@ -197,12 +228,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (mounted && currentTheme && typeof window !== "undefined") {
       const resolvedTheme = theme === "system" ? systemTheme : theme
-      console.log(
-        "Applicando tema personalizzato:",
-        currentTheme.nome_tema || currentTheme.nome,
-        "isDark:",
-        resolvedTheme === "dark",
-      )
+      console.log("Applicando tema personalizzato:", currentTheme.nome_tema, "isDark:", resolvedTheme === "dark")
       applyCustomTheme(currentTheme, resolvedTheme === "dark")
     }
   }, [currentTheme, theme, systemTheme, mounted])

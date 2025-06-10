@@ -5,18 +5,26 @@ import { useSupabase } from "@/lib/supabase-provider"
 
 export interface Theme {
   id: number
-  nome: string
-  primary_color: string
-  secondary_color: string
-  accent_color: string
-  text_color: string
-  background_color: string
-  is_dark: boolean
-  font_family: string
-  border_radius: string
-  css_variables: Record<string, string>
-  created_at?: string
-  updated_at?: string
+  nome_tema: string
+  carattere_tipo: string
+  carattere_dimensione: number
+  carattere_colore: string
+  palette: Record<string, any> | null
+  colore_nav: string | null
+  colore_main: string | null
+  tema: Record<string, any> | null
+  colore_header: string
+  colore_footer: string
+  colore_titolo: string
+  colore_background: string
+  colore_card: string
+  colore_tabs: string
+  colore_div: string
+  modifica?: string
+  attivo?: boolean
+  border_radius: string | null
+  css_variables: Record<string, string> | string | null
+  is_dark: boolean | null
 }
 
 export function useThemes() {
@@ -44,12 +52,13 @@ export function useThemes() {
           // Processiamo i temi per assicurarci che css_variables sia un oggetto
           const processedThemes = data.map((theme) => ({
             ...theme,
-            primary_color: theme.primary_color || "#000000",
-            secondary_color: theme.secondary_color || "#ffffff",
-            accent_color: theme.accent_color || "#0066cc",
-            text_color: theme.text_color || "#000000",
-            background_color: theme.background_color || "#ffffff",
-            font_family: theme.font_family || "system-ui, -apple-system, sans-serif",
+            carattere_colore: theme.carattere_colore || "#111827",
+            colore_header: theme.colore_header || "#F7FAFC",
+            colore_footer: theme.colore_footer || "#2D3748",
+            colore_titolo: theme.colore_titolo || "#1A202C",
+            colore_background: theme.colore_background || "#FFFFFF",
+            colore_card: theme.colore_card || "#E2E8F0",
+            carattere_tipo: theme.carattere_tipo || "Tahoma, sans-serif",
             border_radius: theme.border_radius || "0.5rem",
             css_variables:
               typeof theme.css_variables === "string" ? JSON.parse(theme.css_variables) : theme.css_variables || {},
