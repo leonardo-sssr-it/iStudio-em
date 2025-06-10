@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
 import { useTheme as useNextTheme } from "next-themes"
 import { useThemes, type Theme } from "@/hooks/use-themes"
 
@@ -146,6 +146,19 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
   }
 }
 
+// Valore di default per il contesto
+const defaultThemeContext: ThemeContextType = {
+  currentTheme: null,
+  themes: [],
+  applyTheme: () => false,
+  isLoading: true,
+  layout: "default",
+  setLayout: () => {},
+  toggleDarkMode: () => {},
+  isDarkMode: false,
+  mounted: false,
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { themes, currentTheme, applyTheme, isLoading } = useThemes()
   const { theme, setTheme, systemTheme } = useNextTheme()
@@ -158,7 +171,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   })
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [context, setContext] = useState<ThemeContextType | undefined>(undefined)
 
   // Aspetta che il componente sia montato
   useEffect(() => {
@@ -195,6 +207,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentTheme, theme, systemTheme, mounted])
 
+  // Funzione per cambiare il tema chiaro/scuro
   const toggleDarkMode = useCallback(() => {
     if (!mounted) return
 
@@ -206,18 +219,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     console.log("Nuovo tema:", newTheme)
 
     setTheme(newTheme)
-
-    // Forza l'aggiornamento immediato
-    setTimeout(() => {
-      setIsDarkMode(newTheme === "dark")
-      console.log("Stato aggiornato, isDarkMode:", newTheme === "dark")
-    }, 100)
-
     console.log("=== FINE TOGGLE DARK MODE ===")
   }, [theme, setTheme, isDarkMode, mounted])
 
-  useEffect(() => {
-    setContext({
+  // Creiamo il valore del contesto con useMemo per evitare render inutili
+  const contextValue = useMemo(
+    () => ({
       currentTheme,
       themes,
       applyTheme,
@@ -227,10 +234,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       toggleDarkMode,
       isDarkMode,
       mounted,
-    })
-  }, [currentTheme, themes, applyTheme, isLoading, layout, setLayout, toggleDarkMode, isDarkMode, mounted])
+    }),
+    [currentTheme, themes, applyTheme, isLoading, layout, toggleDarkMode, isDarkMode, mounted],
+  )
 
-  return <ThemeContext.Provider value={context}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
 }
 
 export function useCustomTheme() {
@@ -243,25 +251,10 @@ export function useCustomTheme() {
 
 // Hook sicuro che non genera errori se il provider non è disponibile
 export function useSafeCustomTheme() {
-  const [hasMounted, setHasMounted] = useState(false)
   const context = useContext(ThemeContext)
 
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
-
   if (!context) {
-    return {
-      currentTheme: null,
-      themes: [],
-      applyTheme: () => false,
-      isLoading: true,
-      layout: "default" as LayoutType,
-      setLayout: () => {},
-      toggleDarkMode: () => {},
-      isDarkMode: false,
-      mounted: false,
-    }
+    return defaultThemeContext
   }
 
   return context
