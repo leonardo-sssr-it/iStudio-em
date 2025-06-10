@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
-import { User, Database, List, Filter, LogOut, Loader2, Save, AlertCircle } from "lucide-react"
+import { User, Database, List, Filter, Loader2, Save, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { memo, useRef, useEffect, useState } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
@@ -99,7 +99,7 @@ const validateJSON = (value: string): { isValid: boolean; error?: string; parsed
 
 // Componente principale memoizzato
 const AdminDashboardContent = memo(() => {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { supabase } = useSupabase()
   const [cardsRef, cardsVisible] = useIntersectionObserver()
   const [card1Visible, setCard1Visible] = useState(false)
@@ -402,10 +402,6 @@ const AdminDashboardContent = memo(() => {
           <h1 className="text-3xl font-bold tracking-tight">Dashboard Admin</h1>
           <p className="text-muted-foreground">Benvenuto, {user?.nome || user?.username}. Gestisci il sistema.</p>
         </div>
-        <Button variant="outline" onClick={() => logout()} className="flex items-center gap-2 w-full sm:w-auto">
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
       </div>
 
       {/* Tabs per navigazione */}
