@@ -31,7 +31,7 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="w-full h-full">
+      <div className="w-full h-full content-inherit">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2">
           <h1 className="text-xl sm:text-2xl font-bold">Dashboard Utente</h1>
           <div className="flex flex-wrap gap-2">
@@ -55,7 +55,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Card className="mb-4 sm:mb-6 overflow-hidden">
+        <Card className="mb-4 sm:mb-6 overflow-hidden dashboard-card">
           <CardHeader className="p-3 sm:p-6 flex flex-row justify-between items-start">
             <div>
               <CardTitle>Benvenuto, {user?.nome || user?.username}!</CardTitle>
@@ -80,7 +80,7 @@ export default function DashboardPage() {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-6">
+          <CardContent className="p-3 sm:p-6 dashboard-content">
             <Tabs defaultValue="agenda" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 sm:mb-6 w-full">
                 <TabsTrigger value="agenda" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">

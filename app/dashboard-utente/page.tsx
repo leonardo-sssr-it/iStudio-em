@@ -48,12 +48,10 @@ export default function UserDashboardPage() {
   return (
     <ProtectedRoute>
       <ScrollArea className="h-[calc(100vh-var(--header-height,4rem))]">
-        <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8">
+        <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8 content-inherit">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-800 dark:text-gray-100">
-              Ciao, {user?.nome || user?.username || "Utente"}!
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">Ecco una panoramica delle tue attività e impegni.</p>
+            <h1 className="text-3xl font-bold tracking-tight">Ciao, {user?.nome || user?.username || "Utente"}!</h1>
+            <p className="text-muted-foreground">Ecco una panoramica delle tue attività e impegni.</p>
           </div>
 
           <UserSummary />
@@ -85,12 +83,12 @@ export default function UserDashboardPage() {
             {selectedWidget ? (
               <div key={`${selectedWidget.id}-${key}`}>{React.createElement(selectedWidget.component)}</div>
             ) : (
-              <Card>
+              <Card className="dashboard-card">
                 <CardHeader>
                   <CardTitle>Nessun widget selezionato</CardTitle>
                   <CardDescription>Seleziona un widget dal menu a tendina</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="dashboard-content">
                   <p>Usa il selettore qui sopra per visualizzare e testare i widget disponibili.</p>
                 </CardContent>
               </Card>

@@ -115,15 +115,15 @@ export function Sidebar({ className }: SidebarProps) {
       <Link
         href={item.href}
         className={cn(
-          "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
+          "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200",
           active
-            ? "bg-primary text-foreground outline outline-2 outline-offset-1 outline-border [&>svg]:text-foreground shadow-md"
-            : "hover:bg-accent hover:text-accent-foreground hover:scale-105",
+            ? "bg-primary text-primary-foreground shadow-sm" // Usa text-primary-foreground per garantire contrasto
+            : "text-foreground hover:bg-accent hover:text-accent-foreground",
           isCollapsed ? "justify-center" : "space-x-3",
         )}
         aria-current={active ? "page" : undefined}
       >
-        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+        <motion.div>
           <item.icon className={cn("h-5 w-5", isCollapsed ? "mx-auto" : "")} />
         </motion.div>
         <AnimatePresence>
@@ -164,10 +164,7 @@ export function Sidebar({ className }: SidebarProps) {
     <motion.div
       animate={{ width: isCollapsed ? 64 : 256 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className={cn(
-        "h-screen border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0 relative",
-        className,
-      )}
+      className={cn("h-screen border-r bg-background flex-shrink-0 relative", className)}
     >
       {/* Indicatore visivo dello stato */}
       <div
@@ -179,11 +176,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       <div className="flex h-16 items-center justify-between border-b px-4">
         <Link href="/" className="flex items-center space-x-2">
-          <motion.div
-            className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center"
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          <motion.div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-lg">i</span>
           </motion.div>
           <AnimatePresence>
