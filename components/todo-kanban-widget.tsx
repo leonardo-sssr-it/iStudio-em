@@ -6,13 +6,13 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CalendarDays, CheckCircle, Clock, GripVertical, AlertTriangle } from "lucide-react"
+import { CalendarDays, CheckCircle, Clock, GripVertical, AlertTriangle, ExternalLink } from "lucide-react"
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import type { AuthUser } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { format, isPast, isToday, isFuture, startOfDay, addDays, subDays } from "date-fns"
+import { format, isPast, isToday, isFuture, startOfDay, addDays } from "date-fns"
 import { it } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 
@@ -21,7 +21,7 @@ interface TodoItem {
   id: string // DND ID: "todolist-123"
   dbId: number // ID effettivo nel database
   titolo: string
-  scadenza: Date | null // Corretto: scadenza invece di data_scadenza
+  scadenza: Date | null
   priorita?: string | number | null
   completato: boolean
   id_utente?: string
@@ -80,14 +80,13 @@ export function TodoKanbanWidget() {
       return "completati"
     }
     if (item.scadenza) {
-      // Corretto: scadenza invece di data_scadenza
       const scadenza = startOfDay(new Date(item.scadenza))
       if (isPast(scadenza) && !isToday(scadenza)) return "scaduti"
       if (isToday(scadenza)) return "oggi"
       if (isFuture(scadenza)) return "futuri"
     }
     // Se non ha data di scadenza o la data non rientra, lo mettiamo in futuri per default
-    return item.scadenza ? "futuri" : "futuri" // Corretto: scadenza invece di data_scadenza
+    return item.scadenza ? "futuri" : "futuri"
   }
 
   const loadItems = useCallback(
@@ -99,7 +98,7 @@ export function TodoKanbanWidget() {
       try {
         const { data, error: dbError } = await supabase
           .from("todolist")
-          .select("id, titolo, scadenza, priorita, completato, id_utente") // Corretto: scadenza invece di data_scadenza
+          .select("id, titolo, scadenza, priorita, completato, id_utente")
           .eq("id_utente", userForQuery.id)
 
         if (dbError) throw dbError
@@ -114,7 +113,7 @@ export function TodoKanbanWidget() {
               id: `todolist-${itemData.id}`,
               dbId: itemData.id,
               titolo: itemData.titolo || "Senza Titolo",
-              scadenza: itemData.scadenza ? new Date(itemData.scadenza) : null, // Corretto: scadenza invece di data_scadenza
+              scadenza: itemData.scadenza ? new Date(itemData.scadenza) : null,
               priorita: itemData.priorita,
               completato: itemData.completato,
               id_utente: itemData.id_utente,
@@ -132,7 +131,7 @@ export function TodoKanbanWidget() {
           if (col.id !== "completati") {
             // Non ordinare i completati per scadenza
             col.items.sort((a, b) => {
-              if (a.scadenza && b.scadenza) return a.scadenza.getTime() - b.scadenza.getTime() // Corretto: scadenza invece di data_scadenza
+              if (a.scadenza && b.scadenza) return a.scadenza.getTime() - b.scadenza.getTime()
               if (a.scadenza) return -1 // a ha data, b no -> a prima
               if (b.scadenza) return 1 // b ha data, a no -> b prima
               return 0 // entrambi null
@@ -178,6 +177,27 @@ export function TodoKanbanWidget() {
     const sourceColId = source.droppableId as KanbanColumnId
     const destColId = destination.droppableId as KanbanColumnId
 
+    // Implementazione delle regole specifiche per il drag & drop
+    // 1) Da qualsiasi colonna a "oggi": scadenza = oggi
+    // 2) Da "scaduti" o "oggi" a "futuri": scadenza = domani
+    // 3) Da qualsiasi colonna a "completati": completato = TRUE
+    // Non sono consentite altre operazioni
+
+    // Verifica se l'operazione è consentita
+    const isAllowedOperation =
+      destColId === "oggi" || // Regola 1: qualsiasi -> oggi
+      (destColId === "futuri" && (sourceColId === "scaduti" || sourceColId === "oggi")) || // Regola 2: scaduti/oggi -> futuri
+      destColId === "completati" // Regola 3: qualsiasi -> completati
+
+    if (!isAllowedOperation) {
+      toast({
+        title: "Operazione non consentita",
+        description: "Questa operazione di drag & drop non è consentita.",
+        variant: "destructive",
+      })
+      return
+    }
+
     const sourceColumn = columns.find((col) => col.id === sourceColId)
     const destColumn = columns.find((col) => col.id === destColId)
     const draggedItem = sourceColumn?.items.find((item) => item.id === draggableId)
@@ -191,8 +211,6 @@ export function TodoKanbanWidget() {
       }
       if (col.id === destColId) {
         const newItems = Array.from(col.items)
-        // L'item viene aggiornato con la nuova data/stato *prima* di essere inserito
-        // Questo è gestito dopo, prima dell'update a Supabase
         const tempMovedItem = { ...draggedItem, originalColumnId: destColId }
         newItems.splice(destination.index, 0, tempMovedItem)
         return { ...col, items: newItems }
@@ -206,45 +224,14 @@ export function TodoKanbanWidget() {
     const today = startOfDay(new Date())
 
     if (destColId === "completati") {
-      updatePayload = { ...updatePayload, completato: true, data_completamento: new Date().toISOString() }
-    } else {
-      updatePayload = { ...updatePayload, completato: false, data_completamento: null }
-      if (destColId === "oggi") {
-        updatePayload.scadenza = today.toISOString() // Corretto: scadenza invece di data_scadenza
-      } else if (destColId === "futuri") {
-        // Se l'item aveva una data futura, la manteniamo, altrimenti impostiamo a domani
-        // Se spostato da "scaduti" o "oggi" a "futuri", impostiamo a domani
-        if (
-          draggedItem.originalColumnId === "scaduti" ||
-          draggedItem.originalColumnId === "oggi" ||
-          !draggedItem.scadenza || // Corretto: scadenza invece di data_scadenza
-          isPast(draggedItem.scadenza) || // Corretto: scadenza invece di data_scadenza
-          isToday(draggedItem.scadenza) // Corretto: scadenza invece di data_scadenza
-        ) {
-          updatePayload.scadenza = addDays(today, 1).toISOString() // Corretto: scadenza invece di data_scadenza
-        } else {
-          // Mantiene la data futura esistente se già futura
-          if (draggedItem.scadenza && isFuture(draggedItem.scadenza)) {
-            // Corretto: scadenza invece di data_scadenza
-            updatePayload.scadenza = draggedItem.scadenza.toISOString() // Corretto: scadenza invece di data_scadenza
-          } else {
-            updatePayload.scadenza = addDays(today, 1).toISOString() // Corretto: scadenza invece di data_scadenza
-          }
-        }
-      } else if (destColId === "scaduti") {
-        // Spostare un item in "scaduti" manualmente non dovrebbe cambiarne la data a una passata
-        // ma se proviene da "completati", la sua data originale potrebbe essere passata.
-        // Se non ha data o la data non è passata, impostiamola a ieri per coerenza con la colonna.
-        if (
-          !draggedItem.scadenza || // Corretto: scadenza invece di data_scadenza
-          !isPast(startOfDay(draggedItem.scadenza)) || // Corretto: scadenza invece di data_scadenza
-          isToday(startOfDay(draggedItem.scadenza)) // Corretto: scadenza invece di data_scadenza
-        ) {
-          updatePayload.scadenza = subDays(today, 1).toISOString() // Corretto: scadenza invece di data_scadenza
-        } else {
-          updatePayload.scadenza = draggedItem.scadenza?.toISOString() // Corretto: scadenza invece di data_scadenza
-        }
-      }
+      // Regola 3: Qualsiasi colonna -> Completati
+      updatePayload = { ...updatePayload, completato: true }
+    } else if (destColId === "oggi") {
+      // Regola 1: Qualsiasi colonna -> Oggi
+      updatePayload = { ...updatePayload, completato: false, scadenza: today.toISOString() }
+    } else if (destColId === "futuri" && (sourceColId === "scaduti" || sourceColId === "oggi")) {
+      // Regola 2: Scaduti/Oggi -> Futuri
+      updatePayload = { ...updatePayload, completato: false, scadenza: addDays(today, 1).toISOString() }
     }
 
     try {
@@ -322,7 +309,7 @@ export function TodoKanbanWidget() {
   }
 
   const baseColWidth = 240 // Corrisponde a w-60
-  const responsiveGap = window.innerWidth < 768 ? 12 : 16 // gap-3 o gap-4 (md)
+  const responsiveGap = typeof window !== "undefined" && window.innerWidth < 768 ? 12 : 16 // gap-3 o gap-4 (md)
   const containerMinWidth = `${columns.length * (baseColWidth + responsiveGap) - responsiveGap}px`
 
   return (
@@ -333,7 +320,7 @@ export function TodoKanbanWidget() {
       <CardContent className="p-0">
         <DragDropContext onDragEnd={handleDragEnd}>
           <div
-            className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
+            className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[400px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
             style={{ minWidth: containerMinWidth }}
           >
             {columns.map((column) => (
@@ -362,7 +349,7 @@ export function TodoKanbanWidget() {
                         {column.items.length}
                       </Badge>
                     </div>
-                    <div className="flex-grow overflow-y-auto space-y-2 px-2 pb-2 custom-scrollbar">
+                    <div className="flex-grow space-y-2 px-2 pb-2">
                       {column.items.length === 0 && (
                         <div className="p-4 text-center text-xs text-muted-foreground bg-background/30 dark:bg-background/10 rounded-md border border-dashed mt-2">
                           Nessun task
@@ -371,50 +358,47 @@ export function TodoKanbanWidget() {
                       {column.items.map((item, index) => (
                         <Draggable key={item.id} draggableId={item.id} index={index}>
                           {(providedDraggable, snapshotDraggable) => (
-                            <Link href={`/data-explorer/todolist/${item.dbId}`} passHref legacyBehavior>
-                              <a
-                                ref={providedDraggable.innerRef}
-                                {...providedDraggable.draggableProps}
-                                className={cn(
-                                  "p-2.5 rounded-md border bg-card shadow-sm block cursor-pointer hover:shadow-md transition-shadow",
-                                  snapshotDraggable.isDragging && "shadow-xl ring-2 ring-primary scale-105 opacity-95",
-                                )}
-                                onClick={(e) => {
-                                  if (snapshotDraggable.isDragging) e.preventDefault()
-                                }}
+                            <div
+                              ref={providedDraggable.innerRef}
+                              {...providedDraggable.draggableProps}
+                              className={cn(
+                                "p-2.5 rounded-md border bg-card shadow-sm block hover:shadow-md transition-shadow",
+                                snapshotDraggable.isDragging && "shadow-xl ring-2 ring-primary scale-105 opacity-95",
+                              )}
+                            >
+                              <div
+                                {...providedDraggable.dragHandleProps}
+                                className="flex items-start mb-1.5 cursor-grab active:cursor-grabbing"
                               >
-                                <div
-                                  {...providedDraggable.dragHandleProps}
-                                  className="flex items-start mb-1.5 cursor-grab active:cursor-grabbing"
-                                  onClick={(e) => e.stopPropagation()}
+                                <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground/70 flex-shrink-0 mt-0.5" />
+                                <h4
+                                  className="font-medium text-sm leading-tight line-clamp-2 flex-grow"
+                                  title={item.titolo}
                                 >
-                                  <GripVertical className="h-4 w-4 mr-1.5 text-muted-foreground/70 flex-shrink-0 mt-0.5" />
-                                  <h4
-                                    className="font-medium text-sm leading-tight line-clamp-2 flex-grow"
-                                    title={item.titolo}
-                                  >
-                                    {item.titolo}
-                                  </h4>
-                                </div>
-                                <div className="ml-[calc(1rem+0.375rem)] text-xs space-y-1">
-                                  {" "}
-                                  {/* ml-5.5 approx */}
-                                  {item.scadenza &&
-                                    column.id !== "completati" && ( // Corretto: scadenza invece di data_scadenza
-                                      <Badge variant="outline" className="text-xs py-0.5 px-1.5 font-normal">
-                                        <CalendarDays className="h-3 w-3 mr-1" />
-                                        {formatDateDisplay(item.scadenza)}{" "}
-                                        {/* Corretto: scadenza invece di data_scadenza */}
-                                      </Badge>
-                                    )}
-                                  {item.priorita && (
-                                    <Badge variant="secondary" className="text-xs py-0.5 px-1.5 font-normal">
-                                      Priorità: {item.priorita}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </a>
-                            </Link>
+                                  {item.titolo}
+                                </h4>
+                              </div>
+                              <div className="ml-[calc(1rem+0.375rem)] text-xs space-y-1 flex flex-col">
+                                {item.scadenza && column.id !== "completati" && (
+                                  <Badge variant="outline" className="text-xs py-0.5 px-1.5 font-normal w-fit">
+                                    <CalendarDays className="h-3 w-3 mr-1" />
+                                    {formatDateDisplay(item.scadenza)}
+                                  </Badge>
+                                )}
+                                {item.priorita && (
+                                  <Badge variant="secondary" className="text-xs py-0.5 px-1.5 font-normal w-fit">
+                                    Priorità: {item.priorita}
+                                  </Badge>
+                                )}
+                                <Link
+                                  href={`/data-explorer/todolist/${item.dbId}`}
+                                  className="text-primary hover:text-primary/80 flex items-center mt-1 w-fit underline underline-offset-2"
+                                >
+                                  <ExternalLink className="h-3 w-3 mr-1" />
+                                  Dettagli
+                                </Link>
+                              </div>
+                            </div>
                           )}
                         </Draggable>
                       ))}

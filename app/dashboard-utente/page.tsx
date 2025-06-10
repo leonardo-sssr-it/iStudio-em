@@ -5,7 +5,6 @@ import React from "react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { UserSummary } from "./_components/user-summary"
 import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth } from "@/lib/auth-provider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +13,7 @@ import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
 import { GalleryManagerWidget } from "@/components/gallery-manager-widget"
 import { FeedReaderWidget } from "@/components/feed-reader-widget"
-import { TodoKanbanWidget } from "@/components/todo-kanban-widget" // Importa il nuovo widget
+import { TodoKanbanWidget } from "@/components/todo-kanban-widget"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
 
@@ -22,7 +21,7 @@ const AVAILABLE_WIDGETS = [
   { id: "agenda", name: "Agenda", component: AgendaWidget },
   { id: "gantt", name: "Diagramma Gantt", component: GanttChartWidget },
   { id: "kanban", name: "Kanban Board Generico", component: KanbanWidget },
-  { id: "todo_kanban", name: "Kanban Todolist", component: TodoKanbanWidget }, // Aggiungi il nuovo widget qui
+  { id: "todo_kanban", name: "Kanban Todolist", component: TodoKanbanWidget },
   { id: "gallery", name: "Gestione Galleria", component: GalleryManagerWidget },
   {
     id: "feed1",
@@ -38,7 +37,7 @@ const AVAILABLE_WIDGETS = [
 
 export default function UserDashboardPage() {
   const { user } = useAuth()
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("todo_kanban") // Default al nuovo widget per test
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("todo_kanban")
   const [key, setKey] = useState(0)
 
   const selectedWidget = AVAILABLE_WIDGETS.find((widget) => widget.id === selectedWidgetId)
@@ -49,8 +48,8 @@ export default function UserDashboardPage() {
 
   return (
     <ProtectedRoute>
-      <ScrollArea className="h-[calc(100vh-var(--header-height,4rem))]">
-        <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8 content-inherit">
+      <div className="h-[calc(100vh-var(--header-height,4rem))] overflow-y-auto">
+        <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Ciao, {user?.nome || user?.username || "Utente"}!</h1>
             <p className="text-muted-foreground">Ecco una panoramica delle tue attività e impegni.</p>
@@ -83,7 +82,9 @@ export default function UserDashboardPage() {
 
           <div className="widget-container mt-4">
             {selectedWidget ? (
-              <div key={`${selectedWidget.id}-${key}`}>{React.createElement(selectedWidget.component)}</div>
+              <div key={`${selectedWidget.id}-${key}`} className="w-full">
+                {React.createElement(selectedWidget.component)}
+              </div>
             ) : (
               <Card className="dashboard-card">
                 <CardHeader>
@@ -97,7 +98,7 @@ export default function UserDashboardPage() {
             )}
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </ProtectedRoute>
   )
 }
