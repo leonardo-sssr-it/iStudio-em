@@ -239,7 +239,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAdmin(fetchedUser.ruolo === "admin")
         setIsLoading(false) // Set loading false *before* redirect attempt
         redirectingRef.current = true
-        const destination = fetchedUser.ruolo === "admin" ? "/admin" : "/dashboard"
+        // MODIFICA: Tutti gli utenti (inclusi gli admin) vanno alla dashboard utente
+        const destination = "/dashboard-utente"
         router.push(destination)
         toast({ title: "Login effettuato", description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!` })
         return true
