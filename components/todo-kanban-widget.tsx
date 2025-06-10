@@ -21,7 +21,7 @@ interface TodoItem {
   id: string // DND ID: "todolist-123"
   dbId: number // ID effettivo nel database
   titolo: string
-  data_scadenza: Date | null
+  scadenza: Date | null // Corretto: scadenza invece di data_scadenza
   priorita?: string | number | null
   completato: boolean
   id_utente?: string
@@ -79,18 +79,15 @@ export function TodoKanbanWidget() {
     if (item.completato) {
       return "completati"
     }
-    if (item.data_scadenza) {
-      const scadenza = startOfDay(new Date(item.data_scadenza))
+    if (item.scadenza) {
+      // Corretto: scadenza invece di data_scadenza
+      const scadenza = startOfDay(new Date(item.scadenza))
       if (isPast(scadenza) && !isToday(scadenza)) return "scaduti"
       if (isToday(scadenza)) return "oggi"
       if (isFuture(scadenza)) return "futuri"
     }
-    // Se non ha data di scadenza o la data non rientra, lo mettiamo in futuri per default (o una colonna "Non datati")
-    // Per ora, se non scaduto/oggi/completato e ha una data futura, va in futuri.
-    // Se non ha data o è una data strana, potrebbe andare in "futuri" o una colonna apposita.
-    // Per semplicità, se non completato e non scaduto/oggi, lo consideriamo "futuro" o da definire.
-    // Se la data_scadenza è null e non completato, lo mettiamo in "futuri" come placeholder.
-    return item.data_scadenza ? "futuri" : "futuri" // O una colonna "senza_data"
+    // Se non ha data di scadenza o la data non rientra, lo mettiamo in futuri per default
+    return item.scadenza ? "futuri" : "futuri" // Corretto: scadenza invece di data_scadenza
   }
 
   const loadItems = useCallback(
@@ -102,9 +99,8 @@ export function TodoKanbanWidget() {
       try {
         const { data, error: dbError } = await supabase
           .from("todolist")
-          .select("id, titolo, data_scadenza, priorita, completato, id_utente")
+          .select("id, titolo, scadenza, priorita, completato, id_utente") // Corretto: scadenza invece di data_scadenza
           .eq("id_utente", userForQuery.id)
-        // .order("data_scadenza", { ascending: true, nullsLast: true }) // Opzionale: ordinare già dalla query
 
         if (dbError) throw dbError
 
@@ -118,7 +114,7 @@ export function TodoKanbanWidget() {
               id: `todolist-${itemData.id}`,
               dbId: itemData.id,
               titolo: itemData.titolo || "Senza Titolo",
-              data_scadenza: itemData.data_scadenza ? new Date(itemData.data_scadenza) : null,
+              scadenza: itemData.scadenza ? new Date(itemData.scadenza) : null, // Corretto: scadenza invece di data_scadenza
               priorita: itemData.priorita,
               completato: itemData.completato,
               id_utente: itemData.id_utente,
@@ -136,9 +132,9 @@ export function TodoKanbanWidget() {
           if (col.id !== "completati") {
             // Non ordinare i completati per scadenza
             col.items.sort((a, b) => {
-              if (a.data_scadenza && b.data_scadenza) return a.data_scadenza.getTime() - b.data_scadenza.getTime()
-              if (a.data_scadenza) return -1 // a ha data, b no -> a prima
-              if (b.data_scadenza) return 1 // b ha data, a no -> b prima
+              if (a.scadenza && b.scadenza) return a.scadenza.getTime() - b.scadenza.getTime() // Corretto: scadenza invece di data_scadenza
+              if (a.scadenza) return -1 // a ha data, b no -> a prima
+              if (b.scadenza) return 1 // b ha data, a no -> b prima
               return 0 // entrambi null
             })
           } else {
@@ -214,24 +210,25 @@ export function TodoKanbanWidget() {
     } else {
       updatePayload = { ...updatePayload, completato: false, data_completamento: null }
       if (destColId === "oggi") {
-        updatePayload.data_scadenza = today.toISOString()
+        updatePayload.scadenza = today.toISOString() // Corretto: scadenza invece di data_scadenza
       } else if (destColId === "futuri") {
         // Se l'item aveva una data futura, la manteniamo, altrimenti impostiamo a domani
         // Se spostato da "scaduti" o "oggi" a "futuri", impostiamo a domani
         if (
           draggedItem.originalColumnId === "scaduti" ||
           draggedItem.originalColumnId === "oggi" ||
-          !draggedItem.data_scadenza ||
-          isPast(draggedItem.data_scadenza) ||
-          isToday(draggedItem.data_scadenza)
+          !draggedItem.scadenza || // Corretto: scadenza invece di data_scadenza
+          isPast(draggedItem.scadenza) || // Corretto: scadenza invece di data_scadenza
+          isToday(draggedItem.scadenza) // Corretto: scadenza invece di data_scadenza
         ) {
-          updatePayload.data_scadenza = addDays(today, 1).toISOString()
+          updatePayload.scadenza = addDays(today, 1).toISOString() // Corretto: scadenza invece di data_scadenza
         } else {
           // Mantiene la data futura esistente se già futura
-          if (draggedItem.data_scadenza && isFuture(draggedItem.data_scadenza)) {
-            updatePayload.data_scadenza = draggedItem.data_scadenza.toISOString()
+          if (draggedItem.scadenza && isFuture(draggedItem.scadenza)) {
+            // Corretto: scadenza invece di data_scadenza
+            updatePayload.scadenza = draggedItem.scadenza.toISOString() // Corretto: scadenza invece di data_scadenza
           } else {
-            updatePayload.data_scadenza = addDays(today, 1).toISOString()
+            updatePayload.scadenza = addDays(today, 1).toISOString() // Corretto: scadenza invece di data_scadenza
           }
         }
       } else if (destColId === "scaduti") {
@@ -239,13 +236,13 @@ export function TodoKanbanWidget() {
         // ma se proviene da "completati", la sua data originale potrebbe essere passata.
         // Se non ha data o la data non è passata, impostiamola a ieri per coerenza con la colonna.
         if (
-          !draggedItem.data_scadenza ||
-          !isPast(startOfDay(draggedItem.data_scadenza)) ||
-          isToday(startOfDay(draggedItem.data_scadenza))
+          !draggedItem.scadenza || // Corretto: scadenza invece di data_scadenza
+          !isPast(startOfDay(draggedItem.scadenza)) || // Corretto: scadenza invece di data_scadenza
+          isToday(startOfDay(draggedItem.scadenza)) // Corretto: scadenza invece di data_scadenza
         ) {
-          updatePayload.data_scadenza = subDays(today, 1).toISOString()
+          updatePayload.scadenza = subDays(today, 1).toISOString() // Corretto: scadenza invece di data_scadenza
         } else {
-          updatePayload.data_scadenza = draggedItem.data_scadenza?.toISOString() // Mantiene la data scaduta originale
+          updatePayload.scadenza = draggedItem.scadenza?.toISOString() // Corretto: scadenza invece di data_scadenza
         }
       }
     }
@@ -402,12 +399,14 @@ export function TodoKanbanWidget() {
                                 <div className="ml-[calc(1rem+0.375rem)] text-xs space-y-1">
                                   {" "}
                                   {/* ml-5.5 approx */}
-                                  {item.data_scadenza && column.id !== "completati" && (
-                                    <Badge variant="outline" className="text-xs py-0.5 px-1.5 font-normal">
-                                      <CalendarDays className="h-3 w-3 mr-1" />
-                                      {formatDateDisplay(item.data_scadenza)}
-                                    </Badge>
-                                  )}
+                                  {item.scadenza &&
+                                    column.id !== "completati" && ( // Corretto: scadenza invece di data_scadenza
+                                      <Badge variant="outline" className="text-xs py-0.5 px-1.5 font-normal">
+                                        <CalendarDays className="h-3 w-3 mr-1" />
+                                        {formatDateDisplay(item.scadenza)}{" "}
+                                        {/* Corretto: scadenza invece di data_scadenza */}
+                                      </Badge>
+                                    )}
                                   {item.priorita && (
                                     <Badge variant="secondary" className="text-xs py-0.5 px-1.5 font-normal">
                                       Priorità: {item.priorita}
