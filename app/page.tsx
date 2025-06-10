@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { AuthWidget } from "@/components/auth-widget"
 import { ImageGallery } from "@/components/image-gallery"
 import { useAuth } from "@/lib/auth-provider"
-import { useCustomTheme } from "@/contexts/theme-context"
+import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { BarChart, Database, Users, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
@@ -12,7 +12,7 @@ import { motion } from "framer-motion"
 // Migliorare il rendering condizionale nella landing page
 export default function Home() {
   const { user, isLoading } = useAuth()
-  const { layout, isDarkMode } = useCustomTheme()
+  const { layout, isDarkMode } = useSafeCustomTheme()
   const [mounted, setMounted] = useState(false)
 
   // Assicuriamoci che il componente sia montato solo lato client
