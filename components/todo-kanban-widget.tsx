@@ -383,24 +383,29 @@ export function TodoKanbanWidget() {
                                   {item.titolo}
                                 </h4>
                               </div>
-                              <div className="ml-[calc(1rem+0.375rem)] text-xs space-y-1 flex flex-col">
+                              <div className="ml-[calc(1rem+0.375rem)] flex flex-wrap gap-1.5 items-center">
                                 {item.scadenza && column.id !== "completati" && (
-                                  <Badge variant="outline" className="text-xs py-0.5 px-1.5 font-normal w-fit">
+                                  <Badge variant="outline" className="text-xs py-0.5 px-1.5 font-normal">
                                     <CalendarDays className="h-3 w-3 mr-1" />
                                     {formatDateDisplay(item.scadenza)}
                                   </Badge>
                                 )}
                                 {item.priorita && (
-                                  <Badge variant="secondary" className="text-xs py-0.5 px-1.5 font-normal w-fit">
-                                    Priorità: {item.priorita}
+                                  <Badge variant="secondary" className="text-xs py-0.5 px-1.5 font-normal">
+                                    P: {item.priorita}
                                   </Badge>
                                 )}
                                 <Link
                                   href={`/data-explorer/todolist/${item.dbId}`}
-                                  className="text-primary hover:text-primary/80 flex items-center mt-1 w-fit underline underline-offset-2"
+                                  className="inline-flex items-center"
+                                  title="Visualizza dettagli"
                                 >
-                                  <ExternalLink className="h-3 w-3 mr-1" />
-                                  Dettagli
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs py-0.5 px-1.5 font-normal text-primary hover:bg-primary/10"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Badge>
                                 </Link>
                               </div>
                             </div>
