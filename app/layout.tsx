@@ -2,21 +2,18 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider as NextThemeProvider } from "next-themes"
-import { ThemeProvider } from "@/contexts/theme-context"
-import { AuthProvider } from "@/lib/auth-provider"
 import { SupabaseProvider } from "@/lib/supabase-provider"
+import { AuthProvider } from "@/lib/auth-provider"
+import { ThemeProvider } from "@/contexts/theme-context"
+import { SidebarStateProvider } from "@/contexts/sidebar-state-context"
 import { Toaster } from "@/components/ui/toaster"
-import ClientLayout from "./client-layout"
+import { ClientLayout } from "./client-layout"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "iStudio - Dashboard Intelligente",
-  description: "Dashboard intelligente per la gestione dei dati e delle attività",
-  keywords: ["dashboard", "gestione", "dati", "attività", "intelligente"],
-  authors: [{ name: "iStudio Team" }],
-  viewport: "width=device-width, initial-scale=1",
+  title: "iStudio - Gestione Dati Integrata",
+  description: "Piattaforma completa per la gestione di dati, clienti, progetti e attività",
     generator: 'v0.dev'
 }
 
@@ -28,16 +25,16 @@ export default function RootLayout({
   return (
     <html lang="it" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false}>
+        <ThemeProvider>
           <SupabaseProvider>
             <AuthProvider>
-              <ThemeProvider>
+              <SidebarStateProvider>
                 <ClientLayout>{children}</ClientLayout>
                 <Toaster />
-              </ThemeProvider>
+              </SidebarStateProvider>
             </AuthProvider>
           </SupabaseProvider>
-        </NextThemeProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

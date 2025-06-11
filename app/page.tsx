@@ -1,164 +1,145 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { AuthWidget } from "@/components/auth-widget"
-import { ImageGallery } from "@/components/image-gallery"
 import { useAuth } from "@/lib/auth-provider"
-import { useSafeCustomTheme } from "@/contexts/theme-context"
-import { BarChart, Database, Users, Clock } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { motion } from "framer-motion"
+import { AuthWidget } from "@/components/auth-widget"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { LayoutDashboard, Database, Users, Calendar } from "lucide-react"
+import Link from "next/link"
 
-// Migliorare il rendering condizionale nella landing page
-export default function Home() {
-  const { user, isLoading } = useAuth()
-  const { layout, isDarkMode } = useSafeCustomTheme()
-  const [mounted, setMounted] = useState(false)
+export default function HomePage() {
+  const { user, isAdmin } = useAuth()
 
-  // Assicuriamoci che il componente sia montato solo lato client
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Determiniamo le classi del container in base al layout
-  const containerClass = cn(
-    layout === "fullWidth" ? "w-full" : "container mx-auto",
-    "px-4 py-8 lg:py-12",
-    // Correggiamo il padding quando c'è la sidebar
-    layout === "withSidebar" && user ? "md:pl-8" : "md:px-8",
-  )
-
-  // Mostriamo un placeholder durante il caricamento per evitare flickering
-  if (!mounted) {
+  if (!user) {
     return (
-      <div className={containerClass}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
-          <div className="flex flex-col space-y-8">
-            <div className="text-center lg:text-left">
-              <div className="h-10 w-3/4 bg-muted rounded animate-pulse mb-4"></div>
-              <div className="h-6 w-1/2 bg-muted rounded animate-pulse mb-8"></div>
-            </div>
-            <div className="w-full max-w-md mx-auto lg:mx-0">
-              <div className="h-80 bg-muted rounded animate-pulse"></div>
-            </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-6xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Benvenuto in iStudio</h1>
+            <p className="text-xl text-gray-600 mb-8">La tua piattaforma di gestione dati integrata</p>
           </div>
-          <div className="h-[400px] lg:h-[600px] order-first lg:order-last">
-            <div className="h-full bg-muted rounded animate-pulse"></div>
+
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <Database className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                    <h3 className="font-semibold">Gestione Dati</h3>
+                    <p className="text-sm text-gray-600">Esplora e gestisci i tuoi dati</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <Calendar className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                    <h3 className="font-semibold">Calendario</h3>
+                    <p className="text-sm text-gray-600">Organizza i tuoi appuntamenti</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                    <h3 className="font-semibold">Clienti</h3>
+                    <p className="text-sm text-gray-600">Gestisci i tuoi clienti</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <LayoutDashboard className="h-8 w-8 mx-auto mb-2 text-orange-600" />
+                    <h3 className="font-semibold">Dashboard</h3>
+                    <p className="text-sm text-gray-600">Panoramica completa</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <div>
+              <AuthWidget />
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  // Variante per l'animazione delle card
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: {
-        delay: i * 0.1,
-        duration: 0.5,
-        ease: "easeOut",
-      },
-    }),
-  }
-
-  // Utilizziamo una chiave per forzare il re-render completo quando cambia lo stato dell'utente
   return (
-    <div className="min-h-[calc(100vh-8rem)]" key={user ? "logged-in" : "logged-out"}>
-      {/* Hero Section with Two Columns */}
-      <div className={containerClass}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
-          {/* Left Column - Auth Widget and Features */}
-          <div className="flex flex-col space-y-8">
-            {/* Welcome Text */}
-            <div className="text-center lg:text-left">
-              <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-4">
-                Benvenuto in <span className="text-primary">iStudio</span>
-              </h1>
-              <p className="text-xl text-muted-foreground mb-8">Il sistema di gestione integrato per il tuo ufficio</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Ciao, {user.nome || user.username}!</h1>
+          <p className="text-xl text-gray-600">Benvenuto nella tua dashboard iStudio</p>
+        </div>
 
-            {/* Auth Widget */}
-            <div className="w-full max-w-md mx-auto lg:mx-0">
-              <AuthWidget />
-            </div>
-          </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <LayoutDashboard className="h-5 w-5 text-blue-600" />
+                Dashboard Utente
+              </CardTitle>
+              <CardDescription>Panoramica delle tue attività e impegni</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/dashboard-utente">
+                <Button className="w-full">Vai alla Dashboard</Button>
+              </Link>
+            </CardContent>
+          </Card>
 
-          {/* Right Column - Image Gallery */}
-          <div className="h-[400px] lg:h-[600px] order-first lg:order-last">
-            <ImageGallery className="shadow-2xl rounded-xl overflow-hidden" />
-          </div>
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-green-600" />
+                Esplora Dati
+              </CardTitle>
+              <CardDescription>Visualizza e gestisci i tuoi dati</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/data-explorer">
+                <Button variant="outline" className="w-full">
+                  Esplora
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-600" />
+                Profilo
+              </CardTitle>
+              <CardDescription>Gestisci il tuo profilo utente</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/profile">
+                <Button variant="outline" className="w-full">
+                  Vai al Profilo
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {isAdmin && (
+            <Card className="hover:shadow-lg transition-shadow border-orange-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LayoutDashboard className="h-5 w-5 text-orange-600" />
+                  Pannello Admin
+                </CardTitle>
+                <CardDescription>Gestione amministrativa del sistema</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/admin">
+                  <Button variant="outline" className="w-full border-orange-300 text-orange-700 hover:bg-orange-50">
+                    Accedi come Admin
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
-
-      {/* Features Section - Mostrata solo se l'utente NON è autenticato */}
-      {!user && !isLoading && (
-        <div className="bg-muted/30 dark:bg-muted/10 py-16 mt-8">
-          <div className={layout === "fullWidth" ? "w-full px-4 md:px-8" : "container mx-auto px-4 md:px-8"}>
-            <h2 className="text-3xl font-bold text-center mb-12">Perché scegliere iStudio?</h2>
-
-            {/* Grid di card con animazioni */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                {
-                  icon: <Database className="h-8 w-8 text-primary" />,
-                  title: "Gestione Dati",
-                  description: "Organizza e gestisci tutti i tuoi dati in un unico posto",
-                  color: "from-blue-500/20 to-cyan-400/20",
-                  darkColor: "dark:from-blue-500/30 dark:to-cyan-400/30",
-                },
-                {
-                  icon: <Users className="h-8 w-8 text-primary" />,
-                  title: "Collaborazione",
-                  description: "Lavora in team con accessi e permessi personalizzati",
-                  color: "from-purple-500/20 to-pink-400/20",
-                  darkColor: "dark:from-purple-500/30 dark:to-pink-400/30",
-                },
-                {
-                  icon: <BarChart className="h-8 w-8 text-primary" />,
-                  title: "Analisi Dati",
-                  description: "Visualizza e analizza i tuoi dati con grafici interattivi",
-                  color: "from-green-500/20 to-emerald-400/20",
-                  darkColor: "dark:from-green-500/30 dark:to-emerald-400/30",
-                },
-                {
-                  icon: <Clock className="h-8 w-8 text-primary" />,
-                  title: "Automazione",
-                  description: "Automatizza i processi ripetitivi e risparmia tempo",
-                  color: "from-amber-500/20 to-orange-400/20",
-                  darkColor: "dark:from-amber-500/30 dark:to-orange-400/30",
-                },
-              ].map((feature, i) => (
-                <motion.div
-                  key={feature.title}
-                  custom={i}
-                  initial="hidden"
-                  animate="visible"
-                  variants={cardVariants}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={cn(
-                    "rounded-xl p-6 shadow-lg transition-all",
-                    "bg-gradient-to-br",
-                    feature.color,
-                    feature.darkColor,
-                    "border border-transparent",
-                    "hover:border-primary/20 dark:hover:border-primary/30",
-                  )}
-                >
-                  <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center mb-4 shadow-md">
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
