@@ -48,7 +48,7 @@ export default function UserDashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="h-[calc(100vh-var(--header-height,4rem))] overflow-y-auto">
+      <div className="min-h-full w-full">
         <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Ciao, {user?.nome || user?.username || "Utente"}!</h1>
