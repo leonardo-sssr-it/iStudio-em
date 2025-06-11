@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Info,
   Search,
   Filter,
   Download,
@@ -44,6 +45,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-provider" // Ensure this path is correct
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import { cn } from "@/lib/utils"
@@ -200,7 +202,7 @@ const AgendaItemComponent = ({ item }: { item: AgendaItem }) => {
 // Componente per la legenda dei colori
 const ColorLegend = () => {
   return (
-    <div className="flex flex-wrap gap-2 mt-4 p-3 bg-gray-50 rounded-md">
+    <div className="flex flex-wrap gap-2 mt-2">
       <div className="flex items-center">
         <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.attivita }}></div>
         <span className="text-xs">Attività</span>
@@ -229,52 +231,6 @@ const ColorLegend = () => {
         <span className="text-xs">Todo</span>
       </div>
     </div>
-  )
-}
-
-// Componente per il popup delle statistiche
-const StatsPopup = ({ tableStats }: { tableStats: Record<string, number> }) => {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1">
-          <HelpCircle className="h-4 w-4" />
-          <span className="sr-only">Mostra statistiche dettagliate</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64" align="end">
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm">Riepilogo per tipo</h4>
-          <div className="space-y-1">
-            {Object.entries(tableStats).map(([tipo, count]) => (
-              <div key={tipo} className="flex justify-between items-center text-sm">
-                <span className="flex items-center">
-                  {tipo === "scadenze_generali" ? (
-                    <>
-                      <Globe className="h-3 w-3 mr-1" />
-                      Scadenze generali
-                    </>
-                  ) : (
-                    tipo.charAt(0).toUpperCase() + tipo.slice(1)
-                  )}
-                </span>
-                <Badge variant="outline" className="text-xs">
-                  {count}
-                </Badge>
-              </div>
-            ))}
-          </div>
-          <div className="border-t pt-2 mt-2">
-            <div className="flex justify-between items-center text-sm font-medium">
-              <span>Totale</span>
-              <Badge variant="default" className="text-xs">
-                {Object.values(tableStats).reduce((sum, count) => sum + count, 0)}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
   )
 }
 
@@ -1347,9 +1303,23 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                   <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
                 </Button>
               )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                      <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="sr-only">Legenda</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="end" className="w-auto">
+                    <div className="text-sm font-medium mb-1">Legenda colori</div>
+                    <ColorLegend />
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
-
+          <ColorLegend />
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -1364,85 +1334,156 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
               <Skeleton className="h-8 w-64" />
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-4 w-full" />
+                  <Skeleton key={i} className="h-16 w-full" />
                 ))}
               </div>
             </div>
-          ) : view === "daily" ? (
-            <DailyView
-              items={filteredItems}
-              currentDate={currentDate}
-              filters={filters}
-              isDebugEnabled={isDebugAllowed}
-            />
-          ) : view === "weekly" ? (
-            <WeeklyView
-              items={filteredItems}
-              currentDate={currentDate}
-              filters={filters}
-              isDebugEnabled={isDebugAllowed}
-            />
           ) : (
-            <MonthlyView
-              items={filteredItems}
-              currentDate={currentDate}
-              filters={filters}
-              isDebugEnabled={isDebugAllowed}
-            />
-          )}
-
-          {mode === "desktop" && <ColorLegend />}
-
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              Visualizzando {filteredItems.length} elementi su {items.length} totali
-            </p>
-            <div className="flex items-center">
-              <StatsPopup tableStats={tableStats} />
-            </div>
-          </div>
-
-          {showDebug && isDebugAllowed && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-md overflow-x-auto">
-              <h4 className="font-semibold mb-2">Debug Information</h4>
-              <div>
-                <p>
-                  <strong>Current Date:</strong> {currentDate.toISOString()}
-                </p>
-                <p>
-                  <strong>View:</strong> {view}
-                </p>
-                <p>
-                  <strong>Filters:</strong> {JSON.stringify(filters)}
-                </p>
-                <p>
-                  <strong>Search Term:</strong> {searchTerm}
-                </p>
-                <p>
-                  <strong>Cliente Filter:</strong> {clienteFilter || "None"}
-                </p>
-                <p>
-                  <strong>Total Items:</strong> {items?.length || 0}
-                </p>
-                <p>
-                  <strong>Filtered Items:</strong> {filteredItems?.length || 0}
-                </p>
+            <>
+              {view === "daily" && (
+                <DailyView
+                  items={filteredItems}
+                  currentDate={currentDate}
+                  filters={filters}
+                  isDebugEnabled={isDebugAllowed}
+                />
+              )}
+              {view === "weekly" && (
+                <WeeklyView
+                  items={filteredItems}
+                  currentDate={currentDate}
+                  filters={filters}
+                  isDebugEnabled={isDebugAllowed}
+                />
+              )}
+              {mode === "desktop" && view === "monthly" && (
+                <MonthlyView
+                  items={filteredItems}
+                  currentDate={currentDate}
+                  filters={filters}
+                  isDebugEnabled={isDebugAllowed}
+                />
+              )}
+              <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
+                <div className="flex items-center">
+                  <Info className="h-3 w-3 mr-1" /> Elementi visualizzati: {filteredItems.length} di {items.length}{" "}
+                  totali
+                </div>
+                <div className="flex gap-2">
+                  {Object.entries(tableStats).map(([tipo, count]) => (
+                    <Badge key={tipo} variant="outline" className="text-xs">
+                      {tipo === "scadenze_generali" ? (
+                        <span className="flex items-center">
+                          <Globe className="h-3 w-3 mr-1" />
+                          Scadenze generali: {count}
+                        </span>
+                      ) : (
+                        `${tipo}: ${count}`
+                      )}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-              <h5 className="font-semibold mt-2">Debug Logs:</h5>
-              <div className="max-h-40 overflow-y-auto text-xs">
-                {logs.map((log, index) => (
-                  <div key={index}>{log}</div>
-                ))}
-              </div>
-              <h5 className="font-semibold mt-2">Debug Items:</h5>
-              <div className="max-h-40 overflow-y-auto text-xs">
-                {debugItems.map((item, index) => (
-                  <div key={index}>{JSON.stringify(item)}</div>
-                ))}
-              </div>
-            </div>
+            </>
           )}
         </div>
+        {isDebugAllowed && showDebug && (
+          <div className="mt-4 p-2 border rounded bg-gray-50">
+            <h4 className="font-bold mb-2">Debug Info</h4>
+            <div className="mb-4">
+              <h5 className="font-semibold text-sm">Date di Sistema</h5>
+              <div className="text-xs">
+                <div>
+                  <strong>Current Date (ISO):</strong> {currentDate.toISOString()}
+                </div>
+                <div>
+                  <strong>Current Date (Local):</strong> {currentDate.toLocaleString()}
+                </div>
+                <div>
+                  <strong>Start Date:</strong> {startDate.toISOString()}
+                </div>
+                <div>
+                  <strong>End Date:</strong> {endDate.toISOString()}
+                </div>
+                <div>
+                  <strong>Timezone Offset:</strong> {new Date().getTimezoneOffset()} minutes
+                </div>
+              </div>
+            </div>
+            <div className="mb-4">
+              <h5 className="font-semibold text-sm">Statistiche Elementi</h5>
+              <div className="text-xs">
+                <div>
+                  <strong>Totale elementi:</strong> {items.length}
+                </div>
+                <div>
+                  <strong>Elementi filtrati:</strong> {filteredItems.length}
+                </div>
+                <div>
+                  <strong>Elementi per tipo:</strong>
+                </div>
+                <ul className="list-disc pl-5">
+                  <li>Attività: {items.filter((i) => i.tipo === "attivita").length}</li>
+                  <li>Progetti: {items.filter((i) => i.tipo === "progetto").length}</li>
+                  <li>Appuntamenti: {items.filter((i) => i.tipo === "appuntamento").length}</li>
+                  <li>Scadenze personali: {items.filter((i) => i.tipo === "scadenza" && !i.generale).length}</li>
+                  <li>Scadenze generali: {items.filter((i) => i.tipo === "scadenza" && i.generale).length}</li>
+                  <li>Todo: {items.filter((i) => i.tipo === "todolist").length}</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mb-4">
+              <h5 className="font-semibold text-sm">Elementi per la Data Corrente</h5>
+              <div className="text-xs">
+                <div>
+                  <strong>Data corrente:</strong> {currentDate.toLocaleDateString()}
+                </div>
+                <div>
+                  <strong>Elementi che corrispondono:</strong> {debugItems.filter((i) => i.matchesCurrentDate).length}
+                </div>
+                {debugItems.filter((i) => i.matchesCurrentDate).length > 0 ? (
+                  <div className="mt-2 max-h-40 overflow-y-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="p-1 border">ID</th>
+                          <th className="p-1 border">Titolo</th>
+                          <th className="p-1 border">Tipo</th>
+                          <th className="p-1 border">Data Inizio</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {debugItems
+                          .filter((i) => i.matchesCurrentDate)
+                          .map((item, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td className="p-1 border">{item.id}</td>
+                              <td className="p-1 border">{item.titolo}</td>
+                              <td className="p-1 border">
+                                {item.tipo}
+                                {item.generale ? " (gen)" : ""}
+                              </td>
+                              <td className="p-1 border">{item.data_inizio}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="italic">Nessun elemento corrisponde alla data corrente</div>
+                )}
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              <h5 className="font-semibold text-sm">Log</h5>
+              {logs.map((log, index) => (
+                <div key={index} className="text-xs mb-1">
+                  {log}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

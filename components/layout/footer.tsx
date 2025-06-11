@@ -1,60 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { Github, Twitter, Linkedin, Mail, ExternalLink, Info, AlertCircle, RefreshCw } from "lucide-react"
-import { useAppVersion, useConfigValue } from "@/hooks/use-app-config"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Github, Twitter, Linkedin, Mail, ExternalLink } from "lucide-react"
+import { useAppVersion } from "@/hooks/use-app-config"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
-  const { version, isLoading, error } = useAppVersion()
-  const { value: appName } = useConfigValue("nome_app")
-
-  const getVersionDisplay = () => {
-    if (isLoading) {
-      return (
-        <div className="text-xs flex items-center gap-1 text-muted-foreground">
-          <RefreshCw className="h-3 w-3 animate-spin" />
-          <span>Caricamento...</span>
-        </div>
-      )
-    }
-
-    const icon = error ? <AlertCircle className="h-3 w-3 text-yellow-500" /> : <Info className="h-3 w-3" />
-
-    return (
-      <div className="text-xs flex items-center gap-1 text-muted-foreground">
-        {icon}
-        <span>Versione {version}</span>
-      </div>
-    )
-  }
-
-  const getTooltipContent = () => {
-    if (isLoading) return "Caricamento configurazione..."
-
-    if (error) {
-      return (
-        <div className="text-sm">
-          <div className="font-medium text-yellow-400">Configurazione</div>
-          <div>{error}</div>
-          <div className="mt-1 text-xs opacity-75">Versione: {version} (default)</div>
-        </div>
-      )
-    }
-
-    return (
-      <div className="text-sm">
-        <div className="font-medium">Configurazione App</div>
-        <div>Caricata dal database</div>
-        <div className="mt-1 text-xs opacity-75">
-          Cache sessione attiva
-          <br />
-          Versione: {version}
-        </div>
-      </div>
-    )
-  }
+  const { version, isLoading } = useAppVersion()
 
   return (
     <footer className="w-full border-t bg-background">
@@ -62,19 +14,16 @@ export function Footer() {
         <div className="py-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="space-y-3">
-              <h3 className="font-semibold text-lg">{appName || "iStudio"}</h3>
+              <h3 className="font-semibold text-lg">iStudio</h3>
               <p className="text-sm text-muted-foreground">Sistema di gestione integrato per la tua azienda.</p>
-              {/* Versione dal database con cache sessione */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="cursor-help">{getVersionDisplay()}</div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    {getTooltipContent()}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              {/* Versione dal database */}
+              <div className="text-xs text-muted-foreground">
+                {isLoading ? (
+                  <span className="animate-pulse">Caricamento versione...</span>
+                ) : (
+                  <span>Versione {version}</span>
+                )}
+              </div>
             </div>
             <div className="space-y-3">
               <h4 className="font-semibold">Link Rapidi</h4>
@@ -137,9 +86,7 @@ export function Footer() {
           <div className="mt-8 pt-8 border-t">
             <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
               <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
-                <p className="text-sm text-muted-foreground">
-                  © {currentYear} {appName || "iStudio"}. Tutti i diritti riservati.
-                </p>
+                <p className="text-sm text-muted-foreground">© {currentYear} iStudio. Tutti i diritti riservati.</p>
                 {/* Link al sito Leonardo */}
                 <Link
                   href="https://leonardo.sssr.it"

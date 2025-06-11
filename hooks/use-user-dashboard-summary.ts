@@ -115,14 +115,12 @@ const mapRawItemToUpcoming = (
   }
 }
 
-export function useUserDashboardSummary(userId?: string | number) {
+export function useUserDashboardSummary() {
   const { supabase } = useSupabase()
   const { user } = useAuth()
   const [dashboardData, setDashboardData] = useState<UserDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const effectiveUserId = userId || user?.id
 
   const todayRange = useMemo(
     () => ({
@@ -141,17 +139,17 @@ export function useUserDashboardSummary(userId?: string | number) {
   )
 
   useEffect(() => {
-    if (!supabase || !effectiveUserId) {
+    if (!supabase || !user) {
       setIsLoading(false)
-      if (!effectiveUserId) setError("Utente non specificato.")
       return
     }
 
-    const fetchSummary = async () => {
+    const fetchData = async () => {
       setIsLoading(true)
       setError(null)
 
       try {
+        const userId = user.id
         const fetchedTodaysItems: UpcomingItem[] = []
         const fetchedNextWeekItems: UpcomingItem[] = []
         const summaryCounts: SummaryCount[] = []
@@ -183,7 +181,7 @@ export function useUserDashboardSummary(userId?: string | number) {
               // Use the constructed unique select string
               count: "exact",
             })
-            .eq("id_utente", effectiveUserId)
+            .eq("id_utente", userId)
           // Removed problematic filter line here
 
           if (fetchError) {
@@ -268,7 +266,7 @@ export function useUserDashboardSummary(userId?: string | number) {
         const { count: progettiCount, error: progettiError } = await supabase
           .from("progetti")
           .select("id", { count: "exact" })
-          .eq("id_utente", effectiveUserId)
+          .eq("id_utente", userId)
           .neq("stato", "Completato")
         if (progettiError) console.error("Error fetching progetti count:", progettiError)
         summaryCounts.push({
@@ -282,7 +280,7 @@ export function useUserDashboardSummary(userId?: string | number) {
         const { count: clientiCount, error: clientiError } = await supabase
           .from("clienti")
           .select("id", { count: "exact" })
-          .eq("id_utente", effectiveUserId)
+          .eq("id_utente", userId)
         if (clientiError) console.error("Error fetching clienti count:", clientiError)
         summaryCounts.push({
           type: "clienti",
@@ -307,12 +305,8 @@ export function useUserDashboardSummary(userId?: string | number) {
       }
     }
 
-    fetchSummary()
-  }, [supabase, effectiveUserId, todayRange, nextWeekRange])
+    fetchData()
+  }, [supabase, user, todayRange, nextWeekRange])
 
-  return {
-    summary: dashboardData,
-    isLoading,
-    error,
-  }
+  return { dashboardData, isLoading, error }
 }

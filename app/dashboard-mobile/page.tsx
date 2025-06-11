@@ -33,7 +33,7 @@ function DashboardMobileContent() {
   ]
 
   return (
-    <div className="container px-4 py-6 mx-auto max-w-lg min-h-full content-inherit">
+    <div className="container px-4 py-6 mx-auto max-w-lg content-inherit">
       <h1 className="text-2xl font-bold mb-6">Dashboard Mobile</h1>
       {/* Daily Summary Card */}
       <div className="mb-6">

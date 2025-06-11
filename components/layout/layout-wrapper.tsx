@@ -108,7 +108,7 @@ export function LayoutWrapper({
         {/* Contenuto Principale */}
         <motion.main
           key="main-content"
-          className="flex-1 min-w-0" // Aggiunto overflow-y-auto
+          className="flex-1 min-w-0 overflow-y-auto" // Aggiunto overflow-y-auto
           layout
           transition={{ duration: 0.3, type: "spring", bounce: 0.1 }}
         >
