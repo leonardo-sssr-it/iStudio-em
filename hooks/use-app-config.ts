@@ -47,3 +47,33 @@ export function useAppConfig() {
 
   return { config, isLoading, error }
 }
+
+// Hook specifico per recuperare solo la versione (più leggero)
+export function useAppVersion() {
+  const [version, setVersion] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase.from("configurazione").select("versione").limit(1).maybeSingle()
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Errore nel caricamento della versione:", error)
+        }
+
+        setVersion(data?.versione || "1.0.0")
+      } catch (err) {
+        console.error("Errore nel caricamento della versione:", err)
+        setVersion("1.0.0")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchVersion()
+  }, [])
+
+  return { version, isLoading }
+}

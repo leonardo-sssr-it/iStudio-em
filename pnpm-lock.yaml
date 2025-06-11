@@ -175,7 +175,7 @@ importers:
         version: 7.1.2
       zod:
         specifier: latest
-        version: 3.25.60
+        version: 3.25.61
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -3186,8 +3186,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@3.25.60:
-    resolution: {integrity: sha512-VyPT/ZfyggoJtTnGCfPGx2OOW9idfmyqsqZCAvYscOlXKCGKPCeSfr44Ewp8fqvtfNMe1T88qjWIFKopTL9jSQ==}
+  zod@3.25.61:
+    resolution: {integrity: sha512-fzfJgUw78LTNnHujj9re1Ov/JJQkRZZGDMcYqSx7Hp4rPOkKywaFHq0S6GoHeXs0wGNE/sIOutkXgnwzrVOGCQ==}
 
 snapshots:
 
@@ -6544,4 +6544,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@3.25.60: {}
+  zod@3.25.61: {}
