@@ -1,70 +1,91 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-provider"
-import { DailySummaryCard } from "@/components/daily-summary-card"
-import { AgendaWidget } from "@/components/agenda-widget"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import Link from "next/link"
+import { Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, FileText, LayoutGrid } from "lucide-react"
+import { ProtectedRoute } from "@/components/protected-route"
+import { DailySummaryCard } from "@/components/daily-summary-card"
 
-export default function DashboardMobile() {
-  const { user, isLoading: authLoading } = useAuth()
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState("summary")
+// Componente per il contenuto della dashboard mobile
+function DashboardMobileContent() {
+  const { user, isLoading } = useAuth()
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/")
-    }
-  }, [user, authLoading, router])
-
-  if (authLoading || !user) {
+  // Gestione stato di caricamento
+  if (isLoading) {
     return (
-      <div className="flex min-h-full w-full items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <LoadingSpinner size="lg" />
       </div>
     )
   }
 
-  return (
-    <div className="min-h-full w-full">
-      <div className="container p-4">
-        <div className="mb-4">
-          <h1 className="text-xl font-bold">Dashboard Mobile</h1>
-          <p className="text-sm text-muted-foreground">Benvenuto, {user.nome || user.username}</p>
-        </div>
+  // Data tables available
+  const tables = [
+    { name: "appuntamenti", label: "Appuntamenti", icon: Calendar },
+    { name: "attivita", label: "Attività", icon: CheckSquare },
+    { name: "scadenze", label: "Scadenze", icon: Clock },
+    { name: "todolist", label: "To-Do List", icon: ListTodo },
+    { name: "progetti", label: "Progetti", icon: Briefcase },
+    { name: "clienti", label: "Clienti", icon: Users },
+    { name: "pagine", label: "Pagine", icon: FileText },
+  ]
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="summary">Riepilogo</TabsTrigger>
-            <TabsTrigger value="agenda">Agenda</TabsTrigger>
-          </TabsList>
-          <TabsContent value="summary" className="mt-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Riepilogo Giornaliero</CardTitle>
-                <CardDescription>Le tue attività di oggi</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DailySummaryCard />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="agenda" className="mt-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle>Agenda</CardTitle>
-                <CardDescription>I tuoi prossimi eventi</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AgendaWidget />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+  return (
+    <div className="container px-4 py-6 mx-auto max-w-lg min-h-full content-inherit">
+      <h1 className="text-2xl font-bold mb-6">Dashboard Mobile</h1>
+      {/* Daily Summary Card */}
+      <div className="mb-6">
+        <DailySummaryCard />
       </div>
+      {/* Link to Mobile Agenda */}
+      <Card className="mb-6 dashboard-card">
+        <CardContent className="p-4 dashboard-content">
+          <Link
+            href="/dashboard-mobile/agenda"
+            className="flex items-center justify-between p-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+          >
+            <div className="flex items-center">
+              <LayoutGrid className="h-6 w-6 mr-3" />
+              <span className="font-semibold">Vai all'Agenda Mobile</span>
+            </div>
+            <span>&rarr;</span>
+          </Link>
+        </CardContent>
+      </Card>
+      <Card className="dashboard-card">
+        <CardHeader>
+          <CardTitle>Esplora i tuoi dati</CardTitle>
+          <CardDescription>Seleziona una tabella per visualizzare i dati</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 dashboard-content">
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-4">
+            {tables.map((table) => (
+              <Card
+                key={table.name}
+                className="overflow-hidden shadow-sm hover:shadow-md transition-shadow dashboard-card"
+              >
+                <Link href={`/data-explorer?table=${table.name}`} className="block h-full">
+                  <CardContent className="p-4 flex flex-col items-center justify-center h-full text-center dashboard-content">
+                    <table.icon className="h-8 w-8 mb-2 text-primary" />
+                    <h3 className="font-medium text-sm">{table.label}</h3>
+                  </CardContent>
+                </Link>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  )
+}
+
+// Componente principale che applica la protezione
+export default function DashboardMobile() {
+  return (
+    <ProtectedRoute>
+      <DashboardMobileContent />
+    </ProtectedRoute>
   )
 }

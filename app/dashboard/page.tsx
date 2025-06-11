@@ -1,140 +1,124 @@
 "use client"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-provider"
-import { DailySummaryCard } from "@/components/daily-summary-card"
-import { AgendaWidget } from "@/components/agenda-widget"
-import { KanbanWidget } from "@/components/kanban-widget"
+import { ProtectedRoute } from "@/components/protected-route"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { LogOut, UserCircle, Calendar, ListTodo, LayoutGrid } from "lucide-react"
+import { UserProfileTab } from "@/components/user-profile-tab"
+import { UserTablesTab } from "@/components/user-tables-tab"
+import { GanttChartWidget } from "@/components/gantt-chart-widget"
+import { AgendaWidget } from "@/components/agenda-widget"
+import { KanbanWidget } from "@/components/kanban-widget"
 
-export default function Dashboard() {
-  const { user, isLoading: authLoading } = useAuth()
+export default function DashboardPage() {
+  const { user, logout } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState("agenda")
+  const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date())
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/")
-    }
-  }, [user, authLoading, router])
+    // Update time every second
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date())
+    }, 1000)
 
-  if (authLoading || !user) {
-    return (
-      <div className="flex min-h-full w-full items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
-  }
+    return () => clearInterval(timer)
+  }, [])
 
   return (
-    <div className="min-h-full w-full">
-      <div className="container mx-auto p-4 md:p-6">
-        <div className="mb-6 flex flex-col gap-2">
-          <h1 className="text-2xl font-bold md:text-3xl">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Benvenuto, {user.nome || user.username}. Ecco il riepilogo delle tue attività.
-          </p>
+    <ProtectedRoute>
+      <div className="w-full min-h-full content-inherit">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logout()}
+              className="flex items-center gap-2 w-full sm:w-auto"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex items-center justify-between">
-            <TabsList>
-              <TabsTrigger value="overview">Panoramica</TabsTrigger>
-              <TabsTrigger value="agenda">Agenda</TabsTrigger>
-              <TabsTrigger value="kanban">Kanban</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="overview" className="mt-6">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              <Card className="col-span-full lg:col-span-2">
-                <CardHeader className="pb-2">
-                  <CardTitle>Riepilogo Giornaliero</CardTitle>
-                  <CardDescription>Panoramica delle tue attività di oggi</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <DailySummaryCard />
-                </CardContent>
-              </Card>
-
-              <Card className="lg:row-span-2">
-                <CardHeader className="pb-2">
-                  <CardTitle>Statistiche</CardTitle>
-                  <CardDescription>Metriche e statistiche</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Attività completate</span>
-                        <span className="text-sm font-medium">65%</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-muted">
-                        <div className="h-full w-[65%] rounded-full bg-primary"></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Progetti attivi</span>
-                        <span className="text-sm font-medium">4</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-muted">
-                        <div className="h-full w-[40%] rounded-full bg-blue-500"></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Scadenze imminenti</span>
-                        <span className="text-sm font-medium">3</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-muted">
-                        <div className="h-full w-[30%] rounded-full bg-yellow-500"></div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-full lg:col-span-2">
-                <CardHeader className="pb-2">
-                  <CardTitle>Agenda</CardTitle>
-                  <CardDescription>I tuoi prossimi appuntamenti ed eventi</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AgendaWidget />
-                </CardContent>
-              </Card>
+        <Card className="mb-4 sm:mb-6 overflow-hidden dashboard-card">
+          <CardHeader className="p-3 sm:p-6 flex flex-row justify-between items-start">
+            <div>
+              <CardTitle>Benvenuto, {user?.nome || user?.username}!</CardTitle>
+              <CardDescription className="line-clamp-2 sm:line-clamp-none">
+                Accesso effettuato. Puoi esplorare le tue tabelle e visualizzare i tuoi dati.
+              </CardDescription>
             </div>
-          </TabsContent>
+            <div className="text-right">
+              <CardTitle className="text-sm sm:text-base flex flex-col items-end">
+                <span>{currentDateTime.toLocaleDateString("it-IT", { weekday: "long" })}</span>
+                <span>
+                  {currentDateTime.getDate()} {currentDateTime.toLocaleDateString("it-IT", { month: "long" })}{" "}
+                  {currentDateTime.getFullYear()}
+                </span>
+                <span>
+                  {currentDateTime.getHours().toString().padStart(2, "0")}:
+                  {currentDateTime.getMinutes().toString().padStart(2, "0")}:
+                  {currentDateTime.getSeconds().toString().padStart(2, "0")}
+                </span>
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-6 dashboard-content">
+            <Tabs defaultValue="agenda" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 sm:mb-6 w-full">
+                <TabsTrigger value="agenda" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <ListTodo className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Agenda</span>
+                </TabsTrigger>
+                <TabsTrigger value="kanban" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Kanban</span>
+                </TabsTrigger>
+                <TabsTrigger value="gantt" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Gantt</span>
+                </TabsTrigger>
+                <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <UserCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Profilo</span>
+                </TabsTrigger>
+                <TabsTrigger value="tables" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Tabelle</span>
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="agenda" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Agenda Completa</CardTitle>
-                <CardDescription>Tutti i tuoi appuntamenti ed eventi</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AgendaWidget />
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <div className="overflow-x-auto">
+                <TabsContent value="profile" className="space-y-4 min-w-full">
+                  <UserProfileTab user={user} />
+                </TabsContent>
 
-          <TabsContent value="kanban" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Kanban Board</CardTitle>
-                <CardDescription>Gestisci le tue attività</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <KanbanWidget />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <TabsContent value="tables" className="space-y-4 min-w-full">
+                  <UserTablesTab />
+                </TabsContent>
+
+                <TabsContent value="gantt" className="space-y-4 min-w-full">
+                  <GanttChartWidget />
+                </TabsContent>
+
+                <TabsContent value="agenda" className="space-y-4 min-w-full">
+                  <AgendaWidget />
+                </TabsContent>
+
+                <TabsContent value="kanban" className="space-y-4 min-w-full">
+                  <KanbanWidget />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }
