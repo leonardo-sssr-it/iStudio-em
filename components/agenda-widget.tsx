@@ -45,7 +45,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useAuth } from "@/lib/auth-provider" // Ensure this path is correct
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import { cn } from "@/lib/utils"
@@ -202,7 +201,7 @@ const AgendaItemComponent = ({ item }: { item: AgendaItem }) => {
 // Componente per la legenda dei colori
 const ColorLegend = () => {
   return (
-    <div className="flex flex-wrap gap-2 mt-2">
+    <div className="flex flex-wrap gap-2 mt-4 p-3 bg-gray-50 rounded-md">
       <div className="flex items-center">
         <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.attivita }}></div>
         <span className="text-xs">Attività</span>
@@ -231,6 +230,52 @@ const ColorLegend = () => {
         <span className="text-xs">Todo</span>
       </div>
     </div>
+  )
+}
+
+// Componente per il popup delle statistiche
+const StatsPopup = ({ tableStats }: { tableStats: Record<string, number> }) => {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-1">
+          <HelpCircle className="h-4 w-4" />
+          <span className="sr-only">Mostra statistiche dettagliate</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64" align="end">
+        <div className="space-y-2">
+          <h4 className="font-semibold text-sm">Riepilogo per tipo</h4>
+          <div className="space-y-1">
+            {Object.entries(tableStats).map(([tipo, count]) => (
+              <div key={tipo} className="flex justify-between items-center text-sm">
+                <span className="flex items-center">
+                  {tipo === "scadenze_generali" ? (
+                    <>
+                      <Globe className="h-3 w-3 mr-1" />
+                      Scadenze generali
+                    </>
+                  ) : (
+                    tipo.charAt(0).toUpperCase() + tipo.slice(1)
+                  )}
+                </span>
+                <Badge variant="outline" className="text-xs">
+                  {count}
+                </Badge>
+              </div>
+            ))}
+          </div>
+          <div className="border-t pt-2 mt-2">
+            <div className="flex justify-between items-center text-sm font-medium">
+              <span>Totale</span>
+              <Badge variant="default" className="text-xs">
+                {Object.values(tableStats).reduce((sum, count) => sum + count, 0)}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -1303,23 +1348,9 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                   <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
                 </Button>
               )}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
-                      <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="sr-only">Legenda</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="end" className="w-auto">
-                    <div className="text-sm font-medium mb-1">Legenda colori</div>
-                    <ColorLegend />
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
           </div>
-          <ColorLegend />
+
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -1364,24 +1395,15 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                   isDebugEnabled={isDebugAllowed}
                 />
               )}
+
+              {/* Legenda colori spostata sotto la tabella */}
+              <ColorLegend />
+
               <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
                 <div className="flex items-center">
-                  <Info className="h-3 w-3 mr-1" /> Elementi visualizzati: {filteredItems.length} di {items.length}{" "}
-                  totali
-                </div>
-                <div className="flex gap-2">
-                  {Object.entries(tableStats).map(([tipo, count]) => (
-                    <Badge key={tipo} variant="outline" className="text-xs">
-                      {tipo === "scadenze_generali" ? (
-                        <span className="flex items-center">
-                          <Globe className="h-3 w-3 mr-1" />
-                          Scadenze generali: {count}
-                        </span>
-                      ) : (
-                        `${tipo}: ${count}`
-                      )}
-                    </Badge>
-                  ))}
+                  <Info className="h-3 w-3 mr-1" />
+                  Elementi visualizzati: {filteredItems.length} di {items.length} totali
+                  <StatsPopup tableStats={tableStats} />
                 </div>
               </div>
             </>
