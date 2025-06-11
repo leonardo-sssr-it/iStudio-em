@@ -1363,4 +1363,87 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
             <div className="space-y-4">
               <Skeleton className="h-8 w-64" />
               <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_,
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-4 w-full" />
+                ))}
+              </div>
+            </div>
+          ) : view === "daily" ? (
+            <DailyView
+              items={filteredItems}
+              currentDate={currentDate}
+              filters={filters}
+              isDebugEnabled={isDebugAllowed}
+            />
+          ) : view === "weekly" ? (
+            <WeeklyView
+              items={filteredItems}
+              currentDate={currentDate}
+              filters={filters}
+              isDebugEnabled={isDebugAllowed}
+            />
+          ) : (
+            <MonthlyView
+              items={filteredItems}
+              currentDate={currentDate}
+              filters={filters}
+              isDebugEnabled={isDebugAllowed}
+            />
+          )}
+
+          {mode === "desktop" && <ColorLegend />}
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Visualizzando {filteredItems.length} elementi su {items.length} totali
+            </p>
+            <div className="flex items-center">
+              <StatsPopup tableStats={tableStats} />
+            </div>
+          </div>
+
+          {showDebug && isDebugAllowed && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-md overflow-x-auto">
+              <h4 className="font-semibold mb-2">Debug Information</h4>
+              <div>
+                <p>
+                  <strong>Current Date:</strong> {currentDate.toISOString()}
+                </p>
+                <p>
+                  <strong>View:</strong> {view}
+                </p>
+                <p>
+                  <strong>Filters:</strong> {JSON.stringify(filters)}
+                </p>
+                <p>
+                  <strong>Search Term:</strong> {searchTerm}
+                </p>
+                <p>
+                  <strong>Cliente Filter:</strong> {clienteFilter || "None"}
+                </p>
+                <p>
+                  <strong>Total Items:</strong> {items?.length || 0}
+                </p>
+                <p>
+                  <strong>Filtered Items:</strong> {filteredItems?.length || 0}
+                </p>
+              </div>
+              <h5 className="font-semibold mt-2">Debug Logs:</h5>
+              <div className="max-h-40 overflow-y-auto text-xs">
+                {logs.map((log, index) => (
+                  <div key={index}>{log}</div>
+                ))}
+              </div>
+              <h5 className="font-semibold mt-2">Debug Items:</h5>
+              <div className="max-h-40 overflow-y-auto text-xs">
+                {debugItems.map((item, index) => (
+                  <div key={index}>{JSON.stringify(item)}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
