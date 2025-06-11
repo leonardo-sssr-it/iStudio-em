@@ -13,7 +13,7 @@ const SESSION_DURATION_DAYS = 7
 const HASH_PREFIX = "hashed_"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing } = useSupabase()
+  const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing, resetClient } = useSupabase()
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null) // Uses AuthUser from auth-context.ts
@@ -100,6 +100,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [supabase, hashPassword],
   )
 
+  const clearAllAuthCookies = useCallback(() => {
+    if (typeof document === "undefined") return
+
+    // Rimuovi il cookie di sessione principale
+    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+
+    // Rimuovi anche i cookie di Supabase
+    document.cookie = `sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    document.cookie = `sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    document.cookie = `supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+
+    // Rimuovi eventuali cookie di sessione con domini diversi
+    const domains = [location.hostname, `.${location.hostname}`, ""]
+    const paths = ["/", "/auth", ""]
+
+    domains.forEach((domain) => {
+      paths.forEach((path) => {
+        document.cookie = `${AUTH_COOKIE_NAME}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+        document.cookie = `sb-access-token=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+        document.cookie = `sb-refresh-token=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+      })
+    })
+
+    // Pulisci anche localStorage e sessionStorage
+    try {
+      localStorage.removeItem("supabase.auth.token")
+      localStorage.removeItem("authToken")
+      localStorage.removeItem("authUser")
+      sessionStorage.removeItem("supabase.auth.token")
+      sessionStorage.removeItem("authToken")
+      sessionStorage.removeItem("authUser")
+    } catch (e) {
+      console.error("Errore nella pulizia dello storage:", e)
+    }
+  }, [])
+
   const getSessionFromCookie = useCallback(() => {
     if (typeof document === "undefined") return null // Guard for SSR or non-browser environments
     try {
@@ -141,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = getSessionFromCookie()
       if (!session || !session.user_id || new Date(session.expires_at) <= new Date()) {
         if (session && typeof document !== "undefined") {
-          document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+          clearAllAuthCookies()
         }
         if (user !== null) setUser(null)
         isCheckingSessionRef.current = false
@@ -154,9 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const userData = await fetchUserData(session.user_id)
       if (!userData) {
-        if (typeof document !== "undefined") {
-          document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        }
+        clearAllAuthCookies()
         if (user !== null) setUser(null)
         isCheckingSessionRef.current = false
         return false
@@ -181,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchUserData,
     updateLastAccess,
     saveSessionToCookie,
+    clearAllAuthCookies,
     setUser,
     setIsAdmin,
   ])
@@ -273,15 +308,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async (): Promise<void> => {
     if (redirectingRef.current) return
     redirectingRef.current = true
-    if (typeof document !== "undefined") {
-      document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    }
+
+    // Pulisci tutti i cookie e lo storage
+    clearAllAuthCookies()
+
+    // Reset dello stato
     setUser(null)
     setIsAdmin(false)
     setSessionChecked(false)
+
+    // Reset del client Supabase
+    if (resetClient) {
+      try {
+        await resetClient()
+      } catch (e) {
+        console.error("Errore nel reset del client Supabase:", e)
+      }
+    }
+
+    // Reindirizza alla home
     router.push("/")
+
+    // Mostra toast di conferma
     toast({ title: "Logout effettuato", description: "Hai effettuato il logout con successo." })
-  }, [router, setUser, setIsAdmin])
+
+    // Forza un refresh della pagina dopo un breve ritardo
+    setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.location.reload()
+      }
+    }, 100)
+  }, [router, setUser, setIsAdmin, clearAllAuthCookies, resetClient])
 
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!user?.id || !supabase) return
