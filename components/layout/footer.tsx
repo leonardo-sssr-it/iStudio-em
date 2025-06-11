@@ -1,13 +1,55 @@
 "use client"
 
 import Link from "next/link"
-import { Github, Twitter, Linkedin, Mail, ExternalLink, Info } from "lucide-react"
+import { Github, Twitter, Linkedin, Mail, ExternalLink, Info, AlertCircle } from "lucide-react"
 import { useAppVersion } from "@/hooks/use-app-config"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
   const { version, isLoading, error } = useAppVersion()
+
+  const getVersionDisplay = () => {
+    if (isLoading) {
+      return (
+        <div className="text-xs flex items-center gap-1 text-muted-foreground">
+          <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+          <span>Caricamento...</span>
+        </div>
+      )
+    }
+
+    const icon = error ? <AlertCircle className="h-3 w-3 text-yellow-500" /> : <Info className="h-3 w-3" />
+
+    return (
+      <div className="text-xs flex items-center gap-1 text-muted-foreground">
+        {icon}
+        <span>Versione {version}</span>
+      </div>
+    )
+  }
+
+  const getTooltipContent = () => {
+    if (isLoading) return "Caricamento versione in corso..."
+
+    if (error) {
+      return (
+        <div className="text-sm">
+          <div className="font-medium text-yellow-400">Attenzione</div>
+          <div>{error}</div>
+          <div className="mt-1 text-xs opacity-75">Usando versione di default: {version}</div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="text-sm">
+        <div className="font-medium">Versione applicazione</div>
+        <div>Caricata dal database</div>
+        <div className="mt-1 text-xs opacity-75">Tabella: configurazione.versione</div>
+      </div>
+    )
+  }
 
   return (
     <footer className="w-full border-t bg-background">
@@ -21,33 +63,10 @@ export function Footer() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="text-xs flex items-center gap-1 text-muted-foreground">
-                      <Info className="h-3 w-3" />
-                      {isLoading ? (
-                        <span className="animate-pulse">Caricamento versione...</span>
-                      ) : error ? (
-                        <span>Versione 1.0.0</span>
-                      ) : (
-                        <span>Versione {version}</span>
-                      )}
-                    </div>
+                    <div className="cursor-help">{getVersionDisplay()}</div>
                   </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {isLoading ? (
-                      "Caricamento in corso..."
-                    ) : error ? (
-                      <>
-                        Errore: {error}
-                        <br />
-                        Verificare la tabella configurazione
-                      </>
-                    ) : (
-                      <>
-                        Versione caricata dal database
-                        <br />
-                        Tabella: configurazione
-                      </>
-                    )}
+                  <TooltipContent side="top" className="max-w-xs">
+                    {getTooltipContent()}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

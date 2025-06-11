@@ -58,37 +58,40 @@ export function useAppVersion() {
       try {
         const supabase = createClient()
 
-        // Prima verifichiamo se la tabella e il campo esistono
-        const { data: tableExists, error: tableError } = await supabase.rpc("check_table_exists", {
-          table_name: "configurazione",
-        })
-
-        if (tableError) {
-          console.error("Errore nel verificare l'esistenza della tabella:", tableError)
-          return // Usiamo il valore di default
-        }
-
-        if (!tableExists) {
-          console.warn("La tabella configurazione non esiste")
-          return // Usiamo il valore di default
-        }
-
-        // Ora proviamo a recuperare la versione
+        // Proviamo direttamente a recuperare la versione dalla tabella configurazione
         const { data, error } = await supabase.from("configurazione").select("versione").limit(1).maybeSingle()
 
         if (error) {
-          console.error("Errore nel caricamento della versione:", error)
-          // Non aggiorniamo lo stato, usiamo il valore di default
+          // Gestiamo i diversi tipi di errore
+          if (error.code === "PGRST116") {
+            // Tabella vuota - usiamo il valore di default
+            console.warn("Tabella configurazione vuota, usando versione di default")
+            setError("Tabella configurazione vuota")
+          } else if (error.code === "42P01") {
+            // Tabella non esiste
+            console.warn("Tabella configurazione non esiste, usando versione di default")
+            setError("Tabella configurazione non trovata")
+          } else if (error.code === "42703") {
+            // Colonna non esiste
+            console.warn("Campo versione non esiste nella tabella configurazione")
+            setError("Campo versione non trovato")
+          } else {
+            // Altri errori
+            console.error("Errore nel caricamento della versione:", error)
+            setError(error.message || "Errore sconosciuto")
+          }
         } else if (data && data.versione) {
+          // Successo - abbiamo trovato la versione
           setVersion(data.versione)
+          setError(null)
         } else {
-          console.warn("Campo versione non trovato o vuoto")
-          // Usiamo il valore di default
+          // Dati trovati ma versione vuota
+          console.warn("Campo versione vuoto nella tabella configurazione")
+          setError("Campo versione vuoto")
         }
       } catch (err: any) {
         console.error("Errore nel caricamento della versione:", err)
-        setError(err.message || "Errore sconosciuto")
-        // Non aggiorniamo lo stato, usiamo il valore di default
+        setError(err.message || "Errore di connessione")
       } finally {
         setIsLoading(false)
       }
