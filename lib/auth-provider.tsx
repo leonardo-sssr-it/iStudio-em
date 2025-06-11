@@ -4,7 +4,7 @@ import { useContext, useEffect, useState, useCallback, useRef, type ReactNode } 
 import { useRouter, usePathname } from "next/navigation"
 import { useSupabase } from "./supabase-provider"
 import { toast } from "@/components/ui/use-toast"
-import bcrypt from "bcryptjs"
+import * as bcrypt from "bcryptjs"
 // Import AuthContext and types from the new auth-context.ts file
 import { AuthContext, type AuthContextType, type AuthUser } from "./auth-context"
 
