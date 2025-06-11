@@ -1,19 +1,20 @@
 "use client"
 
 import Link from "next/link"
-import { Github, Twitter, Linkedin, Mail, ExternalLink, Info, AlertCircle } from "lucide-react"
-import { useAppVersion } from "@/hooks/use-app-config"
+import { Github, Twitter, Linkedin, Mail, ExternalLink, Info, AlertCircle, RefreshCw } from "lucide-react"
+import { useAppVersion, useConfigValue } from "@/hooks/use-app-config"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
   const { version, isLoading, error } = useAppVersion()
+  const { value: appName } = useConfigValue("nome_app")
 
   const getVersionDisplay = () => {
     if (isLoading) {
       return (
         <div className="text-xs flex items-center gap-1 text-muted-foreground">
-          <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+          <RefreshCw className="h-3 w-3 animate-spin" />
           <span>Caricamento...</span>
         </div>
       )
@@ -30,23 +31,27 @@ export function Footer() {
   }
 
   const getTooltipContent = () => {
-    if (isLoading) return "Caricamento versione in corso..."
+    if (isLoading) return "Caricamento configurazione..."
 
     if (error) {
       return (
         <div className="text-sm">
-          <div className="font-medium text-yellow-400">Attenzione</div>
+          <div className="font-medium text-yellow-400">Configurazione</div>
           <div>{error}</div>
-          <div className="mt-1 text-xs opacity-75">Usando versione di default: {version}</div>
+          <div className="mt-1 text-xs opacity-75">Versione: {version} (default)</div>
         </div>
       )
     }
 
     return (
       <div className="text-sm">
-        <div className="font-medium">Versione applicazione</div>
+        <div className="font-medium">Configurazione App</div>
         <div>Caricata dal database</div>
-        <div className="mt-1 text-xs opacity-75">Tabella: configurazione.versione</div>
+        <div className="mt-1 text-xs opacity-75">
+          Cache sessione attiva
+          <br />
+          Versione: {version}
+        </div>
       </div>
     )
   }
@@ -57,9 +62,9 @@ export function Footer() {
         <div className="py-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="space-y-3">
-              <h3 className="font-semibold text-lg">iStudio</h3>
+              <h3 className="font-semibold text-lg">{appName || "iStudio"}</h3>
               <p className="text-sm text-muted-foreground">Sistema di gestione integrato per la tua azienda.</p>
-              {/* Versione dal database con tooltip per debug */}
+              {/* Versione dal database con cache sessione */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -132,7 +137,9 @@ export function Footer() {
           <div className="mt-8 pt-8 border-t">
             <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
               <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
-                <p className="text-sm text-muted-foreground">© {currentYear} iStudio. Tutti i diritti riservati.</p>
+                <p className="text-sm text-muted-foreground">
+                  © {currentYear} {appName || "iStudio"}. Tutti i diritti riservati.
+                </p>
                 {/* Link al sito Leonardo */}
                 <Link
                   href="https://leonardo.sssr.it"
