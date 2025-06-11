@@ -118,6 +118,29 @@
   .hover-simple:hover {
     background-color: hsl(var(--accent) / 0.5);
   }
+
+  /* Stili per i popup e dropdown */
+  .popup-layer {
+    @apply z-50;
+  }
+
+  .dropdown-layer {
+    @apply z-40;
+  }
+
+  /* Precaricamento per dropdown e popup */
+  .preload-dropdown {
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    transform: translateY(-10px);
+    transition: none;
+  }
+
+  /* Stili per i toast */
+  .toast {
+    @apply z-[100] bg-background text-foreground border border-border shadow-lg rounded-md;
+  }
 }
 
 /* Rimuovi transizioni eccessive */
@@ -230,7 +253,7 @@ button:focus:not(:focus-visible) {
 
 /* Stili per i dropdown */
 .dropdown-content {
-  @apply bg-popover text-popover-foreground border border-border shadow-lg rounded-md;
+  @apply bg-popover text-popover-foreground border border-border shadow-lg rounded-md z-50;
 }
 
 .dropdown-item {
@@ -338,4 +361,22 @@ button:focus:not(:focus-visible) {
   .print-only {
     display: block !important;
   }
+}
+
+/* Fix per i popup e dropdown che appaiono sotto altri elementi */
+.popover-content,
+.dropdown-menu-content,
+.dialog-content,
+.select-content,
+.command-dialog,
+.tooltip-content {
+  z-index: 999 !important;
+}
+
+/* Precaricamento per migliorare la reattività dei componenti UI */
+.preload-ui {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-9999px);
 }
