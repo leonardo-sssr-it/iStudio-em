@@ -76,66 +76,74 @@ export function useAppConfig() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchConfig = useCallback(async (forceRefresh = false) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      // Controlla prima la cache se non è un refresh forzato
-      if (!forceRefresh) {
-        const cachedConfig = getStoredConfig()
-        if (cachedConfig) {
-          setConfig(cachedConfig)
-          setIsLoading(false)
-          return cachedConfig
-        }
+  const fetchConfig = useCallback(
+    async (forceRefresh = false) => {
+      // Evita chiamate multiple se già in caricamento
+      if (isLoading && !forceRefresh) {
+        return config
       }
 
-      // Carica dal database
-      const supabase = createClient()
-      const { data, error: supabaseError } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
-
-      if (supabaseError) {
-        if (supabaseError.code === "PGRST116") {
-          // Tabella vuota - usa configurazione di default
-          console.warn("Tabella configurazione vuota, usando configurazione di default")
-          const defaultConfig = { ...DEFAULT_CONFIG } as AppConfig
-          setConfig(defaultConfig)
-          setStoredConfig(defaultConfig)
-          setError("Configurazione di default")
-          return defaultConfig
-        } else if (supabaseError.code === "42P01") {
-          // Tabella non esiste
-          console.warn("Tabella configurazione non esiste, usando configurazione di default")
-          const defaultConfig = { ...DEFAULT_CONFIG } as AppConfig
-          setConfig(defaultConfig)
-          setError("Tabella non trovata")
-          return defaultConfig
-        } else {
-          throw supabaseError
-        }
-      }
-
-      // Merge con configurazione di default per campi mancanti
-      const finalConfig = { ...DEFAULT_CONFIG, ...data } as AppConfig
-
-      setConfig(finalConfig)
-      setStoredConfig(finalConfig)
+      setIsLoading(true)
       setError(null)
 
-      return finalConfig
-    } catch (err: any) {
-      console.error("Errore nel caricamento della configurazione:", err)
-      setError(err.message || "Errore sconosciuto")
+      try {
+        // Controlla prima la cache se non è un refresh forzato
+        if (!forceRefresh) {
+          const cachedConfig = getStoredConfig()
+          if (cachedConfig) {
+            setConfig(cachedConfig)
+            setIsLoading(false)
+            return cachedConfig
+          }
+        }
 
-      // In caso di errore, usa la configurazione di default
-      const defaultConfig = { ...DEFAULT_CONFIG } as AppConfig
-      setConfig(defaultConfig)
-      return defaultConfig
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+        // Carica dal database
+        const supabase = createClient()
+        const { data, error: supabaseError } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
+
+        if (supabaseError) {
+          if (supabaseError.code === "PGRST116") {
+            // Tabella vuota - usa configurazione di default
+            console.warn("Tabella configurazione vuota, usando configurazione di default")
+            const defaultConfig = { ...DEFAULT_CONFIG } as AppConfig
+            setConfig(defaultConfig)
+            setStoredConfig(defaultConfig)
+            setError("Configurazione di default")
+            return defaultConfig
+          } else if (supabaseError.code === "42P01") {
+            // Tabella non esiste
+            console.warn("Tabella configurazione non esiste, usando configurazione di default")
+            const defaultConfig = { ...DEFAULT_CONFIG } as AppConfig
+            setConfig(defaultConfig)
+            setError("Tabella non trovata")
+            return defaultConfig
+          } else {
+            throw supabaseError
+          }
+        }
+
+        // Merge con configurazione di default per campi mancanti
+        const finalConfig = { ...DEFAULT_CONFIG, ...data } as AppConfig
+
+        setConfig(finalConfig)
+        setStoredConfig(finalConfig)
+        setError(null)
+
+        return finalConfig
+      } catch (err: any) {
+        console.error("Errore nel caricamento della configurazione:", err)
+        setError(err.message || "Errore sconosciuto")
+
+        // In caso di errore, usa la configurazione di default
+        const defaultConfig = { ...DEFAULT_CONFIG } as AppConfig
+        setConfig(defaultConfig)
+        return defaultConfig
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [isLoading, config],
+  )
 
   const refreshConfig = useCallback(() => {
     clearStoredConfig()

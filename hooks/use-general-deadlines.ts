@@ -1,355 +1,44 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useSupabase } from "@/lib/supabase-provider"
-import type { AgendaItem } from "./use-agenda-items"
-import { format, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns"
-import { useAuth } from "@/lib/auth-provider"
+import { useCallback, useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
+import { trpc } from "../utils/trpc"
 
-// Funzione di utilità per normalizzare le date delle scadenze
-export function normalizeDeadlineDate(date: Date | null | undefined, isStartDate = false): Date | undefined {
-  if (!date) return undefined
-
-  // Crea una nuova data per non modificare l'originale
-  const normalizedDate = new Date(date)
-
-  if (isStartDate) {
-    // Per le date di inizio: imposta l'orario a 00:00:00.001 (inizio della giornata)
-    return setMilliseconds(setSeconds(setMinutes(setHours(normalizedDate, 0), 0), 0), 1)
-  } else {
-    // Per le date di fine/scadenza: imposta l'orario a 23:59:59.999 (fine della giornata)
-    return setMilliseconds(setSeconds(setMinutes(setHours(normalizedDate, 23), 59), 59), 999)
-  }
-}
-
-// Funzione per creare date senza timezone
-export function createDateWithoutTimezone(dateString: string): Date {
-  // Crea una data interpretando la stringa come ora locale, non UTC
-  const parts = dateString.split("-")
-  if (parts.length === 3) {
-    const year = Number.parseInt(parts[0], 10)
-    const month = Number.parseInt(parts[1], 10) - 1 // I mesi in JavaScript sono 0-based
-    const day = Number.parseInt(parts[2], 10)
-    return new Date(year, month, day)
-  }
-  return new Date(dateString)
-}
-
-export function useGeneralDeadlines(startDate: Date, endDate: Date) {
-  const { supabase } = useSupabase()
-  const { user } = useAuth()
-  const [items, setItems] = useState<AgendaItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+const useGeneralDeadlines = () => {
+  const [deadlines, setDeadlines] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  const [rawData, setRawData] = useState<any[]>([]) // Per debug
+  const { data: session } = useSession()
+  const user = session?.user
 
-  useEffect(() => {
-    const fetchGeneralDeadlines = async () => {
-      console.log("Inizializzazione fetchGeneralDeadlines con date:", {
-        startDate: startDate ? format(startDate, "yyyy-MM-dd") : null,
-        endDate: endDate ? format(endDate, "yyyy-MM-dd") : null,
-      })
-      if (!supabase || !startDate || !endDate) {
-        setItems([])
-        setIsLoading(false)
-        return
-      }
+  const utils = trpc.useContext()
 
-      // Aggiungiamo validazione esplicita che startDate e endDate siano oggetti Date validi
-      if (
-        !(startDate instanceof Date) ||
-        !(endDate instanceof Date) ||
-        isNaN(startDate.getTime()) ||
-        isNaN(endDate.getTime())
-      ) {
-        console.error("startDate o endDate non sono oggetti Date validi", {
-          startDate,
-          endDate,
-          startDateType: typeof startDate,
-          endDateType: typeof endDate,
-          startDateIsDate: startDate instanceof Date,
-          endDateIsDate: endDate instanceof Date,
-        })
-        setError(new Error("Date non valide"))
-        setIsLoading(false)
-        return
-      }
+  const fetchDeadlines = useCallback(async () => {
+    if (isLoading) return // Evita chiamate multiple
 
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        // Assicuriamoci che startDate sia all'inizio del giorno e endDate alla fine del giorno
-        // Utilizziamo le nuove funzioni per gestire le date senza timezone
-        const adjustedStartDate = normalizeDeadlineDate(startDate, true) || startDate
-        const adjustedEndDate = normalizeDeadlineDate(endDate, false) || endDate
-
-        console.log(
-          `Fetching general deadlines from ${format(adjustedStartDate, "yyyy-MM-dd")} to ${format(adjustedEndDate, "yyyy-MM-dd")}`,
-        )
-
-        // Formatta le date per la query SQL nel formato YYYY-MM-DD senza timezone
-        const startDateIso = format(adjustedStartDate, "yyyy-MM-dd")
-        const endDateIso = format(adjustedEndDate, "yyyy-MM-dd")
-
-        console.log("Date formattate per query SQL (scadenze generali):", {
-          startDateIso,
-          endDateIso,
-          startDateFormatted: format(adjustedStartDate, "yyyy-MM-dd"),
-          endDateFormatted: format(adjustedEndDate, "yyyy-MM-dd"),
-        })
-
-        // Verifichiamo se la tabella scadenze esiste
-        try {
-          const { count, error } = await supabase.from("scadenze").select("*", { count: "exact", head: true })
-
-          if (error) {
-            console.log("Tabella scadenze non esiste o non è accessibile")
-            setItems([])
-            setIsLoading(false)
-            return
-          }
-        } catch (err) {
-          console.log("Tabella scadenze non esiste o non è accessibile")
-          setItems([])
-          setIsLoading(false)
-          return
-        }
-
-        // Prima verifichiamo la struttura della tabella
-        const { data: columns, error: columnsError } = await supabase.from("scadenze").select("*").limit(1)
-
-        if (columnsError) {
-          console.error("Errore nel recupero della struttura della tabella scadenze:", columnsError)
-          setError(columnsError)
-          setIsLoading(false)
-          return
-        }
-
-        if (!columns || columns.length === 0) {
-          console.log("Nessuna colonna trovata nella tabella scadenze")
-          setItems([])
-          setIsLoading(false)
-          return
-        }
-
-        console.log("Struttura tabella scadenze:", columns)
-        console.log("Colonne disponibili in scadenze (generali):", Object.keys(columns[0]))
-
-        // Verifichiamo se la tabella ha le colonne necessarie
-        const hasPrivatoColumn = "privato" in columns[0]
-        const hasDataColumn = "data" in columns[0]
-        const hasScadenzaColumn = "scadenza" in columns[0]
-
-        console.log("Colonne disponibili:", {
-          hasPrivatoColumn,
-          hasDataColumn,
-          hasScadenzaColumn,
-        })
-
-        // Recuperiamo le scadenze generali (utente id=1 e privato<>true)
-        let scadenzeQuery = supabase.from("scadenze").select("*")
-
-        // Aggiungiamo il filtro per l'utente id=1 (utente generale)
-        scadenzeQuery = scadenzeQuery.eq("id_utente", 1)
-        console.log("Query dopo filtro id_utente=1")
-
-        // Aggiungiamo il filtro privato<>true solo se la colonna esiste
-        if (hasPrivatoColumn) {
-          // CORREZIONE: Utilizziamo la sintassi corretta di Supabase per "not equal"
-          scadenzeQuery = scadenzeQuery.not("privato", "eq", true)
-          console.log("Query dopo filtro privato<>true")
-        } else {
-          console.warn("Colonna 'privato' non trovata nella tabella scadenze")
-        }
-
-        // IMPORTANTE: Se l'utente corrente è l'utente 1, non carichiamo le scadenze generali
-        // per evitare duplicati
-        if (user && user.id === 1) {
-          console.log("Utente corrente è l'utente generale (id=1), non carico scadenze generali per evitare duplicati")
-          setItems([])
-          setIsLoading(false)
-          return
-        }
-
-        // Costruiamo una query che includa scadenze che rientrano nel periodo selezionato
-        let dateFilterQuery = scadenzeQuery
-
-        // Aggiungiamo filtri per la colonna 'data' se esiste
-        if (hasDataColumn) {
-          console.log("Applicazione filtri per colonna 'data'")
-          // VERIFICA: Sintassi corretta per il filtro OR in Supabase
-          dateFilterQuery = dateFilterQuery.or(`data.gte.${startDateIso},data.lte.${endDateIso}`)
-        }
-
-        // Aggiungiamo filtri per la colonna 'scadenza' se esiste
-        if (hasScadenzaColumn) {
-          console.log("Applicazione filtri per colonna 'scadenza'")
-          // VERIFICA: Sintassi corretta per il filtro OR in Supabase
-          dateFilterQuery = dateFilterQuery.or(`scadenza.gte.${startDateIso},scadenza.lte.${endDateIso}`)
-        }
-
-        // Se non abbiamo né 'data' né 'scadenza', non applichiamo filtri di data
-        if (!hasDataColumn && !hasScadenzaColumn) {
-          console.warn("Nessuna colonna di data trovata, non verranno applicati filtri di data")
-        }
-
-        // Eseguiamo la query finale
-        console.log("Esecuzione query finale per scadenze generali")
-        const { data: scadenze, error: scadenzeError } = await dateFilterQuery
-
-        // Dopo aver ottenuto i risultati
-        console.log("Risultati query scadenze generali:", {
-          success: !scadenzeError,
-          count: scadenze?.length || 0,
-          error: scadenzeError?.message,
-          firstItem: scadenze?.[0]
-            ? {
-                id: scadenze[0].id,
-                id_utente: scadenze[0].id_utente,
-                privato: scadenze[0].privato,
-                titolo: scadenze[0].titolo,
-                data: scadenze[0].data,
-                scadenza: scadenze[0].scadenza,
-              }
-            : null,
-        })
-
-        if (scadenze && Array.isArray(scadenze)) {
-          // Verifica esplicita che le scadenze siano dell'utente 1 e non private
-          const scadenzeUtente1 = scadenze.filter((item) => item.id_utente === 1)
-          // VERIFICA: Utilizziamo !== per confronto stretto
-          const scadenzeNonPrivate = hasPrivatoColumn ? scadenze.filter((item) => item.privato !== true) : scadenze
-
-          console.log("Verifica filtri scadenze:", {
-            totali: scadenze.length,
-            utente1: scadenzeUtente1.length,
-            nonPrivate: scadenzeNonPrivate.length,
-            // VERIFICA: Utilizziamo !== per confronto stretto
-            corrispondentiEntrambi: scadenze.filter(
-              (item) => item.id_utente === 1 && (!hasPrivatoColumn || item.privato !== true),
-            ).length,
-          })
-        }
-
-        if (scadenzeError) {
-          console.error("Errore nel recupero delle scadenze generali:", scadenzeError)
-          setError(scadenzeError)
-          setIsLoading(false)
-          return
-        }
-
-        if (!scadenze || !Array.isArray(scadenze)) {
-          console.log("Nessuna scadenza generale trovata")
-          setItems([])
-          setIsLoading(false)
-          return
-        }
-
-        console.log(`Trovate ${scadenze.length} scadenze generali prima del filtro`)
-        if (scadenze.length > 0) {
-          console.log("Esempio di scadenza generale:", scadenze[0])
-        }
-
-        // Salva i dati grezzi per debug
-        setRawData(scadenze.map((item) => ({ ...item, tabella: "scadenze_generali" })))
-
-        // Filtriamo le scadenze in base al periodo selezionato
-        const filteredScadenze = scadenze.filter((item) => {
-          // Per le scadenze, verifichiamo se la data di scadenza rientra nel periodo selezionato
-          if (hasScadenzaColumn && item.scadenza) {
-            // Crea la data senza considerare la timezone
-            const scadenzaDate = createDateWithoutTimezone(item.scadenza.split("T")[0])
-            const normalizedScadenza = normalizeDeadlineDate(scadenzaDate, false)
-
-            // Debug - utilizziamo format invece di toISOString per evitare timezone
-            console.log(`Scadenza generale ${item.id} - ${item.titolo || "Senza titolo"}:`, {
-              scadenzaOriginale: item.scadenza.split("T")[0],
-              scadenzaNormalizzata: normalizedScadenza ? format(normalizedScadenza, "yyyy-MM-dd HH:mm:ss.SSS") : null,
-              startDate: format(adjustedStartDate, "yyyy-MM-dd HH:mm:ss.SSS"),
-              endDate: format(adjustedEndDate, "yyyy-MM-dd HH:mm:ss.SSS"),
-              inRange:
-                normalizedScadenza && normalizedScadenza >= adjustedStartDate && normalizedScadenza <= adjustedEndDate,
-            })
-
-            return (
-              normalizedScadenza && normalizedScadenza >= adjustedStartDate && normalizedScadenza <= adjustedEndDate
-            )
-          }
-
-          // Se non c'è scadenza ma c'è data, usiamo quella
-          if (hasDataColumn && item.data) {
-            // Crea la data senza considerare la timezone
-            const dataDate = createDateWithoutTimezone(item.data.split("T")[0])
-            const normalizedData = normalizeDeadlineDate(dataDate, false)
-
-            // Debug - utilizziamo format invece di toISOString per evitare timezone
-            console.log(`Scadenza generale ${item.id} - ${item.titolo || "Senza titolo"} (usando data):`, {
-              dataOriginale: item.data.split("T")[0],
-              dataNormalizzata: normalizedData ? format(normalizedData, "yyyy-MM-dd HH:mm:ss.SSS") : null,
-              startDate: format(adjustedStartDate, "yyyy-MM-dd HH:mm:ss.SSS"),
-              endDate: format(adjustedEndDate, "yyyy-MM-dd HH:mm:ss.SSS"),
-              inRange: normalizedData && normalizedData >= adjustedStartDate && normalizedData <= adjustedEndDate,
-            })
-
-            return normalizedData && normalizedData >= adjustedStartDate && normalizedData <= adjustedEndDate
-          }
-
-          return false
-        })
-
-        console.log(`Dopo il filtro per data: ${filteredScadenze.length} scadenze generali`)
-
-        // Formatta le scadenze generali
-        const formattedScadenze = filteredScadenze.map((item) => {
-          // Determina la data da usare (scadenza o data)
-          let dataScadenzaRaw: Date
-
-          if (item.scadenza) {
-            dataScadenzaRaw = createDateWithoutTimezone(item.scadenza.split("T")[0])
-          } else if (item.data) {
-            dataScadenzaRaw = createDateWithoutTimezone(item.data.split("T")[0])
-          } else {
-            dataScadenzaRaw = new Date()
-          }
-
-          // Normalizza la data di scadenza (fine giornata)
-          const dataScadenza = normalizeDeadlineDate(dataScadenzaRaw, false) || new Date()
-
-          return {
-            id: item.id,
-            titolo: item.titolo || item.nome || item.descrizione || `Scadenza #${item.id}`,
-            descrizione: item.descrizione || item.note,
-            data_inizio: dataScadenza,
-            data_fine: dataScadenza,
-            data_scadenza: dataScadenza,
-            priorita: item.priorita,
-            stato: item.stato,
-            cliente: item.cliente || item.id_cli,
-            tipo: "scadenza" as const,
-            colore: "#FFC107", // Giallo ambra per le scadenze generali
-            tabella_origine: "scadenze",
-            id_origine: item.id,
-            generale: true, // Flag per identificare le scadenze generali
-          }
-        })
-
-        console.log("Scadenze generali formattate:", formattedScadenze)
-        // Aggiungiamo più log di debug
-        console.log("Scadenze generali prima del filtro:", scadenze.length)
-        console.log("Scadenze generali dopo il filtro:", filteredScadenze.length)
-        console.log("Scadenze generali formattate (prime 3):", formattedScadenze.slice(0, 3))
-        setItems(formattedScadenze)
-      } catch (err) {
-        console.error("Errore generale nel recupero delle scadenze generali:", err)
-        setError(err instanceof Error ? err : new Error(String(err)))
-      } finally {
-        setIsLoading(false)
-      }
+    if (!user?.id) {
+      setIsLoading(false)
+      return
     }
 
-    fetchGeneralDeadlines()
-  }, [supabase, startDate, endDate, user])
+    setIsLoading(true)
+    try {
+      const fetchedDeadlines = await utils.deadline.getGeneralDeadlines.query()
+      setDeadlines(fetchedDeadlines)
+      setError(null)
+    } catch (err: any) {
+      setError(err)
+      console.error("Failed to fetch deadlines:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isLoading, user?.id, utils.deadline.getGeneralDeadlines])
 
-  return { items, isLoading, error, rawData }
+  useEffect(() => {
+    fetchDeadlines()
+  }, [fetchDeadlines])
+
+  return { deadlines, isLoading, error, refetch: fetchDeadlines }
 }
+
+export default useGeneralDeadlines

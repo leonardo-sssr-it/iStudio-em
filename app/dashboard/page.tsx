@@ -30,7 +30,7 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="w-full h-full content-inherit">
+      <div className="w-full min-h-full content-inherit">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2">
           <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
           <div className="flex flex-wrap gap-2">

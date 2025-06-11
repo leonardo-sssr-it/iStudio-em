@@ -22,7 +22,7 @@ function DashboardUContent() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6 content-inherit">
+    <div className="container mx-auto py-6 space-y-6 min-h-full content-inherit">
       <Card className="dashboard-card">
         <CardHeader>
           <CardTitle className="text-2xl flex items-center">
