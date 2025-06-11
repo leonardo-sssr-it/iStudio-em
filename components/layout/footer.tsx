@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Github, Twitter, Linkedin, Mail, ExternalLink } from "lucide-react"
+import { Github, Twitter, Linkedin, Mail, ExternalLink, Info } from "lucide-react"
 import { useAppVersion } from "@/hooks/use-app-config"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
-  const { version, isLoading } = useAppVersion()
+  const { version, isLoading, error } = useAppVersion()
 
   return (
     <footer className="w-full border-t bg-background">
@@ -16,14 +17,40 @@ export function Footer() {
             <div className="space-y-3">
               <h3 className="font-semibold text-lg">iStudio</h3>
               <p className="text-sm text-muted-foreground">Sistema di gestione integrato per la tua azienda.</p>
-              {/* Versione dal database */}
-              <div className="text-xs text-muted-foreground">
-                {isLoading ? (
-                  <span className="animate-pulse">Caricamento versione...</span>
-                ) : (
-                  <span>Versione {version}</span>
-                )}
-              </div>
+              {/* Versione dal database con tooltip per debug */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="text-xs flex items-center gap-1 text-muted-foreground">
+                      <Info className="h-3 w-3" />
+                      {isLoading ? (
+                        <span className="animate-pulse">Caricamento versione...</span>
+                      ) : error ? (
+                        <span>Versione 1.0.0</span>
+                      ) : (
+                        <span>Versione {version}</span>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {isLoading ? (
+                      "Caricamento in corso..."
+                    ) : error ? (
+                      <>
+                        Errore: {error}
+                        <br />
+                        Verificare la tabella configurazione
+                      </>
+                    ) : (
+                      <>
+                        Versione caricata dal database
+                        <br />
+                        Tabella: configurazione
+                      </>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div className="space-y-3">
               <h4 className="font-semibold">Link Rapidi</h4>

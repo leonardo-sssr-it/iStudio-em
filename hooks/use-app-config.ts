@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-// L'import ora dovrebbe funzionare correttamente
 import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/types/supabase"
 
@@ -50,23 +49,46 @@ export function useAppConfig() {
 
 // Hook specifico per recuperare solo la versione (più leggero)
 export function useAppVersion() {
-  const [version, setVersion] = useState<string | null>(null)
+  const [version, setVersion] = useState<string>("1.0.0") // Default value
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchVersion = async () => {
       try {
         const supabase = createClient()
-        const { data, error } = await supabase.from("configurazione").select("versione").limit(1).maybeSingle()
 
-        if (error && error.code !== "PGRST116") {
-          console.error("Errore nel caricamento della versione:", error)
+        // Prima verifichiamo se la tabella e il campo esistono
+        const { data: tableExists, error: tableError } = await supabase.rpc("check_table_exists", {
+          table_name: "configurazione",
+        })
+
+        if (tableError) {
+          console.error("Errore nel verificare l'esistenza della tabella:", tableError)
+          return // Usiamo il valore di default
         }
 
-        setVersion(data?.versione || "1.0.0")
-      } catch (err) {
+        if (!tableExists) {
+          console.warn("La tabella configurazione non esiste")
+          return // Usiamo il valore di default
+        }
+
+        // Ora proviamo a recuperare la versione
+        const { data, error } = await supabase.from("configurazione").select("versione").limit(1).maybeSingle()
+
+        if (error) {
+          console.error("Errore nel caricamento della versione:", error)
+          // Non aggiorniamo lo stato, usiamo il valore di default
+        } else if (data && data.versione) {
+          setVersion(data.versione)
+        } else {
+          console.warn("Campo versione non trovato o vuoto")
+          // Usiamo il valore di default
+        }
+      } catch (err: any) {
         console.error("Errore nel caricamento della versione:", err)
-        setVersion("1.0.0")
+        setError(err.message || "Errore sconosciuto")
+        // Non aggiorniamo lo stato, usiamo il valore di default
       } finally {
         setIsLoading(false)
       }
@@ -75,5 +97,5 @@ export function useAppVersion() {
     fetchVersion()
   }, [])
 
-  return { version, isLoading }
+  return { version, isLoading, error }
 }
