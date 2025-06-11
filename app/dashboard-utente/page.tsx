@@ -20,8 +20,8 @@ import { RefreshCw } from "lucide-react"
 const AVAILABLE_WIDGETS = [
   { id: "agenda", name: "Agenda", component: AgendaWidget },
   { id: "gantt", name: "Diagramma Gantt", component: GanttChartWidget },
-  { id: "kanban", name: "Kanban Board Generico", component: KanbanWidget },
-  { id: "todo_kanban", name: "Kanban Todolist", component: TodoKanbanWidget },
+  { id: "kanban", name: "Priorità", component: KanbanWidget },
+  { id: "todo_kanban", name: "Scadenze Todolist", component: TodoKanbanWidget },
   { id: "gallery", name: "Gestione Galleria", component: GalleryManagerWidget },
   {
     id: "feed1",
