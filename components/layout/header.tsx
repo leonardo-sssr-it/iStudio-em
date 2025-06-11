@@ -62,7 +62,7 @@ export function Header() {
 
           {/* Center - Date */}
           <div className="hidden md:flex items-center space-x-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
+            
             <span className="font-medium">{currentDate}</span>
           </div>
 
