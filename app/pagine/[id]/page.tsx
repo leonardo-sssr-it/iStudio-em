@@ -5,22 +5,13 @@ import type { Database } from "@/types/supabase"
 
 type Page = Database["public"]["Tables"]["pagine"]["Row"]
 
-async function getPageData(id: string): Promise<{ page: Page | null; session: any }> {
+async function getPageData(id: string): Promise<{ page: Page | null; session: any; username?: string }> {
   const supabase = createServerClient()
 
   console.log("Cercando pagina con ID:", id)
 
-  // Prima verifichiamo se la pagina esiste
-  const { data: page, error } = await supabase
-    .from("pagine")
-    .select(`
-      *,
-      utente:utenti!pagine_id_utente_fkey (
-        username
-      )
-    `)
-    .eq("id", id)
-    .single()
+  // Query semplice senza join per evitare problemi di relazione
+  const { data: page, error } = await supabase.from("pagine").select("*").eq("id", id).single()
 
   console.log("Risultato query pagina:", { page, error })
 
@@ -32,19 +23,27 @@ async function getPageData(id: string): Promise<{ page: Page | null; session: an
     }
   }
 
+  // Se abbiamo trovato la pagina, recuperiamo anche i dati dell'utente
+  let username = undefined
+  if (page && page.id_utente) {
+    const { data: userData } = await supabase.from("utenti").select("username").eq("id", page.id_utente).single()
+
+    username = userData?.username
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
   console.log("Sessione utente:", session?.user?.id)
 
-  return { page: page as Page | null, session }
+  return { page: page as Page | null, session, username }
 }
 
 export default async function Page({ params }: { params: { id: string } }) {
   console.log("Parametri ricevuti:", params)
 
-  const { page, session } = await getPageData(params.id)
+  const { page, session, username } = await getPageData(params.id)
 
   if (!page) {
     console.log("Pagina non trovata, reindirizzando a notFound")
@@ -68,18 +67,23 @@ export default async function Page({ params }: { params: { id: string } }) {
     notFound()
   }
 
-  return <PageViewer initialPage={page} session={session} />
+  return <PageViewer initialPage={page} session={session} username={username} />
 }
 
 // Genera i parametri statici per le pagine più comuni (opzionale)
 export async function generateStaticParams() {
-  const supabase = createServerClient()
+  try {
+    const supabase = createServerClient()
 
-  const { data: pages } = await supabase.from("pagine").select("id").eq("attivo", true).limit(10)
+    const { data: pages } = await supabase.from("pagine").select("id").eq("attivo", true).limit(10)
 
-  return (
-    pages?.map((page) => ({
-      id: page.id.toString(),
-    })) || []
-  )
+    return (
+      pages?.map((page) => ({
+        id: page.id.toString(),
+      })) || []
+    )
+  } catch (error) {
+    console.error("Errore in generateStaticParams:", error)
+    return []
+  }
 }
