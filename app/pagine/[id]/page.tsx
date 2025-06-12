@@ -7,14 +7,14 @@ type Page = Database["public"]["Tables"]["pagine"]["Row"]
 
 async function getPageData(id: string): Promise<{ page: Page | null; session: any }> {
   const supabase = createServerClient()
+
   const { data: page, error } = await supabase
     .from("pagine")
-    .select("*, utente:id_utente ( username )") // Join implicito
+    .select("*, utente:id_utente ( username )")
     .eq("id", id)
     .single()
 
   if (error && error.code !== "PGRST116") {
-    // PGRST116 = no rows found
     console.error("Errore caricamento pagina:", error)
   }
 
@@ -37,7 +37,7 @@ export default async function Page({ params }: { params: { id: string } }) {
   const isAdmin = session?.user?.user_metadata?.roles?.includes("admin")
 
   if (page.privato && !isOwner && !isAdmin) {
-    notFound() // O mostra una pagina di "accesso negato"
+    notFound()
   }
 
   return <PageViewer initialPage={page} session={session} />
