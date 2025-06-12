@@ -1,43 +1,92 @@
-import { createServerClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText } from "lucide-react"
-import type { Database } from "@/types/supabase"
+import { Plus, FileText, Loader2 } from "lucide-react"
+import { useAuth } from "@/lib/auth-provider"
+import { useSupabase } from "@/lib/supabase-provider"
+import { useRouter } from "next/navigation"
 
-type Page = Database["public"]["Tables"]["pagine"]["Row"]
-
-async function getUserPages(): Promise<{ pages: Page[]; session: any }> {
-  const supabase = createServerClient()
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session) {
-    redirect("/")
-  }
-
-  const { data: pages, error } = await supabase
-    .from("pagine")
-    .select("*")
-    .eq("id_utente", session.user.id)
-    .order("pubblicato", { ascending: false })
-
-  if (error) {
-    console.error("Errore caricamento pagine:", error)
-    return { pages: [], session }
-  }
-
-  return { pages: pages || [], session }
+type Page = {
+  id: string
+  titolo: string
+  estratto?: string
+  pubblicato: string
+  categoria?: string
+  privato: boolean
+  attivo: boolean
+  id_utente: string
 }
 
-export default async function PagineListPage() {
-  const { pages, session } = await getUserPages()
+export default function PagineListPage() {
+  const { user, isLoading: authLoading } = useAuth()
+  const { supabase } = useSupabase()
+  const router = useRouter()
+  const [pages, setPages] = useState<Page[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (authLoading) return
+
+    if (!user) {
+      router.push("/")
+      return
+    }
+
+    async function fetchPages() {
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        const { data, error } = await supabase
+          .from("pagine")
+          .select("*")
+          .eq("id_utente", user.id)
+          .order("pubblicato", { ascending: false })
+
+        if (error) throw error
+
+        setPages(data || [])
+      } catch (err: any) {
+        console.error("Errore caricamento pagine:", err)
+        setError(err.message || "Errore durante il caricamento delle pagine")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchPages()
+  }, [user, authLoading, supabase, router])
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="max-w-6xl mx-auto my-8">
+        <CardHeader>
+          <CardTitle className="text-red-500">Errore</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Riprova
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
