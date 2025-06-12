@@ -9,23 +9,35 @@ import type { Database } from "@/types/supabase"
 type SupabaseContext = {
   supabase: ReturnType<typeof createClient<Database>> | null
   isConnected: boolean
+  isInitializing: boolean
 }
 
 const Context = createContext<SupabaseContext>({
   supabase: null,
   isConnected: false,
+  isInitializing: true,
 })
+
+// Singleton per evitare istanze multiple
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient<Database>> | null>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(true)
 
   useEffect(() => {
-    if (isInitialized) return
-
     const initializeSupabase = async () => {
       try {
+        // Se abbiamo già un'istanza, riutilizzala
+        if (supabaseInstance) {
+          console.log("Riutilizzo istanza Supabase esistente")
+          setSupabase(supabaseInstance)
+          setIsConnected(true)
+          setIsInitializing(false)
+          return
+        }
+
         // Ottieni le variabili d'ambiente
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
         const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
@@ -34,6 +46,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
         if (!supabaseUrl || !supabaseAnonKey) {
           console.error("Variabili d'ambiente Supabase mancanti")
+          setIsInitializing(false)
           return
         }
 
@@ -44,6 +57,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
             autoRefreshToken: true,
           },
         })
+
+        // Salva l'istanza nel singleton
+        supabaseInstance = client
 
         // Verifica la connessione
         console.log("Verifica della connessione...")
@@ -61,14 +77,14 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         console.error("Errore nell'inizializzazione di Supabase:", error)
         setIsConnected(false)
       } finally {
-        setIsInitialized(true)
+        setIsInitializing(false)
       }
     }
 
     initializeSupabase()
-  }, [isInitialized])
+  }, [])
 
-  return <Context.Provider value={{ supabase, isConnected }}>{children}</Context.Provider>
+  return <Context.Provider value={{ supabase, isConnected, isInitializing }}>{children}</Context.Provider>
 }
 
 export const useSupabase = () => useContext(Context)

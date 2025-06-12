@@ -6,15 +6,15 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, Database, LogOut, UserCircle, Calendar, ListTodo } from "lucide-react"
-import Link from "next/link"
+import { LogOut, UserCircle, Calendar, ListTodo, LayoutGrid } from "lucide-react"
 import { UserProfileTab } from "@/components/user-profile-tab"
 import { UserTablesTab } from "@/components/user-tables-tab"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { AgendaWidget } from "@/components/agenda-widget"
+import { KanbanWidget } from "@/components/kanban-widget"
 
 export default function DashboardPage() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, logout } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("agenda")
   const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date())
@@ -30,18 +30,10 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto p-2 sm:p-4 max-w-full lg:max-w-6xl">
+      <div className="w-full h-full content-inherit">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold">Dashboard Utente</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
           <div className="flex flex-wrap gap-2">
-            {isAdmin && (
-              <Link href="/admin">
-                <Button variant="outline" size="sm" className="flex items-center gap-2 w-full sm:w-auto">
-                  <User className="h-4 w-4" />
-                  <span className="whitespace-nowrap">Dashboard Admin</span>
-                </Button>
-              </Link>
-            )}
             <Button
               variant="outline"
               size="sm"
@@ -54,14 +46,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Card className="mb-4 sm:mb-6 overflow-hidden">
+        <Card className="mb-4 sm:mb-6 overflow-hidden dashboard-card">
           <CardHeader className="p-3 sm:p-6 flex flex-row justify-between items-start">
             <div>
               <CardTitle>Benvenuto, {user?.nome || user?.username}!</CardTitle>
               <CardDescription className="line-clamp-2 sm:line-clamp-none">
-                {isAdmin
-                  ? "Accesso effettuato come amministratore. Puoi accedere a tutte le funzionalità del sistema."
-                  : "Accesso effettuato come utente standard. Puoi esplorare le tue tabelle e visualizzare i tuoi dati."}
+                Accesso effettuato. Puoi esplorare le tue tabelle e visualizzare i tuoi dati.
               </CardDescription>
             </div>
             <div className="text-right">
@@ -79,12 +69,16 @@ export default function DashboardPage() {
               </CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-3 sm:p-6">
+          <CardContent className="p-3 sm:p-6 dashboard-content">
             <Tabs defaultValue="agenda" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 sm:grid-cols-4 mb-4 sm:mb-6 w-full">
+              <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 sm:mb-6 w-full">
                 <TabsTrigger value="agenda" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                   <ListTodo className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="truncate">Agenda</span>
+                </TabsTrigger>
+                <TabsTrigger value="kanban" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">Kanban</span>
                 </TabsTrigger>
                 <TabsTrigger value="gantt" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                   <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
@@ -95,7 +89,7 @@ export default function DashboardPage() {
                   <span className="truncate">Profilo</span>
                 </TabsTrigger>
                 <TabsTrigger value="tables" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-                  <Database className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <LayoutGrid className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="truncate">Tabelle</span>
                 </TabsTrigger>
               </TabsList>
@@ -115,6 +109,10 @@ export default function DashboardPage() {
 
                 <TabsContent value="agenda" className="space-y-4 min-w-full">
                   <AgendaWidget />
+                </TabsContent>
+
+                <TabsContent value="kanban" className="space-y-4 min-w-full">
+                  <KanbanWidget />
                 </TabsContent>
               </div>
             </Tabs>

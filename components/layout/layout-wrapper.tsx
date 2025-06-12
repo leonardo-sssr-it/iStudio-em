@@ -2,13 +2,14 @@
 
 import type React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useCustomTheme } from "@/contexts/theme-context"
+import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { useSidebarState } from "@/contexts/sidebar-state-context"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Sidebar } from "@/components/layout/sidebar"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-provider"
+import { usePathname } from "next/navigation"
 
 // Simula la lettura delle configurazioni dal DB
 interface LayoutConfig {
@@ -28,11 +29,15 @@ export function LayoutWrapper({
   children: React.ReactNode
   layoutConfig?: LayoutConfig
 }) {
-  const { layout: themeLayoutChoice } = useCustomTheme()
+  const { layout: themeLayoutChoice } = useSafeCustomTheme()
   const { user } = useAuth()
   const { isCollapsed, setIsCollapsed, isMobile } = useSidebarState()
 
   const showSidebar = themeLayoutChoice === "sidebar" && user
+
+  const pathname = usePathname()
+  const isDashboardPage = pathname.startsWith("/dashboard")
+
   const actualIsCollapsed = layoutConfig.sidebarCollapsible ? isCollapsed : false
   const sidebarWidth = actualIsCollapsed ? 64 : 256
 
@@ -107,7 +112,14 @@ export function LayoutWrapper({
           layout
           transition={{ duration: 0.3, type: "spring", bounce: 0.1 }}
         >
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-full h-full">{children}</div>
+          <div
+            className={cn(
+              "py-6 h-full",
+              isDashboardPage ? "w-full px-4 sm:px-6 lg:px-8" : "container mx-auto px-4 sm:px-6 lg:px-8 max-w-full",
+            )}
+          >
+            {children}
+          </div>
         </motion.main>
         {/* Sidebar Desktop (se a destra) */}
         {layoutConfig.sidebarPosition === "right" && sidebarComponent}

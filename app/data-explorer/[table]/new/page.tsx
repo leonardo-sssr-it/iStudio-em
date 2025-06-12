@@ -32,6 +32,50 @@ const AVAILABLE_TABLES = [
   { id: "pagine", label: "Pagine", icon: "📄" },
 ]
 
+// Funzione per pulire i dati prima del salvataggio
+function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
+  const cleaned = { ...data }
+
+  // Rimuovi campi di sola lettura per i nuovi elementi
+  readOnlyFields.forEach((field) => {
+    if (field !== "id_utente") {
+      // Mantieni id_utente
+      delete cleaned[field]
+    }
+  })
+
+  // Pulisci tutti i campi
+  Object.keys(cleaned).forEach((key) => {
+    const value = cleaned[key]
+
+    // Rimuovi valori undefined
+    if (value === undefined) {
+      delete cleaned[key]
+      return
+    }
+
+    // Rimuovi valori che sono la stringa "undefined"
+    if (value === "undefined") {
+      delete cleaned[key]
+      return
+    }
+
+    // Gestisci stringhe vuote
+    if (typeof value === "string") {
+      if (value.trim() === "") {
+        cleaned[key] = null
+      }
+    }
+
+    // Gestisci numeri NaN
+    if (typeof value === "number" && isNaN(value)) {
+      delete cleaned[key]
+    }
+  })
+
+  return cleaned
+}
+
 // Estendi la configurazione dei campi con più dettagli
 const TABLE_FIELDS = {
   appuntamenti: {
@@ -129,12 +173,12 @@ const TABLE_FIELDS = {
       stato: "attivo",
       priorita: 3,
     },
-    fieldOrder: ["titolo", "descrizione", "data_scadenza", "stato", "priorita", "note"],
+    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      data_scadenza: "datetime",
+      scadenza: "datetime",
       stato: "select",
       priorita: "number",
       note: "text",
@@ -155,20 +199,20 @@ const TABLE_FIELDS = {
     },
   },
   todolist: {
-    requiredFields: ["titolo"],
+    requiredFields: ["titolo", "descrizione"],
     autoFields: ["id", "id_utente", "data_creazione", "modifica"],
     defaultValues: {
       completato: false,
       priorita: 3,
     },
-    fieldOrder: ["titolo", "descrizione", "data_scadenza", "priorita", "completato", "note"],
+    fieldOrder: ["titolo", "descrizione", "scadenza", "priorita", "completato", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
       completato: "boolean",
       priorita: "number",
-      data_scadenza: "datetime",
+      scadenza: "datetime",
       note: "text",
       id_utente: "number",
       data_creazione: "datetime",
@@ -176,6 +220,7 @@ const TABLE_FIELDS = {
     },
     validation: {
       titolo: { minLength: 3, maxLength: 100 },
+      descrizione: { minLength: 3, maxLength: 500 },
       priorita: { min: 1, max: 5 },
     },
   },
@@ -360,9 +405,18 @@ export default function NewItemPage() {
         ...defaultValues,
         id_utente: user.id,
       }
+
+      // Imposta valori di default specifici per tabella
+      if (tableName === "todolist") {
+        initialData.titolo = ""
+        initialData.descrizione = ""
+        initialData.completato = false
+        initialData.priorita = 3
+      }
+
       setFormData(initialData)
     }
-  }, [tableConfig, user])
+  }, [tableConfig, user, tableName])
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
@@ -504,20 +558,13 @@ export default function NewItemPage() {
 
     setSaving(true)
     try {
-      // Prepara i dati da salvare
-      const dataToSave = {
-        ...formData,
-        id_utente: user.id,
-        data_creazione: new Date().toISOString(),
-        modifica: new Date().toISOString(),
-      }
+      // Prepara i dati da salvare usando la funzione di pulizia
+      const dataToSave = cleanDataForSave(formData, autoFields)
 
-      // Rimuovi i campi vuoti o undefined
-      Object.keys(dataToSave).forEach((key) => {
-        if (dataToSave[key] === "" || dataToSave[key] === undefined) {
-          delete dataToSave[key]
-        }
-      })
+      // Aggiorna i campi di sistema
+      dataToSave.id_utente = user.id
+      dataToSave.data_creazione = new Date().toISOString()
+      dataToSave.modifica = new Date().toISOString()
 
       console.log(`Inserimento nuovo elemento in tabella: ${tableName}`, dataToSave)
 
@@ -526,7 +573,17 @@ export default function NewItemPage() {
 
       if (error) {
         console.error("Errore inserimento:", error)
-        throw error
+
+        // Gestisci errori specifici del database
+        let errorMessage = error.message
+        if (error.message.includes("check constraint")) {
+          if (error.message.includes("descrizione_check")) {
+            errorMessage =
+              "La descrizione non rispetta i requisiti del database. Assicurati che sia compilata correttamente."
+          }
+        }
+
+        throw new Error(errorMessage)
       }
 
       toast({
@@ -626,7 +683,10 @@ export default function NewItemPage() {
             id={field}
             type="number"
             value={value || ""}
-            onChange={(e) => handleFieldChange(field, e.target.value ? Number(e.target.value) : "")}
+            onChange={(e) => {
+              const numValue = e.target.value ? Number(e.target.value) : null
+              handleFieldChange(field, numValue)
+            }}
             className={cn(error && "border-red-500")}
             min={validationRules.min}
             max={validationRules.max}
@@ -807,59 +867,13 @@ export default function NewItemPage() {
         </CardHeader>
 
         <CardContent>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {Object.entries(fieldGroups).map(([groupKey, group]: [string, any]) => {
-              const IconComponent = group.icon // Assumendo che group.icon sia un componente React
-              const hasDateFields = group.fields.some((field: string) => fieldTypes[field] === "datetime")
-
-              return (
-                <Card
-                  key={groupKey}
-                  className={cn(
-                    "h-fit", // Per far sì che le card si adattino al contenuto
-                    // Se il gruppo è 'date' o contiene più di un campo data, fallo più largo
-                    (groupKey === "date" || (hasDateFields && group.fields.length > 1)) &&
-                      "lg:col-span-2 xl:col-span-2",
-                  )}
-                >
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      {IconComponent && <IconComponent size={20} className="text-blue-600" />}
-                      {group.title}
-                    </CardTitle>
-                    <CardDescription>
-                      {/* Potresti aggiungere descrizioni specifiche per gruppo qui se necessario */}
-                      {groupKey === "principale" && "Informazioni essenziali dell'elemento"}
-                      {groupKey === "date" && "Date e orari di riferimento"}
-                      {groupKey === "dettagli" && "Informazioni aggiuntive e note"}
-                      {/* Aggiungi altre descrizioni per altri gruppi se li definisci */}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {groupKey === "date" ? ( // Logica specifica per il gruppo 'date'
-                      renderDateFields(group.fields)
-                    ) : (
-                      <div className="space-y-4">
-                        {group.fields.map((field: string) => (
-                          <div
-                            key={field}
-                            // Rendi i campi di testo lunghi e i tag input full-width all'interno del loro contenitore
-                            className={cn(
-                              (fieldTypes[field] === "text" ||
-                                fieldTypes[field] === "richtext" ||
-                                fieldTypes[field] === "tags") &&
-                                "col-span-full",
-                            )}
-                          >
-                            {renderField(field, fieldTypes[field] || "string")}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })}
+          {/* Renderizza i campi in base alla configurazione della tabella */}
+          <div className="space-y-6">
+            {Object.keys(fieldTypes)
+              .filter((field) => !autoFields.includes(field))
+              .map((field) => (
+                <div key={field}>{renderField(field, fieldTypes[field])}</div>
+              ))}
           </div>
 
           {/* Mostra informazioni sui campi auto-compilati */}

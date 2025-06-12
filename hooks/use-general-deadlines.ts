@@ -3,18 +3,36 @@
 import { useState, useEffect } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 import type { AgendaItem } from "./use-agenda-items"
-import { startOfDay, endOfDay, format, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns"
+import { format, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns"
 import { useAuth } from "@/lib/auth-provider"
 
 // Funzione di utilità per normalizzare le date delle scadenze
-export function normalizeDeadlineDate(date: Date | null | undefined): Date | undefined {
+export function normalizeDeadlineDate(date: Date | null | undefined, isStartDate = false): Date | undefined {
   if (!date) return undefined
 
   // Crea una nuova data per non modificare l'originale
   const normalizedDate = new Date(date)
 
-  // Imposta l'orario a 23:59:59.999 (fine della giornata)
-  return setMilliseconds(setSeconds(setMinutes(setHours(normalizedDate, 23), 59), 59), 999)
+  if (isStartDate) {
+    // Per le date di inizio: imposta l'orario a 00:00:00.001 (inizio della giornata)
+    return setMilliseconds(setSeconds(setMinutes(setHours(normalizedDate, 0), 0), 0), 1)
+  } else {
+    // Per le date di fine/scadenza: imposta l'orario a 23:59:59.999 (fine della giornata)
+    return setMilliseconds(setSeconds(setMinutes(setHours(normalizedDate, 23), 59), 59), 999)
+  }
+}
+
+// Funzione per creare date senza timezone
+export function createDateWithoutTimezone(dateString: string): Date {
+  // Crea una data interpretando la stringa come ora locale, non UTC
+  const parts = dateString.split("-")
+  if (parts.length === 3) {
+    const year = Number.parseInt(parts[0], 10)
+    const month = Number.parseInt(parts[1], 10) - 1 // I mesi in JavaScript sono 0-based
+    const day = Number.parseInt(parts[2], 10)
+    return new Date(year, month, day)
+  }
+  return new Date(dateString)
 }
 
 export function useGeneralDeadlines(startDate: Date, endDate: Date) {
@@ -62,8 +80,9 @@ export function useGeneralDeadlines(startDate: Date, endDate: Date) {
 
       try {
         // Assicuriamoci che startDate sia all'inizio del giorno e endDate alla fine del giorno
-        const adjustedStartDate = startOfDay(startDate)
-        const adjustedEndDate = endOfDay(endDate)
+        // Utilizziamo le nuove funzioni per gestire le date senza timezone
+        const adjustedStartDate = normalizeDeadlineDate(startDate, true) || startDate
+        const adjustedEndDate = normalizeDeadlineDate(endDate, false) || endDate
 
         console.log(
           `Fetching general deadlines from ${format(adjustedStartDate, "yyyy-MM-dd")} to ${format(adjustedEndDate, "yyyy-MM-dd")}`,
@@ -239,40 +258,41 @@ export function useGeneralDeadlines(startDate: Date, endDate: Date) {
         const filteredScadenze = scadenze.filter((item) => {
           // Per le scadenze, verifichiamo se la data di scadenza rientra nel periodo selezionato
           if (hasScadenzaColumn && item.scadenza) {
-            // NORMALIZZAZIONE: Impostiamo l'orario della scadenza a 23:59:59.999
-            const scadenzaDate = normalizeDeadlineDate(new Date(item.scadenza))
+            // Crea la data senza considerare la timezone
+            const scadenzaDate = createDateWithoutTimezone(item.scadenza.split("T")[0])
+            const normalizedScadenza = normalizeDeadlineDate(scadenzaDate, false)
 
             // Debug - utilizziamo format invece di toISOString per evitare timezone
             console.log(`Scadenza generale ${item.id} - ${item.titolo || "Senza titolo"}:`, {
-              scadenzaOriginale: format(new Date(item.scadenza), "yyyy-MM-dd"),
-              scadenzaNormalizzata: scadenzaDate ? format(scadenzaDate, "yyyy-MM-dd") : null,
-              startDate: format(adjustedStartDate, "yyyy-MM-dd"),
-              endDate: format(adjustedEndDate, "yyyy-MM-dd"),
-              // VERIFICA: Utilizziamo && per combinare le condizioni
-              inRange: scadenzaDate && scadenzaDate >= adjustedStartDate && scadenzaDate <= adjustedEndDate,
+              scadenzaOriginale: item.scadenza.split("T")[0],
+              scadenzaNormalizzata: normalizedScadenza ? format(normalizedScadenza, "yyyy-MM-dd HH:mm:ss.SSS") : null,
+              startDate: format(adjustedStartDate, "yyyy-MM-dd HH:mm:ss.SSS"),
+              endDate: format(adjustedEndDate, "yyyy-MM-dd HH:mm:ss.SSS"),
+              inRange:
+                normalizedScadenza && normalizedScadenza >= adjustedStartDate && normalizedScadenza <= adjustedEndDate,
             })
 
-            // VERIFICA: Utilizziamo && per combinare le condizioni
-            return scadenzaDate && scadenzaDate >= adjustedStartDate && scadenzaDate <= adjustedEndDate
+            return (
+              normalizedScadenza && normalizedScadenza >= adjustedStartDate && normalizedScadenza <= adjustedEndDate
+            )
           }
 
           // Se non c'è scadenza ma c'è data, usiamo quella
           if (hasDataColumn && item.data) {
-            // NORMALIZZAZIONE: Impostiamo l'orario della data a 23:59:59.999
-            const dataDate = normalizeDeadlineDate(new Date(item.data))
+            // Crea la data senza considerare la timezone
+            const dataDate = createDateWithoutTimezone(item.data.split("T")[0])
+            const normalizedData = normalizeDeadlineDate(dataDate, false)
 
             // Debug - utilizziamo format invece di toISOString per evitare timezone
             console.log(`Scadenza generale ${item.id} - ${item.titolo || "Senza titolo"} (usando data):`, {
-              dataOriginale: format(new Date(item.data), "yyyy-MM-dd"),
-              dataNormalizzata: dataDate ? format(dataDate, "yyyy-MM-dd") : null,
-              startDate: format(adjustedStartDate, "yyyy-MM-dd"),
-              endDate: format(adjustedEndDate, "yyyy-MM-dd"),
-              // VERIFICA: Utilizziamo && per combinare le condizioni
-              inRange: dataDate && dataDate >= adjustedStartDate && dataDate <= adjustedEndDate,
+              dataOriginale: item.data.split("T")[0],
+              dataNormalizzata: normalizedData ? format(normalizedData, "yyyy-MM-dd HH:mm:ss.SSS") : null,
+              startDate: format(adjustedStartDate, "yyyy-MM-dd HH:mm:ss.SSS"),
+              endDate: format(adjustedEndDate, "yyyy-MM-dd HH:mm:ss.SSS"),
+              inRange: normalizedData && normalizedData >= adjustedStartDate && normalizedData <= adjustedEndDate,
             })
 
-            // VERIFICA: Utilizziamo && per combinare le condizioni
-            return dataDate && dataDate >= adjustedStartDate && dataDate <= adjustedEndDate
+            return normalizedData && normalizedData >= adjustedStartDate && normalizedData <= adjustedEndDate
           }
 
           return false
@@ -283,10 +303,18 @@ export function useGeneralDeadlines(startDate: Date, endDate: Date) {
         // Formatta le scadenze generali
         const formattedScadenze = filteredScadenze.map((item) => {
           // Determina la data da usare (scadenza o data)
-          const dataScadenzaRaw = item.scadenza ? new Date(item.scadenza) : item.data ? new Date(item.data) : new Date()
+          let dataScadenzaRaw: Date
 
-          // NORMALIZZAZIONE: Impostiamo l'orario della scadenza a 23:59:59.999
-          const dataScadenza = normalizeDeadlineDate(dataScadenzaRaw) || new Date()
+          if (item.scadenza) {
+            dataScadenzaRaw = createDateWithoutTimezone(item.scadenza.split("T")[0])
+          } else if (item.data) {
+            dataScadenzaRaw = createDateWithoutTimezone(item.data.split("T")[0])
+          } else {
+            dataScadenzaRaw = new Date()
+          }
+
+          // Normalizza la data di scadenza (fine giornata)
+          const dataScadenza = normalizeDeadlineDate(dataScadenzaRaw, false) || new Date()
 
           return {
             id: item.id,

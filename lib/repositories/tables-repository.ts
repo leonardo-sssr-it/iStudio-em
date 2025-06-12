@@ -153,21 +153,11 @@ export class TablesRepository extends BaseRepository {
         return storageColumns
       }
 
-      // Approccio 1: Prova a utilizzare la funzione RPC
-      try {
-        const data = await this.rpcService.getColumns(cleanTableName)
-        const columns = data.map((col) => ({
-          name: col.column_name,
-          type: col.data_type,
-          is_nullable: col.is_nullable === "YES",
-          is_identity: col.is_identity === "YES",
-          is_primary: col.is_primary === true,
-        }))
-
-        this.columnsCache.set(cacheKey, columns)
-        return columns
-      } catch (error) {
-        console.log("RPC get_columns non disponibile, utilizzo metodo alternativo:", error)
+      // Approccio 1: Prova prima con information_schema (più affidabile)
+      const schemaColumns = await this.getColumnsFromInformationSchema(cleanTableName)
+      if (schemaColumns.length > 0) {
+        this.columnsCache.set(cacheKey, schemaColumns)
+        return schemaColumns
       }
 
       // Approccio 2: Prova a ottenere una riga dalla tabella per vedere le colonne
@@ -190,14 +180,27 @@ export class TablesRepository extends BaseRepository {
         console.log("Fallback select fallito:", fallbackError)
       }
 
-      // Approccio 3: Prova a ottenere le colonne da information_schema
-      const columns = await this.getColumnsFromInformationSchema(cleanTableName)
-      if (columns.length > 0) {
+      // Approccio 3: Prova RPC solo come ultima risorsa (commentato per ora)
+      /*
+      try {
+        const data = await this.rpcService.getColumns(cleanTableName)
+        const columns = data.map((col) => ({
+          name: col.column_name,
+          type: col.data_type,
+          is_nullable: col.is_nullable === "YES",
+          is_identity: col.is_identity === "YES",
+          is_primary: col.is_primary === true,
+        }))
+
         this.columnsCache.set(cacheKey, columns)
         return columns
+      } catch (error) {
+        console.log("RPC get_columns non disponibile:", error)
       }
+      */
 
       // Se arriviamo qui, non siamo riusciti a trovare colonne
+      console.warn(`Nessuna colonna trovata per la tabella: ${cleanTableName}`)
       return []
     } catch (error) {
       console.error("Errore nel recupero delle colonne:", error)
@@ -224,16 +227,10 @@ export class TablesRepository extends BaseRepository {
    */
   private async getColumnsFromInformationSchema(tableName: string): Promise<ColumnInfo[]> {
     try {
-      const { data, error } = await createSupabaseQuery(
-        this.client,
-        "information_schema.columns",
-        `
-        column_name,
-        data_type,
-        is_nullable,
-        column_default
-      `,
-      )
+      // Prima prova con una query più semplice
+      const { data, error } = await this.client
+        .from("information_schema.columns")
+        .select("column_name, data_type, is_nullable, column_default")
         .eq("table_schema", "public")
         .eq("table_name", tableName)
         .order("ordinal_position")
@@ -247,11 +244,45 @@ export class TablesRepository extends BaseRepository {
           is_primary: col.column_name === "id", // Assunzione semplificata
         }))
       }
+
+      // Se la prima query fallisce, prova un approccio alternativo
+      if (error) {
+        console.log("Query information_schema fallita, provo approccio alternativo:", error)
+
+        // Prova a fare una query diretta sulla tabella per ottenere la struttura
+        const { data: sampleData, error: sampleError } = await this.client.from(tableName).select("*").limit(1)
+
+        if (!sampleError && sampleData && sampleData.length > 0) {
+          return Object.keys(sampleData[0]).map((key) => ({
+            name: key,
+            type: this.inferColumnType(sampleData[0][key]),
+            is_nullable: true,
+            is_identity: key === "id",
+            is_primary: key === "id",
+          }))
+        }
+      }
     } catch (schemaError) {
       console.log("Accesso a information_schema.columns fallito:", schemaError)
     }
 
     return []
+  }
+
+  /**
+   * Inferisce il tipo di colonna dal valore
+   */
+  private inferColumnType(value: any): string {
+    if (value === null || value === undefined) return "text"
+    if (typeof value === "number") return Number.isInteger(value) ? "integer" : "numeric"
+    if (typeof value === "boolean") return "boolean"
+    if (value instanceof Date) return "timestamp"
+    if (typeof value === "string") {
+      // Prova a riconoscere alcuni pattern comuni
+      if (value.match(/^\d{4}-\d{2}-\d{2}/)) return "date"
+      if (value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) return "uuid"
+    }
+    return "text"
   }
 
   /**

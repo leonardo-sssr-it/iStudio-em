@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
@@ -379,12 +381,61 @@ export default function DataExplorerPage() {
     }
   }
 
+  // Funzione per completare rapidamente un elemento
+  const handleMarkCompleted = async (itemId: number, e: React.MouseEvent) => {
+    e.stopPropagation() // Previene il click sulla riga
+
+    if (!supabase || !selectedTable || !user?.id) return
+
+    try {
+      const { error } = await supabase
+        .from(selectedTable)
+        .update({
+          stato: "completato",
+          modifica: new Date().toISOString(),
+        })
+        .eq("id", itemId)
+        .eq("id_utente", user.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Completato",
+        description: "Elemento marcato come completato",
+      })
+
+      // Ricarica i dati per aggiornare la vista
+      loadTableData()
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: `Impossibile aggiornare lo stato: ${error.message}`,
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Funzione per verificare se mostrare il pulsante completato
+  const shouldShowCompleteButton = (item: any) => {
+    if (!selectedTable) return false
+
+    const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
+    const types = tableConfig?.types || {}
+
+    // Verifica se la tabella ha il campo stato
+    if (!types.stato) return false
+
+    // Verifica se lo stato attuale è diverso da "completato"
+    return item.stato && item.stato !== "completato"
+  }
+
   // Renderizza l'intestazione della tabella
   const renderTableHeader = () => {
     if (!selectedTable) return null
 
     const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
     const fields = tableConfig?.listFields || []
+    const hasStateField = tableConfig?.types?.stato
 
     return (
       <TableHeader>
@@ -401,6 +452,11 @@ export default function DataExplorerPage() {
               </div>
             </TableHead>
           ))}
+          {hasStateField && (
+            <TableHead className="text-center w-24">
+              <span className="text-xs sm:text-sm font-medium">Azioni</span>
+            </TableHead>
+          )}
         </TableRow>
       </TableHeader>
     )
@@ -431,7 +487,10 @@ export default function DataExplorerPage() {
         <TableBody>
           <TableRow>
             <TableCell
-              colSpan={TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0}
+              colSpan={
+                (TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0) +
+                (TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.types?.stato ? 1 : 0)
+              }
               className="text-center h-32"
             >
               <div className="flex flex-col items-center justify-center space-y-4">
@@ -463,6 +522,20 @@ export default function DataExplorerPage() {
                 {renderCellValue(item[field], types[field as keyof typeof types])}
               </TableCell>
             ))}
+            {tableConfig?.types?.stato && (
+              <TableCell className="p-2 text-center">
+                {shouldShowCompleteButton(item) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                    onClick={(e) => handleMarkCompleted(item.id, e)}
+                  >
+                    ✓ Completato
+                  </Button>
+                )}
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>
@@ -542,12 +615,24 @@ export default function DataExplorerPage() {
         {filteredData.map((item) => (
           <Card
             key={item.id}
-            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group"
+            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group relative"
             onClick={() => handleRowClick(item.id)}
           >
             <CardContent className="p-4">
+              {/* Pulsante completato in alto a destra */}
+              {shouldShowCompleteButton(item) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="absolute top-2 right-2 h-6 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => handleMarkCompleted(item.id, e)}
+                >
+                  ✓
+                </Button>
+              )}
+
               <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-sm line-clamp-2 flex-1">
+                <h3 className="font-semibold text-sm line-clamp-2 flex-1 pr-8">
                   {item.titolo || item.nome || item.descrizione || `ID: ${item.id}`}
                 </h3>
               </div>
