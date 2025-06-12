@@ -205,7 +205,7 @@ export default function AdminUsersPage() {
         } else if (typeof data.ruoli === "object") {
           // Se è un oggetto, convertilo in array
           rolesArray = Object.entries(data.ruoli).map(([key, value]) => ({
-            value: key,
+            value: String(key),
             name: String(typeof value === "string" ? value : key),
           }))
         } else if (typeof data.ruoli === "string") {
@@ -706,7 +706,8 @@ export default function AdminUsersPage() {
                           <Badge variant={user.ruolo === "admin" ? "default" : "outline"}>
                             {(() => {
                               const roleObj = availableRoles.find((role) => role.value === user.ruolo)
-                              return roleObj?.name || user.ruolo || "Non definito"
+                              const roleName = roleObj?.name || user.ruolo || "Non definito"
+                              return String(roleName)
                             })()}
                           </Badge>
                         </TableCell>
@@ -1164,20 +1165,12 @@ export default function AdminUsersPage() {
                       <SelectContent>
                         {availableRoles.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
-                            {role.name}
+                            {String(role.name || role.value || "")}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     {formErrors.ruolo && <p className="text-sm text-red-500">{formErrors.ruolo}</p>}
-
-                    {/* Debug info - rimuovi in produzione */}
-                    {editMode && (
-                      <div className="text-xs text-gray-500">
-                        Debug: Ruolo attuale = "{formData.ruolo || "undefined"}", Ruoli disponibili ={" "}
-                        {availableRoles.length}
-                      </div>
-                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="attivo" className={formErrors.attivo ? "text-red-500" : ""}>
