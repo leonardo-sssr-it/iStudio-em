@@ -146,6 +146,26 @@ function SidebarContent({
           <div className="space-y-1">
             <Button
               asChild
+              variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
+              className="w-full justify-start"
+            >
+              <Link href="/admin/users">
+                <Users className="mr-2 h-4 w-4" />
+                Utenti
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
+              className="w-full justify-start"
+            >
+              <Link href="/pagine">
+                <FileText className="mr-2 h-4 w-4" />
+                Pagine
+              </Link>
+            </Button>
+            <Button
+              asChild
               variant={
                 pathname?.includes("/data-explorer") && searchParams?.get("table") === "appuntamenti"
                   ? "secondary"
