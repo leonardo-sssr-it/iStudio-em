@@ -90,10 +90,10 @@ export default function PageViewer({ initialPage, session }: PageViewerProps) {
 
         <CardContent>
           {page.contenuto ? (
-            <div
-              className="prose prose-sm max-w-none dark:prose-invert"
-              dangerouslySetInnerHTML={{ __html: page.contenuto }}
-            />
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              {/* Renderizza il contenuto come testo semplice per ora */}
+              <div className="whitespace-pre-wrap">{page.contenuto}</div>
+            </div>
           ) : (
             <p className="text-muted-foreground italic">Nessun contenuto disponibile.</p>
           )}
