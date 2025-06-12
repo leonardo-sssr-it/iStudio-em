@@ -19,7 +19,7 @@ async function getUserPages(): Promise<{ pages: Page[]; session: any }> {
   } = await supabase.auth.getSession()
 
   if (!session) {
-    redirect("/auth/login")
+    redirect("/")
   }
 
   const { data: pages, error } = await supabase
@@ -40,7 +40,7 @@ export default async function PagineListPage() {
   const { pages, session } = await getUserPages()
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4 max-w-6xl">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Le mie Pagine</h1>
