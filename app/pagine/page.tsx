@@ -1,167 +1,300 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { format } from "date-fns"
-import { it } from "date-fns/locale"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText, Loader2 } from "lucide-react"
-import { useAuth } from "@/lib/auth-provider"
-import { useSupabase } from "@/lib/supabase-provider"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/components/ui/use-toast"
+import { Search, Plus, RefreshCw, FileText, Calendar, CheckCircle, XCircle } from "lucide-react"
+import Link from "next/link"
+import type { Pagina } from "@/lib/services/pagine-service"
 
-type Page = {
-  id: string
-  titolo: string
-  estratto?: string
-  pubblicato: string
-  categoria?: string
-  privato: boolean
-  attivo: boolean
-  id_utente: string
-}
-
-export default function PagineListPage() {
-  const { user, isLoading: authLoading } = useAuth()
+export default function PaginePage() {
   const { supabase } = useSupabase()
+  const { user } = useAuth()
   const router = useRouter()
-  const [pages, setPages] = useState<Page[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+
+  const [loading, setLoading] = useState(true)
+  const [pagine, setPagine] = useState<Pagina[]>([])
+  const [categorie, setCategorie] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [categoriaFilter, setCategoriaFilter] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (authLoading) return
+  // Carica le pagine
+  const loadPagine = async () => {
+    if (!supabase || !user?.id) return
 
-    if (!user) {
-      router.push("/")
-      return
-    }
+    setLoading(true)
+    setError(null)
 
-    async function fetchPages() {
-      try {
-        setIsLoading(true)
-        setError(null)
+    try {
+      // Costruisci la query
+      let query = supabase.from("pagine").select("*").eq("id_utente", user.id).order("pubblicato", { ascending: false })
 
-        const { data, error } = await supabase
-          .from("pagine")
-          .select("*")
-          .eq("id_utente", user.id)
-          .order("pubblicato", { ascending: false })
-
-        if (error) throw error
-
-        setPages(data || [])
-      } catch (err: any) {
-        console.error("Errore caricamento pagine:", err)
-        setError(err.message || "Errore durante il caricamento delle pagine")
-      } finally {
-        setIsLoading(false)
+      // Applica filtri
+      if (categoriaFilter) {
+        query = query.eq("categoria", categoriaFilter)
       }
+
+      if (searchTerm) {
+        query = query.ilike("titolo", `%${searchTerm}%`)
+      }
+
+      const { data, error } = await query
+
+      if (error) throw error
+
+      setPagine(data || [])
+    } catch (err: any) {
+      console.error("Errore nel caricamento delle pagine:", err)
+      setError(err.message)
+      toast({
+        title: "Errore",
+        description: `Impossibile caricare le pagine: ${err.message}`,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-
-    fetchPages()
-  }, [user, authLoading, supabase, router])
-
-  if (authLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
   }
 
-  if (error) {
-    return (
-      <Card className="max-w-6xl mx-auto my-8">
-        <CardHeader>
-          <CardTitle className="text-red-500">Errore</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>{error}</p>
-          <Button onClick={() => window.location.reload()} className="mt-4">
-            Riprova
-          </Button>
-        </CardContent>
-      </Card>
+  // Carica le categorie
+  const loadCategorie = async () => {
+    if (!supabase || !user?.id) return
+
+    try {
+      const { data, error } = await supabase
+        .from("pagine")
+        .select("categoria")
+        .eq("id_utente", user.id)
+        .not("categoria", "is", null)
+
+      if (error) throw error
+
+      // Estrai categorie uniche
+      const uniqueCategorie = [...new Set(data.map((item) => item.categoria))].filter(Boolean) as string[]
+      setCategorie(uniqueCategorie)
+    } catch (err) {
+      console.error("Errore nel caricamento delle categorie:", err)
+    }
+  }
+
+  // Carica dati all'inizializzazione
+  useEffect(() => {
+    if (supabase && user?.id) {
+      loadPagine()
+      loadCategorie()
+    }
+  }, [supabase, user?.id])
+
+  // Ricarica quando cambiano i filtri
+  useEffect(() => {
+    if (supabase && user?.id) {
+      loadPagine()
+    }
+  }, [searchTerm, categoriaFilter])
+
+  // Formatta la data
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "-"
+
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString("it-IT", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    } catch (e) {
+      return dateString
+    }
+  }
+
+  // Gestisce il click sulla riga
+  const handleRowClick = (id: number) => {
+    router.push(`/pagine/${id}`)
+  }
+
+  // Renderizza lo stato attivo
+  const renderActiveStatus = (attivo: boolean) => {
+    return attivo ? (
+      <span className="flex items-center text-green-600">
+        <CheckCircle className="h-4 w-4 mr-1" />
+      </span>
+    ) : (
+      <span className="flex items-center text-red-600">
+        <XCircle className="h-4 w-4 mr-1" />
+      </span>
     )
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Le mie Pagine</h1>
-          <p className="text-muted-foreground">Gestisci le tue pagine pubblicate</p>
-        </div>
-        <Button asChild>
-          <Link href="/pagine/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nuova Pagina
-          </Link>
-        </Button>
-      </div>
-
-      {pages.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Nessuna pagina trovata</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Non hai ancora creato nessuna pagina. Inizia creando la tua prima pagina.
-            </p>
-            <Button asChild>
-              <Link href="/pagine/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Crea la prima pagina
-              </Link>
+    <div className="container mx-auto py-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl flex items-center">
+                <FileText className="h-6 w-6 mr-2" />
+                Gestione Pagine
+              </CardTitle>
+              <CardDescription>Visualizza e gestisci le tue pagine</CardDescription>
+            </div>
+            <Button onClick={() => router.push("/pagine/new")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuova Pagina
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Pagine ({pages.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {/* Filtri */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cerca per titolo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <div className="w-full sm:w-64">
+              <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtra per categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutte le categorie</SelectItem>
+                  {categorie.map((categoria) => (
+                    <SelectItem key={categoria} value={categoria}>
+                      {categoria}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button variant="outline" size="icon" onClick={loadPagine} className="shrink-0">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Stato di errore */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md mb-6">
+              <p className="font-medium">Si è verificato un errore</p>
+              <p className="text-sm">{error}</p>
+              <Button variant="outline" size="sm" onClick={loadPagine} className="mt-2">
+                Riprova
+              </Button>
+            </div>
+          )}
+
+          {/* Stato di caricamento */}
+          {loading && (
             <div className="space-y-4">
-              {pages.map((page) => (
-                <Link
-                  key={page.id}
-                  href={`/pagine/${page.id}`}
-                  className="block p-4 rounded-lg border hover:bg-accent transition-colors"
-                >
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div
-                          className={`w-3 h-3 rounded-full ${page.attivo ? "bg-green-500" : "bg-red-500"}`}
-                          title={page.attivo ? "Attivo" : "Non attivo"}
-                        />
-                        <h3 className="text-lg font-semibold truncate">{page.titolo}</h3>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>
-                          Pubblicato il{" "}
-                          {format(new Date(page.pubblicato), "d MMMM yyyy", {
-                            locale: it,
-                          })}
-                        </span>
-                        {page.categoria && <Badge variant="secondary">{page.categoria}</Badge>}
-                        {page.privato && <Badge variant="outline">Privato</Badge>}
-                      </div>
-                      {page.estratto && (
-                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{page.estratto}</p>
-                      )}
-                    </div>
+                    <Skeleton className="h-6 w-1/3" />
+                    <Skeleton className="h-4 w-24" />
                   </div>
-                </Link>
+                  <Skeleton className="h-4 w-1/2 mt-2" />
+                  <div className="flex gap-2 mt-4">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
+                </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {/* Lista pagine */}
+          {!loading && pagine.length === 0 && (
+            <div className="text-center py-12 border rounded-lg">
+              <FileText className="h-12 w-12 mx-auto text-gray-400" />
+              <h3 className="mt-4 text-lg font-medium">Nessuna pagina trovata</h3>
+              <p className="mt-1 text-gray-500">
+                {searchTerm || categoriaFilter
+                  ? "Nessuna pagina corrisponde ai filtri selezionati"
+                  : "Inizia creando la tua prima pagina"}
+              </p>
+              <Button onClick={() => router.push("/pagine/new")} className="mt-4">
+                <Plus className="h-4 w-4 mr-2" />
+                Crea pagina
+              </Button>
+            </div>
+          )}
+
+          {!loading && pagine.length > 0 && (
+            <div className="space-y-4">
+              {pagine.map((pagina) => (
+                <div
+                  key={pagina.id}
+                  className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => handleRowClick(pagina.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      {renderActiveStatus(pagina.attivo)}
+                      <h3 className="font-medium ml-2">{pagina.titolo}</h3>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-500">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {formatDate(pagina.pubblicato)}
+                    </div>
+                  </div>
+
+                  {pagina.estratto && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{pagina.estratto}</p>}
+
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {pagina.categoria && (
+                      <Badge variant="outline" className="text-xs">
+                        {pagina.categoria}
+                      </Badge>
+                    )}
+
+                    {pagina.privato && (
+                      <Badge variant="secondary" className="text-xs">
+                        Privato
+                      </Badge>
+                    )}
+
+                    {!pagina.attivo && (
+                      <Badge variant="destructive" className="text-xs">
+                        Non attivo
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Paginazione o conteggio */}
+          {!loading && pagine.length > 0 && (
+            <div className="mt-6 text-sm text-gray-500 flex justify-between items-center">
+              <span>
+                Visualizzazione di {pagine.length} pagine
+                {(searchTerm || categoriaFilter) && " (filtrate)"}
+              </span>
+
+              <Link href="/pagine/new" className="text-blue-600 hover:underline">
+                + Aggiungi nuova pagina
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

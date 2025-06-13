@@ -61,11 +61,11 @@
     "react-hook-form": "^7.48.2",
     "recharts": "^2.8.0",
     "rss-parser": "latest",
-    "sonner": "latest",
+    "sonner": "^1.2.4",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "turndown": "^7.1.2",
-    "zod": "latest"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/node": "^22",
