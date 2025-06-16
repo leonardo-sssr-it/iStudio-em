@@ -1,312 +1,224 @@
 "use client"
-import { useState, useEffect, useMemo } from "react"
+
+import { useState, useEffect } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { startOfDay, endOfDay, addDays, isWithinInterval, parseISO } from "date-fns"
-import type { LucideIcon } from "lucide-react"
-import { CalendarDays, ClipboardCheck, AlarmClock, ListChecks, Briefcase, Users } from "lucide-react"
-import { normalizeDeadlineDate, isDeadlineField } from "@/lib/date-utils"
+import {
+  Calendar,
+  ClipboardList,
+  Clock,
+  CheckSquare,
+  BarChart3,
+  Users,
+  FileText,
+  StickyNote,
+  type LucideIcon,
+} from "lucide-react"
 
 export interface SummaryCount {
   type: string
   label: string
   count: number
   icon: LucideIcon
-  color: string // Tailwind background color class
-  textColor: string // Tailwind text color class
+  color: string
+  textColor: string
 }
 
 export interface UpcomingItem {
-  id: number
+  id_origine: number
+  tabella_origine: string
   title: string
   date: Date
   type: string
-  tabella_origine: string
-  id_origine: number
-  color?: string // Tailwind text color class for item type
+  color: string
 }
 
-export interface UserDashboardData {
+interface DashboardData {
   summaryCounts: SummaryCount[]
   todaysItems: UpcomingItem[]
   nextWeekItems: UpcomingItem[]
 }
 
-const ITEM_TYPE_DETAILS: Record<
-  string,
-  { icon: LucideIcon; baseColor: string; textColor: string; itemTextColor: string }
-> = {
-  appuntamenti: {
-    icon: CalendarDays,
-    baseColor: "bg-sky-100",
-    textColor: "text-sky-700",
-    itemTextColor: "text-sky-600",
+const TABLE_CONFIGS = [
+  {
+    table: "appuntamenti",
+    label: "Appuntamenti",
+    icon: Calendar,
+    color: "bg-blue-50 border-blue-200",
+    textColor: "text-blue-700",
+    dateField: "data_appuntamento",
+    titleField: "titolo",
   },
-  attivita: {
-    icon: ClipboardCheck,
-    baseColor: "bg-rose-100",
-    textColor: "text-rose-700",
-    itemTextColor: "text-rose-600",
+  {
+    table: "attivita",
+    label: "Attività",
+    icon: ClipboardList,
+    color: "bg-green-50 border-green-200",
+    textColor: "text-green-700",
+    dateField: "data_scadenza",
+    titleField: "titolo",
   },
-  scadenze: {
-    icon: AlarmClock,
-    baseColor: "bg-amber-100",
-    textColor: "text-amber-700",
-    itemTextColor: "text-amber-600",
+  {
+    table: "scadenze",
+    label: "Scadenze",
+    icon: Clock,
+    color: "bg-red-50 border-red-200",
+    textColor: "text-red-700",
+    dateField: "data_scadenza",
+    titleField: "titolo",
   },
-  todolist: {
-    icon: ListChecks,
-    baseColor: "bg-violet-100",
-    textColor: "text-violet-700",
-    itemTextColor: "text-violet-600",
+  {
+    table: "todolist",
+    label: "Todo",
+    icon: CheckSquare,
+    color: "bg-yellow-50 border-yellow-200",
+    textColor: "text-yellow-700",
+    dateField: "data_scadenza",
+    titleField: "titolo",
   },
-  progetti: {
-    icon: Briefcase,
-    baseColor: "bg-emerald-100",
-    textColor: "text-emerald-700",
-    itemTextColor: "text-emerald-600",
+  {
+    table: "progetti",
+    label: "Progetti",
+    icon: BarChart3,
+    color: "bg-purple-50 border-purple-200",
+    textColor: "text-purple-700",
+    dateField: "data_fine",
+    titleField: "nome",
   },
-  clienti: { icon: Users, baseColor: "bg-slate-100", textColor: "text-slate-700", itemTextColor: "text-slate-600" },
-}
-
-const mapRawItemToUpcoming = (
-  raw: any,
-  type: string,
-  dateField: string | string[],
-  titleField: string,
-  table: string,
-): UpcomingItem | null => {
-  let dateValue: Date | undefined
-  if (Array.isArray(dateField)) {
-    for (const field of dateField) {
-      if (raw[field]) {
-        // Normalizza le date di scadenza per scadenze e todolist
-        if (isDeadlineField(table, field)) {
-          // Se è una scadenza, assicuriamoci che sia normalizzata a fine giornata
-          const normalizedDate = normalizeDeadlineDate(raw[field])
-          dateValue = normalizedDate ? parseISO(normalizedDate) : undefined
-        } else {
-          dateValue = parseISO(raw[field])
-        }
-        break
-      }
-    }
-  } else if (raw[dateField]) {
-    // Normalizza le date di scadenza per scadenze e todolist
-    if (isDeadlineField(table, dateField)) {
-      // Se è una scadenza, assicuriamoci che sia normalizzata a fine giornata
-      const normalizedDate = normalizeDeadlineDate(raw[dateField])
-      dateValue = normalizedDate ? parseISO(normalizedDate) : undefined
-    } else {
-      dateValue = parseISO(raw[dateField])
-    }
-  }
-
-  if (!dateValue) return null
-
-  return {
-    id: raw.id,
-    title: raw[titleField] || `Item #${raw.id}`,
-    date: dateValue,
-    type,
-    tabella_origine: table,
-    id_origine: raw.id,
-    color: ITEM_TYPE_DETAILS[type]?.itemTextColor || "text-gray-600",
-  }
-}
+  {
+    table: "clienti",
+    label: "Clienti",
+    icon: Users,
+    color: "bg-indigo-50 border-indigo-200",
+    textColor: "text-indigo-700",
+    dateField: "data_creazione",
+    titleField: "nome",
+  },
+  {
+    table: "pagine",
+    label: "Pagine",
+    icon: FileText,
+    color: "bg-teal-50 border-teal-200",
+    textColor: "text-teal-700",
+    dateField: "pubblicato",
+    titleField: "titolo",
+  },
+  {
+    table: "note",
+    label: "Note",
+    icon: StickyNote,
+    color: "bg-orange-50 border-orange-200",
+    textColor: "text-orange-700",
+    dateField: "data_creazione",
+    titleField: "titolo",
+  },
+]
 
 export function useUserDashboardSummary() {
   const { supabase } = useSupabase()
   const { user } = useAuth()
-  const [dashboardData, setDashboardData] = useState<UserDashboardData | null>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const todayRange = useMemo(
-    () => ({
-      start: startOfDay(new Date()),
-      end: endOfDay(new Date()),
-    }),
-    [],
-  )
-
-  const nextWeekRange = useMemo(
-    () => ({
-      start: startOfDay(addDays(new Date(), 1)),
-      end: endOfDay(addDays(new Date(), 7)),
-    }),
-    [],
-  )
-
   useEffect(() => {
-    if (!supabase || !user) {
-      setIsLoading(false)
-      return
-    }
-
-    const fetchData = async () => {
-      setIsLoading(true)
-      setError(null)
+    async function fetchDashboardData() {
+      if (!supabase || !user?.id) {
+        setIsLoading(false)
+        return
+      }
 
       try {
-        const userId = user.id
-        const fetchedTodaysItems: UpcomingItem[] = []
-        const fetchedNextWeekItems: UpcomingItem[] = []
+        setIsLoading(true)
+        setError(null)
+
+        // Fetch counts for each table
         const summaryCounts: SummaryCount[] = []
+        const allUpcomingItems: UpcomingItem[] = []
 
-        // Helper to fetch and process items
-        const processTable = async (
-          tableName: string,
-          typeLabel: string,
-          dateFields: string | string[],
-          titleField: string,
-        ) => {
-          // Construct the select string carefully
-          const selectFields = ["id", titleField]
-          if (Array.isArray(dateFields)) {
-            selectFields.push(...dateFields)
-          } else {
-            selectFields.push(dateFields)
-          }
-          // Ensure unique fields in select if titleField or id is also in dateFields
-          const uniqueSelectFields = [...new Set(selectFields)].join(", ")
+        for (const config of TABLE_CONFIGS) {
+          try {
+            // Get count
+            const { count, error: countError } = await supabase
+              .from(config.table)
+              .select("*", { count: "exact", head: true })
+              .eq("id_utente", user.id)
 
-          const {
-            data,
-            error: fetchError,
-            count,
-          } = await supabase
-            .from(tableName)
-            .select(uniqueSelectFields, {
-              // Use the constructed unique select string
-              count: "exact",
+            if (countError) {
+              console.warn(`Errore nel conteggio per ${config.table}:`, countError)
+              continue
+            }
+
+            summaryCounts.push({
+              type: config.table,
+              label: config.label,
+              count: count || 0,
+              icon: config.icon,
+              color: config.color,
+              textColor: config.textColor,
             })
-            .eq("id_utente", userId)
-          // Removed problematic filter line here
 
-          if (fetchError) {
-            console.error(`Error fetching ${tableName}:`, fetchError)
-            setError((prevError) =>
-              prevError ? `${prevError}\nFailed to fetch ${tableName}` : `Failed to fetch ${tableName}`,
-            )
-            return { count: 0, items: [] }
-          }
+            // Get upcoming items (only if table has date field)
+            if (config.dateField) {
+              const today = new Date()
+              const nextWeek = new Date()
+              nextWeek.setDate(today.getDate() + 7)
 
-          const items: UpcomingItem[] = []
-          data?.forEach((rawItem) => {
-            const item = mapRawItemToUpcoming(rawItem, typeLabel, dateFields, titleField, tableName)
-            if (item) {
-              items.push(item)
-              if (isWithinInterval(item.date, todayRange)) {
-                fetchedTodaysItems.push(item)
-              } else if (isWithinInterval(item.date, nextWeekRange)) {
-                fetchedNextWeekItems.push(item)
+              const { data: upcomingData, error: upcomingError } = await supabase
+                .from(config.table)
+                .select(`id, ${config.titleField}, ${config.dateField}`)
+                .eq("id_utente", user.id)
+                .gte(config.dateField, today.toISOString())
+                .lte(config.dateField, nextWeek.toISOString())
+                .order(config.dateField, { ascending: true })
+                .limit(5)
+
+              if (!upcomingError && upcomingData) {
+                const items: UpcomingItem[] = upcomingData.map((item) => ({
+                  id_origine: item.id,
+                  tabella_origine: config.table,
+                  title: item[config.titleField] || "Senza titolo",
+                  date: new Date(item[config.dateField]),
+                  type: config.label.toLowerCase(),
+                  color: config.textColor,
+                }))
+
+                allUpcomingItems.push(...items)
               }
             }
-          })
-          return { count: count || 0, items }
-        }
-
-        // Appuntamenti
-        const appuntamentiResult = await processTable("appuntamenti", "appuntamenti", "data_inizio", "titolo")
-        summaryCounts.push({
-          type: "appuntamenti",
-          label: "Appuntamenti",
-          count: appuntamentiResult.count,
-          ...ITEM_TYPE_DETAILS.appuntamenti,
-        })
-
-        // Attività
-        const attivitaResult = await processTable("attivita", "attivita", "data_inizio", "titolo")
-        summaryCounts.push({
-          type: "attivita",
-          label: "Attività",
-          count: attivitaResult.count,
-          ...ITEM_TYPE_DETAILS.attivita,
-        })
-
-        // Scadenze (Personali)
-        const scadenzeResult = await processTable("scadenze", "scadenze", "scadenza", "titolo")
-        summaryCounts.push({
-          type: "scadenze",
-          label: "Scadenze",
-          count: scadenzeResult.count,
-          ...ITEM_TYPE_DETAILS.scadenze,
-        })
-
-        // Todolist
-        let todoTableName = "todolist"
-        try {
-          // Check if 'todolist' table exists by attempting a lightweight query
-          const { error: tableCheckError } = await supabase
-            .from("todolist")
-            .select("id", { head: true, count: "exact" })
-            .limit(0)
-          if (tableCheckError && tableCheckError.code === "42P01") {
-            // 42P01 is "undefined_table"
-            todoTableName = "todo" // Fallback if todolist doesn't exist
-          } else if (tableCheckError) {
-            // Some other error occurred, log it but proceed with 'todolist' as default
-            console.warn(`Error checking for 'todolist' table, defaulting to it:`, tableCheckError.message)
+          } catch (err) {
+            console.warn(`Errore nel recupero dati per ${config.table}:`, err)
           }
-        } catch (e) {
-          // Catch any unexpected error during the check, default to 'todolist'
-          console.warn(`Unexpected error checking for 'todolist' table, defaulting to it:`, e)
-          todoTableName = "todolist" // Or 'todo' if that's a more likely fallback
         }
-        const todolistResult = await processTable(todoTableName, "todolist", "scadenza", "titolo")
-        summaryCounts.push({
-          type: "todolist",
-          label: "Todo List",
-          count: todolistResult.count,
-          ...ITEM_TYPE_DETAILS.todolist,
-        })
 
-        // Progetti (Attivi)
-        const { count: progettiCount, error: progettiError } = await supabase
-          .from("progetti")
-          .select("id", { count: "exact" })
-          .eq("id_utente", userId)
-          .neq("stato", "Completato")
-        if (progettiError) console.error("Error fetching progetti count:", progettiError)
-        summaryCounts.push({
-          type: "progetti",
-          label: "Progetti Attivi",
-          count: progettiCount || 0,
-          ...ITEM_TYPE_DETAILS.progetti,
-        })
+        // Sort upcoming items by date
+        allUpcomingItems.sort((a, b) => a.date.getTime() - b.date.getTime())
 
-        // Clienti
-        const { count: clientiCount, error: clientiError } = await supabase
-          .from("clienti")
-          .select("id", { count: "exact" })
-          .eq("id_utente", userId)
-        if (clientiError) console.error("Error fetching clienti count:", clientiError)
-        summaryCounts.push({
-          type: "clienti",
-          label: "Clienti",
-          count: clientiCount || 0,
-          ...ITEM_TYPE_DETAILS.clienti,
-        })
+        // Separate today's items from next week's items
+        const today = new Date()
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+        const todayEnd = new Date(todayStart)
+        todayEnd.setDate(todayEnd.getDate() + 1)
 
-        fetchedTodaysItems.sort((a, b) => a.date.getTime() - b.date.getTime())
-        fetchedNextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+        const todaysItems = allUpcomingItems.filter((item) => item.date >= todayStart && item.date < todayEnd)
+
+        const nextWeekItems = allUpcomingItems.filter((item) => item.date >= todayEnd).slice(0, 10)
 
         setDashboardData({
           summaryCounts,
-          todaysItems: fetchedTodaysItems.slice(0, 5),
-          nextWeekItems: fetchedNextWeekItems.slice(0, 5),
+          todaysItems,
+          nextWeekItems,
         })
-      } catch (e) {
-        console.error("Error fetching user dashboard summary:", e)
-        setError(e instanceof Error ? e.message : String(e))
+      } catch (err: any) {
+        console.error("Errore nel recupero dei dati del dashboard:", err)
+        setError(err.message || "Errore sconosciuto")
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchData()
-  }, [supabase, user, todayRange, nextWeekRange])
+    fetchDashboardData()
+  }, [supabase, user?.id])
 
   return { dashboardData, isLoading, error }
 }

@@ -35,8 +35,6 @@ const UpcomingItemsList = ({
   if (!items.length) {
     return (
       <Card className="col-span-1">
-        {" "}
-        {/* Mantenuto col-span-1 per coerenza con la grid principale */}
         <CardHeader>
           <CardTitle className="text-lg flex items-center">
             <Icon className="h-5 w-5 mr-2 text-gray-500" />
@@ -52,8 +50,6 @@ const UpcomingItemsList = ({
 
   return (
     <Card className="col-span-1 shadow-md">
-      {" "}
-      {/* Mantenuto col-span-1 */}
       <CardHeader>
         <CardTitle className="text-lg flex items-center">
           <Icon className="h-5 w-5 mr-2 text-primary" />
@@ -95,8 +91,8 @@ export function UserSummary() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+          {Array.from({ length: 8 }).map((_, i) => (
             <Card key={i}>
               <CardHeader>
                 <Skeleton className="h-5 w-24" />
@@ -151,12 +147,11 @@ export function UserSummary() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
         {dashboardData.summaryCounts.map((summary) => (
           <SummaryCard key={summary.type} {...summary} />
         ))}
       </div>
-      {/* Modifica qui per layout a due colonne su schermi medi e superiori */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <UpcomingItemsList title="Elementi di Oggi" items={dashboardData.todaysItems} icon={CalendarClock} />
         <UpcomingItemsList title="Prossima Settimana" items={dashboardData.nextWeekItems} icon={CalendarPlus} />

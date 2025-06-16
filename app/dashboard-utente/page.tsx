@@ -3,7 +3,6 @@ import { useState } from "react"
 import React from "react"
 
 import { ProtectedRoute } from "@/components/protected-route"
-import { UserSummary } from "./_components/user-summary"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/auth-provider"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,6 +15,7 @@ import { FeedReaderWidget } from "@/components/feed-reader-widget"
 import { TodoKanbanWidget } from "@/components/todo-kanban-widget"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
+import { UserSummary } from "./_components/user-summary"
 
 const AVAILABLE_WIDGETS = [
   { id: "agenda", name: "Agenda", component: AgendaWidget },
@@ -55,9 +55,6 @@ export default function UserDashboardPage() {
             <p className="text-muted-foreground">Ecco una panoramica delle tue attività e impegni.</p>
           </div>
 
-          <UserSummary />
-          <Separator className="my-2" />
-
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h2 className="text-2xl font-semibold tracking-tight">Widget Disponibili</h2>
@@ -96,6 +93,13 @@ export default function UserDashboardPage() {
                 </CardContent>
               </Card>
             )}
+          </div>
+
+          <Separator className="my-6" />
+
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight mb-4">Riepilogo Attività</h2>
+            <UserSummary />
           </div>
         </div>
       </div>

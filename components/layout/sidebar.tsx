@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Wifi,
   WifiOff,
+  StickyNote,
 } from "lucide-react"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -152,6 +153,16 @@ function SidebarContent({
               <Link href="/pagine">
                 <FileText className="mr-2 h-4 w-4" />
                 Pagine
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant={pathname?.includes("/note") ? "secondary" : "ghost"}
+              className="w-full justify-start"
+            >
+              <Link href="/note">
+                <StickyNote className="mr-2 h-4 w-4" />
+                Note
               </Link>
             </Button>
             <Button
