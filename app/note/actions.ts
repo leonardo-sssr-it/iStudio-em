@@ -20,7 +20,7 @@ export async function createNota(nota: NotaInsert) {
 /**
  * Aggiorna una nota esistente
  */
-export async function updateNota(id: number | string, nota: NotaUpdate, userId: string | number) {
+export async function updateNota(id: number | string, nota: NotaUpdate, userId: string) {
   const result = await NoteService.updateNota(id, nota, userId)
 
   if (result.data) {
@@ -34,7 +34,7 @@ export async function updateNota(id: number | string, nota: NotaUpdate, userId: 
 /**
  * Elimina una nota
  */
-export async function deleteNota(id: number | string, userId: string | number) {
+export async function deleteNota(id: number | string, userId: string) {
   const result = await NoteService.deleteNota(id, userId)
 
   if (result.success) {
@@ -47,7 +47,7 @@ export async function deleteNota(id: number | string, userId: string | number) {
 /**
  * Ottiene una nota per ID
  */
-export async function getNotaById(id: number | string, userId: string | number) {
+export async function getNotaById(id: number | string, userId: string) {
   return await NoteService.getNotaById(id, userId)
 }
 
@@ -55,7 +55,7 @@ export async function getNotaById(id: number | string, userId: string | number) 
  * Ottiene tutte le note con filtri
  */
 export async function getNote(params: {
-  userId: string | number
+  userId: string
   priorita?: string
   searchTerm?: string
   hasNotifica?: boolean
@@ -91,6 +91,6 @@ export async function getNote(params: {
 /**
  * Ottiene le priorità distinte
  */
-export async function getPriorita(userId: string | number) {
+export async function getPriorita(userId: string) {
   return await NoteService.getPriorita(userId)
 }

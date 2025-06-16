@@ -32,12 +32,10 @@ export function useNote() {
   const [totalCount, setTotalCount] = useState(0)
   const [error, setError] = useState<Error | null>(null)
 
-  // Converti user.id in numero se necessario
+  // Usa sempre user.id come stringa
   const userId = useMemo(() => {
     if (!user?.id) return null
-    // Se user.id è una stringa numerica, convertila in numero
-    const numericId = Number.parseInt(user.id.toString(), 10)
-    return isNaN(numericId) ? user.id : numericId
+    return user.id.toString()
   }, [user?.id])
 
   // Memoizza la chiave di cache
@@ -81,7 +79,7 @@ export function useNote() {
       setError(null)
 
       try {
-        // Costruisci la query con debouncing per ricerca
+        // Costruisci la query - usa sempre userId come stringa
         let query = supabase.from("note").select("*", { count: "exact" }).eq("id_utente", userId)
 
         // Applica i filtri
@@ -194,7 +192,7 @@ export function useNote() {
         const now = new Date().toISOString()
         const newNota: NotaInsert = {
           ...nota,
-          id_utente: userId,
+          id_utente: userId, // Usa sempre come stringa
           creato_il: now,
           modifica: now,
           synced: false,
