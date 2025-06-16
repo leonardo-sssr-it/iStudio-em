@@ -85,6 +85,47 @@ export type Database = {
           privato?: boolean | null
         }
       }
+      note: {
+        Row: {
+          id: number
+          titolo: string
+          contenuto: string
+          creato_il: string | null
+          modifica: string | null
+          tags: string[] | null
+          priorita: string | null
+          notifica: string | null
+          notebook_id: string | null
+          id_utente: string | null
+          synced: boolean | null
+        }
+        Insert: {
+          id?: number
+          titolo: string
+          contenuto: string
+          creato_il?: string | null
+          modifica?: string | null
+          tags?: string[] | null
+          priorita?: string | null
+          notifica?: string | null
+          notebook_id?: string | null
+          id_utente?: string | null
+          synced?: boolean | null
+        }
+        Update: {
+          id?: number
+          titolo?: string
+          contenuto?: string
+          creato_il?: string | null
+          modifica?: string | null
+          tags?: string[] | null
+          priorita?: string | null
+          notifica?: string | null
+          notebook_id?: string | null
+          id_utente?: string | null
+          synced?: boolean | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
