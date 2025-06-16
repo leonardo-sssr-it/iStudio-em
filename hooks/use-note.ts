@@ -32,10 +32,11 @@ export function useNote() {
   const [totalCount, setTotalCount] = useState(0)
   const [error, setError] = useState<Error | null>(null)
 
-  // Usa sempre user.id come stringa
+  // Converti user.id in numero per bigint
   const userId = useMemo(() => {
     if (!user?.id) return null
-    return user.id.toString()
+    const numericId = Number.parseInt(user.id.toString(), 10)
+    return isNaN(numericId) ? null : numericId
   }, [user?.id])
 
   // Memoizza la chiave di cache
@@ -79,7 +80,7 @@ export function useNote() {
       setError(null)
 
       try {
-        // Costruisci la query - usa sempre userId come stringa
+        // Costruisci la query - usa userId come numero (bigint)
         let query = supabase.from("note").select("*", { count: "exact" }).eq("id_utente", userId)
 
         // Applica i filtri
@@ -192,7 +193,7 @@ export function useNote() {
         const now = new Date().toISOString()
         const newNota: NotaInsert = {
           ...nota,
-          id_utente: userId, // Usa sempre come stringa
+          id_utente: userId, // Usa come numero (bigint)
           creato_il: now,
           modifica: now,
           synced: false,

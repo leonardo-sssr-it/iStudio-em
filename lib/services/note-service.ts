@@ -7,7 +7,7 @@ export type NotaInsert = Database["public"]["Tables"]["note"]["Insert"]
 export type NotaUpdate = Database["public"]["Tables"]["note"]["Update"]
 
 export type NotaFilter = {
-  id_utente?: string
+  id_utente?: number
   priorita?: string
   titolo?: string
   searchTerm?: string
@@ -24,24 +24,12 @@ const sanitizeString = (str: string): string => {
   return str.trim().replace(/\0/g, "")
 }
 
-const validateUserId = (userId: string | number): string => {
-  // Converti sempre in stringa per compatibilità con UUID
-  const stringId = userId.toString()
-
-  // Se sembra un UUID, validalo come tale
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-  if (uuidRegex.test(stringId)) {
-    return stringId
+const validateUserId = (userId: string | number): number => {
+  const numericId = typeof userId === "string" ? Number.parseInt(userId, 10) : userId
+  if (isNaN(numericId) || numericId <= 0) {
+    throw new Error("ID utente non valido")
   }
-
-  // Se è un numero, potrebbe essere che il sistema usi ID numerici come stringhe
-  // In questo caso, restituisci la stringa così com'è
-  const numericId = Number(stringId)
-  if (!isNaN(numericId) && numericId > 0) {
-    return stringId
-  }
-
-  throw new Error("ID utente non valido")
+  return numericId
 }
 
 const validateNotaInput = (nota: NotaInsert | NotaUpdate): string[] => {
@@ -86,7 +74,7 @@ const validateNotaInput = (nota: NotaInsert | NotaUpdate): string[] => {
     errors.push("La priorità deve essere una stringa")
   }
 
-  // Validazione notifica
+  // Validazione notifica (time with time zone)
   if (nota.notifica) {
     const notificaDate = new Date(nota.notifica)
     if (isNaN(notificaDate.getTime())) {
@@ -128,7 +116,7 @@ export class NoteService {
       // Applica i filtri
       if (filter) {
         if (filter.id_utente !== undefined) {
-          // Validazione ID utente
+          // Validazione ID utente come bigint
           const validUserId = validateUserId(filter.id_utente)
           query = query.eq("id_utente", validUserId)
         }
@@ -207,7 +195,7 @@ export class NoteService {
         throw new Error("ID nota non valido")
       }
 
-      // Validazione ID utente
+      // Validazione ID utente come bigint
       const validUserId = validateUserId(userId)
 
       const { data, error } = await supabase
@@ -240,7 +228,7 @@ export class NoteService {
         throw new Error(`Errori di validazione: ${validationErrors.join(", ")}`)
       }
 
-      // Validazione ID utente
+      // Validazione ID utente come bigint
       if (nota.id_utente !== undefined) {
         nota.id_utente = validateUserId(nota.id_utente)
       }
@@ -291,7 +279,7 @@ export class NoteService {
         throw new Error("ID nota non valido")
       }
 
-      // Validazione ID utente
+      // Validazione ID utente come bigint
       const validUserId = validateUserId(userId)
 
       // Validazione input
@@ -348,7 +336,7 @@ export class NoteService {
         throw new Error("ID nota non valido")
       }
 
-      // Validazione ID utente
+      // Validazione ID utente come bigint
       const validUserId = validateUserId(userId)
 
       const { error } = await supabase.from("note").delete().eq("id", numericId).eq("id_utente", validUserId)
@@ -369,7 +357,7 @@ export class NoteService {
     try {
       const supabase = createClient()
 
-      // Validazione ID utente
+      // Validazione ID utente come bigint
       const validUserId = validateUserId(userId)
 
       const { data, error } = await supabase
