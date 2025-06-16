@@ -19,17 +19,70 @@ export type NotaSortOptions = {
   direction: "asc" | "desc"
 }
 
+// Validazione e sanitizzazione
+const sanitizeString = (str: string): string => {
+  return str.trim().replace(/\0/g, "")
+}
+
+const validateNotaInput = (nota: NotaInsert | NotaUpdate): string[] => {
+  const errors: string[] = []
+
+  // Validazione titolo
+  if ("titolo" in nota) {
+    if (!nota.titolo || typeof nota.titolo !== "string") {
+      errors.push("Il titolo è obbligatorio")
+    } else if (nota.titolo.length > 255) {
+      errors.push("Il titolo non può superare i 255 caratteri")
+    }
+  }
+
+  // Validazione contenuto
+  if ("contenuto" in nota) {
+    if (!nota.contenuto || typeof nota.contenuto !== "string") {
+      errors.push("Il contenuto è obbligatorio")
+    } else if (nota.contenuto.length > 50000) {
+      errors.push("Il contenuto non può superare i 50.000 caratteri")
+    }
+  }
+
+  // Validazione tags
+  if (nota.tags) {
+    if (!Array.isArray(nota.tags)) {
+      errors.push("I tags devono essere un array")
+    } else if (nota.tags.length > 20) {
+      errors.push("Non puoi avere più di 20 tags")
+    } else {
+      for (const tag of nota.tags) {
+        if (typeof tag !== "string" || tag.length > 50) {
+          errors.push("Ogni tag deve essere una stringa di massimo 50 caratteri")
+          break
+        }
+      }
+    }
+  }
+
+  // Validazione priorità
+  if (nota.priorita && typeof nota.priorita !== "string") {
+    errors.push("La priorità deve essere una stringa")
+  }
+
+  // Validazione notifica
+  if (nota.notifica) {
+    const notificaDate = new Date(nota.notifica)
+    if (isNaN(notificaDate.getTime())) {
+      errors.push("La data di notifica non è valida")
+    }
+  }
+
+  return errors
+}
+
 /**
  * Servizio per la gestione delle note
  */
 export class NoteService {
   /**
    * Ottiene tutte le note con filtri opzionali
-   * @param filter Filtri da applicare
-   * @param sort Opzioni di ordinamento
-   * @param limit Limite di risultati
-   * @param offset Offset per la paginazione
-   * @returns Lista di note filtrate e ordinate
    */
   static async getNote(
     filter?: NotaFilter,
@@ -40,17 +93,31 @@ export class NoteService {
     try {
       const supabase = createClient()
 
+      // Validazione parametri
+      if (limit && (limit < 1 || limit > 100)) {
+        throw new Error("Il limite deve essere tra 1 e 100")
+      }
+
+      if (offset && offset < 0) {
+        throw new Error("L'offset non può essere negativo")
+      }
+
       // Inizia la query base
       let query = supabase.from("note").select("*", { count: "exact" })
 
       // Applica i filtri
       if (filter) {
         if (filter.id_utente !== undefined) {
+          // Validazione UUID
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+          if (!uuidRegex.test(filter.id_utente)) {
+            throw new Error("ID utente non valido")
+          }
           query = query.eq("id_utente", filter.id_utente)
         }
 
         if (filter.priorita) {
-          query = query.eq("priorita", filter.priorita)
+          query = query.eq("priorita", sanitizeString(filter.priorita))
         }
 
         if (filter.hasNotifica !== undefined) {
@@ -61,16 +128,26 @@ export class NoteService {
           }
         }
 
-        // Ricerca full-text
+        // Ricerca full-text con sanitizzazione
         if (filter.searchTerm) {
-          const term = filter.searchTerm.toLowerCase()
+          const term = sanitizeString(filter.searchTerm.toLowerCase())
+          if (term.length > 100) {
+            throw new Error("Il termine di ricerca è troppo lungo")
+          }
           query = query.or(`titolo.ilike.%${term}%,contenuto.ilike.%${term}%`)
         }
 
         // Ricerca per titolo specifico
         if (filter.titolo) {
-          query = query.ilike("titolo", `%${filter.titolo}%`)
+          const titolo = sanitizeString(filter.titolo)
+          query = query.ilike("titolo", `%${titolo}%`)
         }
+      }
+
+      // Validazione campo di ordinamento
+      const validSortFields: (keyof Nota)[] = ["id", "titolo", "creato_il", "modifica", "priorita"]
+      if (!validSortFields.includes(sort.field)) {
+        throw new Error("Campo di ordinamento non valido")
       }
 
       // Applica ordinamento
@@ -99,18 +176,27 @@ export class NoteService {
 
   /**
    * Ottiene una singola nota per ID
-   * @param id ID della nota
-   * @param userId ID utente per verifica permessi
-   * @returns Nota trovata o null
    */
   static async getNotaById(id: number | string, userId: string): Promise<{ data: Nota | null; error: Error | null }> {
     try {
       const supabase = createClient()
 
+      // Validazione ID
+      const numericId = Number(id)
+      if (isNaN(numericId) || numericId <= 0) {
+        throw new Error("ID nota non valido")
+      }
+
+      // Validazione UUID utente
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(userId)) {
+        throw new Error("ID utente non valido")
+      }
+
       const { data, error } = await supabase
         .from("note")
         .select("*")
-        .eq("id", id)
+        .eq("id", numericId)
         .eq("id_utente", userId)
         .single()
         .headers(NO_CACHE_HEADERS)
@@ -126,20 +212,33 @@ export class NoteService {
 
   /**
    * Crea una nuova nota
-   * @param nota Dati della nota da creare
-   * @returns Nota creata
    */
   static async createNota(nota: NotaInsert): Promise<{ data: Nota | null; error: Error | null }> {
     try {
       const supabase = createClient()
 
+      // Validazione input
+      const validationErrors = validateNotaInput(nota)
+      if (validationErrors.length > 0) {
+        throw new Error(`Errori di validazione: ${validationErrors.join(", ")}`)
+      }
+
+      // Sanitizzazione
+      const sanitizedNota: NotaInsert = {
+        ...nota,
+        titolo: sanitizeString(nota.titolo || ""),
+        contenuto: sanitizeString(nota.contenuto || ""),
+        tags: nota.tags?.map((tag) => sanitizeString(tag)) || null,
+        priorita: nota.priorita ? sanitizeString(nota.priorita) : null,
+      }
+
       // Imposta i campi obbligatori se non forniti
       const now = new Date().toISOString()
       const notaToInsert: NotaInsert = {
-        ...nota,
-        creato_il: nota.creato_il || now,
-        modifica: nota.modifica || now,
-        synced: nota.synced !== undefined ? nota.synced : false,
+        ...sanitizedNota,
+        creato_il: sanitizedNota.creato_il || now,
+        modifica: sanitizedNota.modifica || now,
+        synced: sanitizedNota.synced !== undefined ? sanitizedNota.synced : false,
       }
 
       const { data, error } = await supabase.from("note").insert(notaToInsert).select().single()
@@ -155,10 +254,6 @@ export class NoteService {
 
   /**
    * Aggiorna una nota esistente
-   * @param id ID della nota da aggiornare
-   * @param nota Dati da aggiornare
-   * @param userId ID utente per verifica permessi
-   * @returns Nota aggiornata
    */
   static async updateNota(
     id: number | string,
@@ -168,16 +263,43 @@ export class NoteService {
     try {
       const supabase = createClient()
 
+      // Validazione ID
+      const numericId = Number(id)
+      if (isNaN(numericId) || numericId <= 0) {
+        throw new Error("ID nota non valido")
+      }
+
+      // Validazione UUID utente
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(userId)) {
+        throw new Error("ID utente non valido")
+      }
+
+      // Validazione input
+      const validationErrors = validateNotaInput(nota)
+      if (validationErrors.length > 0) {
+        throw new Error(`Errori di validazione: ${validationErrors.join(", ")}`)
+      }
+
+      // Sanitizzazione
+      const sanitizedNota: NotaUpdate = {
+        ...nota,
+        titolo: nota.titolo ? sanitizeString(nota.titolo) : undefined,
+        contenuto: nota.contenuto ? sanitizeString(nota.contenuto) : undefined,
+        tags: nota.tags?.map((tag) => sanitizeString(tag)) || undefined,
+        priorita: nota.priorita ? sanitizeString(nota.priorita) : undefined,
+      }
+
       // Imposta il timestamp di modifica
       const notaToUpdate: NotaUpdate = {
-        ...nota,
+        ...sanitizedNota,
         modifica: new Date().toISOString(),
       }
 
       const { data, error } = await supabase
         .from("note")
         .update(notaToUpdate)
-        .eq("id", id)
+        .eq("id", numericId)
         .eq("id_utente", userId)
         .select()
         .single()
@@ -193,15 +315,24 @@ export class NoteService {
 
   /**
    * Elimina una nota
-   * @param id ID della nota da eliminare
-   * @param userId ID utente per verifica permessi
-   * @returns Successo o errore
    */
   static async deleteNota(id: number | string, userId: string): Promise<{ success: boolean; error: Error | null }> {
     try {
       const supabase = createClient()
 
-      const { error } = await supabase.from("note").delete().eq("id", id).eq("id_utente", userId)
+      // Validazione ID
+      const numericId = Number(id)
+      if (isNaN(numericId) || numericId <= 0) {
+        throw new Error("ID nota non valido")
+      }
+
+      // Validazione UUID utente
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(userId)) {
+        throw new Error("ID utente non valido")
+      }
+
+      const { error } = await supabase.from("note").delete().eq("id", numericId).eq("id_utente", userId)
 
       if (error) throw error
 
@@ -214,12 +345,16 @@ export class NoteService {
 
   /**
    * Ottiene le priorità distinte delle note
-   * @param userId ID utente per filtrare le priorità
-   * @returns Lista di priorità distinte
    */
   static async getPriorita(userId: string): Promise<{ data: string[] | null; error: Error | null }> {
     try {
       const supabase = createClient()
+
+      // Validazione UUID utente
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(userId)) {
+        throw new Error("ID utente non valido")
+      }
 
       const { data, error } = await supabase
         .from("note")
@@ -230,8 +365,8 @@ export class NoteService {
 
       if (error) throw error
 
-      // Estrai priorità uniche
-      const priorita = [...new Set(data.map((item) => item.priorita))].filter(Boolean) as string[]
+      // Estrai priorità uniche e sanitizza
+      const priorita = [...new Set(data.map((item) => sanitizeString(item.priorita || "")))].filter(Boolean)
 
       return { data: priorita, error: null }
     } catch (error) {
