@@ -89,4 +89,5 @@ export default function NotaDetailPage() {
       case "bassa":
         return "bg-green-100 text-green-800"
       default:
-        return \"bg-gray-100 text-
+        return "bg-gray-100 text-gray-800"
+    }
