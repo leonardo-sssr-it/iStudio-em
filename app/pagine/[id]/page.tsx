@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { toast } from "@/components/ui/use-toast"
 import { ArrowLeft, Edit, Calendar, User, Clock, CheckCircle, XCircle } from "lucide-react"
 import Link from "next/link"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import type { Pagina } from "@/lib/services/pagine-service"
 
 export default function PaginaDetailPage() {
@@ -40,33 +41,31 @@ export default function PaginaDetailPage() {
 
         if (paginaError) throw paginaError
 
-        // Verifica permessi: deve essere pubblica o dell'utente corrente
+        // Verifica se la pagina è attiva (le pagine non attive sono visibili solo al proprietario)
+        if (!paginaData.attivo && paginaData.id_utente !== user?.id) {
+          throw new Error("Questa pagina non è più disponibile")
+        }
+
+        // Verifica permessi per pagine private: devono essere pubbliche O dell'utente corrente
         if (paginaData.privato && paginaData.id_utente !== user?.id) {
-          throw new Error("Non hai i permessi per visualizzare questa pagina")
+          throw new Error("Non hai i permessi per visualizzare questa pagina privata")
         }
 
         setPagina(paginaData)
 
-        // Carica il nome dell'autore se necessario
-        if (paginaData.id_utente !== user?.id) {
-          const { data: userData, error: userError } = await supabase
-            .from("utenti")
-            .select("username, nome, cognome")
-            .eq("id", paginaData.id_utente)
-            .single()
+        // Carica il nome dell'autore
+        const { data: userData, error: userError } = await supabase
+          .from("utenti")
+          .select("username, nome, cognome")
+          .eq("id", paginaData.id_utente)
+          .single()
 
-          if (!userError && userData) {
-            setAutore(userData.username || `${userData.nome} ${userData.cognome}`.trim())
-          }
+        if (!userError && userData) {
+          setAutore(userData.username || `${userData.nome} ${userData.cognome}`.trim() || "Autore sconosciuto")
         }
       } catch (err: any) {
         console.error("Errore nel caricamento della pagina:", err)
         setError(err.message)
-        toast({
-          title: "Errore",
-          description: `Impossibile caricare la pagina: ${err.message}`,
-          variant: "destructive",
-        })
       } finally {
         setLoading(false)
       }
@@ -189,8 +188,12 @@ export default function PaginaDetailPage() {
                 {pagina.privato && <Badge variant="secondary">Privato</Badge>}
               </div>
 
-              {/* Estratto */}
-              {pagina.estratto && <p className="text-lg text-gray-600 mb-4">{pagina.estratto}</p>}
+              {/* Estratto con Markdown */}
+              {pagina.estratto && (
+                <div className="text-lg text-gray-600 mb-4 prose prose-lg max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{pagina.estratto}</ReactMarkdown>
+                </div>
+              )}
             </div>
           </div>
 
@@ -230,9 +233,38 @@ export default function PaginaDetailPage() {
             </div>
           )}
 
-          {/* Contenuto */}
-          <div className="prose prose-lg max-w-none">
-            <div className="whitespace-pre-wrap">{pagina.contenuto}</div>
+          {/* Contenuto con Markdown */}
+          <div className="prose prose-lg max-w-none dark:prose-invert">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Personalizza i componenti se necessario
+                h1: ({ children }) => <h1 className="text-3xl font-bold mb-4">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-2xl font-semibold mb-3 mt-6">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-xl font-medium mb-2 mt-4">{children}</h3>,
+                p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-1">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-1">{children}</ol>,
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-600">
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ children, className }) => {
+                  const isInline = !className
+                  return isInline ? (
+                    <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
+                  ) : (
+                    <code className="block bg-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                      {children}
+                    </code>
+                  )
+                },
+                pre: ({ children }) => <div className="my-4">{children}</div>,
+              }}
+            >
+              {pagina.contenuto}
+            </ReactMarkdown>
           </div>
 
           {/* Tags */}
