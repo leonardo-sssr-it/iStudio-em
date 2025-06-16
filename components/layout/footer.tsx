@@ -2,11 +2,40 @@
 
 import Link from "next/link"
 import { Github, Twitter, Linkedin, Mail, ExternalLink } from "lucide-react"
-import { useAppVersion } from "@/hooks/use-app-config"
+import { useAppConfig } from "@/hooks/use-app-config"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
-  const { version, isLoading } = useAppVersion()
+  const { config, isLoading } = useAppConfig()
+
+  // Funzione per determinare se un URL è esterno
+  const isExternalUrl = (url: string) => {
+    return url.startsWith("http://") || url.startsWith("https://")
+  }
+
+  // Configurazione dei link legali
+  const legalLinks = [
+    {
+      key: "URLprivacy",
+      label: "Privacy Policy",
+      url: config?.URLprivacy,
+    },
+    {
+      key: "URLtermini",
+      label: "Termini di Servizio",
+      url: config?.URLtermini,
+    },
+    {
+      key: "URLcookies",
+      label: "Informativa Cookie",
+      url: config?.URLcookies,
+    },
+    {
+      key: "URLlicenza",
+      label: "Licenza",
+      url: config?.URLlicenza,
+    },
+  ].filter((link) => link.url && link.url.trim() !== "") // Mostra solo i link configurati
 
   return (
     <footer className="w-full border-t bg-background">
@@ -21,7 +50,7 @@ export function Footer() {
                 {isLoading ? (
                   <span className="animate-pulse">Caricamento versione...</span>
                 ) : (
-                  <span>Versione {version}</span>
+                  <span>Versione {config?.versione || "N/A"}</span>
                 )}
               </div>
             </div>
@@ -41,6 +70,11 @@ export function Footer() {
                 <li>
                   <Link href="/profile" className="text-muted-foreground hover:text-primary transition-colors">
                     Profilo
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/pagine" className="text-muted-foreground hover:text-primary transition-colors">
+                    Pagine
                   </Link>
                 </li>
               </ul>
@@ -86,11 +120,15 @@ export function Footer() {
           <div className="mt-8 pt-8 border-t">
             <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
               <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
-                <p className="text-sm text-muted-foreground">© {currentYear} iStudio {isLoading ? (
-                  <span className="animate-pulse">Caricamento versione...</span>
-                ) : (
-                  <span>Versione {version}</span>
-                )}. Tutti i diritti riservati.</p>
+                <p className="text-sm text-muted-foreground">
+                  © {currentYear} iStudio{" "}
+                  {isLoading ? (
+                    <span className="animate-pulse">Caricamento versione...</span>
+                  ) : (
+                    <span>Versione {config?.versione || "N/A"}</span>
+                  )}
+                  . Tutti i diritti riservati.
+                </p>
                 {/* Link al sito Leonardo */}
                 <Link
                   href="https://leonardo.sssr.it"
@@ -102,14 +140,27 @@ export function Footer() {
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
-              <div className="flex space-x-4 text-sm">
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  Termini di Servizio
-                </Link>
-              </div>
+
+              {/* Link legali dinamici */}
+              {legalLinks.length > 0 && (
+                <div className="flex flex-wrap justify-center md:justify-end gap-x-4 gap-y-1 text-sm">
+                  {legalLinks.map((link, index) => {
+                    const isExternal = isExternalUrl(link.url!)
+                    return (
+                      <Link
+                        key={link.key}
+                        href={link.url!}
+                        target={isExternal ? "_blank" : undefined}
+                        rel={isExternal ? "noopener noreferrer" : undefined}
+                        className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                      >
+                        {link.label}
+                        {isExternal && <ExternalLink className="h-3 w-3" />}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
