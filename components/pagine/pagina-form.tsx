@@ -29,6 +29,9 @@ import { ArrowLeft, Save, Trash2, X, AlertCircle, Eye } from "lucide-react"
 import Link from "next/link"
 import type { Pagina } from "@/lib/services/pagine-service"
 
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+
 // Componente per l'editor Markdown
 const MarkdownEditor = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
   const [isPreview, setIsPreview] = useState(false)
@@ -51,7 +54,45 @@ const MarkdownEditor = ({ value, onChange }: { value: string; onChange: (value: 
       {isPreview ? (
         <div className="min-h-[200px] p-4 border rounded-md bg-gray-50">
           <div className="prose prose-sm max-w-none">
-            <div className="whitespace-pre-wrap">{value || "Nessun contenuto da visualizzare"}</div>
+            {value ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 text-gray-900">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-xl font-semibold mb-3 text-gray-800">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-lg font-medium mb-2 text-gray-700">{children}</h3>,
+                  p: ({ children }) => <p className="mb-3 text-gray-600 leading-relaxed">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc list-inside mb-3 text-gray-600">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal list-inside mb-3 text-gray-600">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1">{children}</li>,
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 mb-3">
+                      {children}
+                    </blockquote>
+                  ),
+                  code: ({ children }) => (
+                    <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto mb-3 text-sm">{children}</pre>
+                  ),
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      className="text-blue-600 hover:text-blue-800 underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {children}
+                    </a>
+                  ),
+                }}
+              >
+                {value}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-gray-500 italic">Nessun contenuto da visualizzare</p>
+            )}
           </div>
         </div>
       ) : (
