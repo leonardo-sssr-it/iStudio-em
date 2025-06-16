@@ -7,7 +7,7 @@ export type NotaInsert = Database["public"]["Tables"]["note"]["Insert"]
 export type NotaUpdate = Database["public"]["Tables"]["note"]["Update"]
 
 export type NotaFilter = {
-  id_utente?: string
+  id_utente?: string | number
   priorita?: string
   titolo?: string
   searchTerm?: string
@@ -22,6 +22,14 @@ export type NotaSortOptions = {
 // Validazione e sanitizzazione
 const sanitizeString = (str: string): string => {
   return str.trim().replace(/\0/g, "")
+}
+
+const validateUserId = (userId: string | number): number => {
+  const numericId = typeof userId === "string" ? Number.parseInt(userId, 10) : userId
+  if (isNaN(numericId) || numericId <= 0) {
+    throw new Error("ID utente non valido")
+  }
+  return numericId
 }
 
 const validateNotaInput = (nota: NotaInsert | NotaUpdate): string[] => {
@@ -108,12 +116,9 @@ export class NoteService {
       // Applica i filtri
       if (filter) {
         if (filter.id_utente !== undefined) {
-          // Validazione UUID
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-          if (!uuidRegex.test(filter.id_utente)) {
-            throw new Error("ID utente non valido")
-          }
-          query = query.eq("id_utente", filter.id_utente)
+          // Validazione e conversione ID utente
+          const validUserId = validateUserId(filter.id_utente)
+          query = query.eq("id_utente", validUserId)
         }
 
         if (filter.priorita) {
@@ -177,7 +182,10 @@ export class NoteService {
   /**
    * Ottiene una singola nota per ID
    */
-  static async getNotaById(id: number | string, userId: string): Promise<{ data: Nota | null; error: Error | null }> {
+  static async getNotaById(
+    id: number | string,
+    userId: string | number,
+  ): Promise<{ data: Nota | null; error: Error | null }> {
     try {
       const supabase = createClient()
 
@@ -187,17 +195,14 @@ export class NoteService {
         throw new Error("ID nota non valido")
       }
 
-      // Validazione UUID utente
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(userId)) {
-        throw new Error("ID utente non valido")
-      }
+      // Validazione e conversione ID utente
+      const validUserId = validateUserId(userId)
 
       const { data, error } = await supabase
         .from("note")
         .select("*")
         .eq("id", numericId)
-        .eq("id_utente", userId)
+        .eq("id_utente", validUserId)
         .single()
         .headers(NO_CACHE_HEADERS)
 
@@ -221,6 +226,11 @@ export class NoteService {
       const validationErrors = validateNotaInput(nota)
       if (validationErrors.length > 0) {
         throw new Error(`Errori di validazione: ${validationErrors.join(", ")}`)
+      }
+
+      // Validazione e conversione ID utente
+      if (nota.id_utente !== undefined) {
+        nota.id_utente = validateUserId(nota.id_utente)
       }
 
       // Sanitizzazione
@@ -258,7 +268,7 @@ export class NoteService {
   static async updateNota(
     id: number | string,
     nota: NotaUpdate,
-    userId: string,
+    userId: string | number,
   ): Promise<{ data: Nota | null; error: Error | null }> {
     try {
       const supabase = createClient()
@@ -269,11 +279,8 @@ export class NoteService {
         throw new Error("ID nota non valido")
       }
 
-      // Validazione UUID utente
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(userId)) {
-        throw new Error("ID utente non valido")
-      }
+      // Validazione e conversione ID utente
+      const validUserId = validateUserId(userId)
 
       // Validazione input
       const validationErrors = validateNotaInput(nota)
@@ -300,7 +307,7 @@ export class NoteService {
         .from("note")
         .update(notaToUpdate)
         .eq("id", numericId)
-        .eq("id_utente", userId)
+        .eq("id_utente", validUserId)
         .select()
         .single()
 
@@ -316,7 +323,10 @@ export class NoteService {
   /**
    * Elimina una nota
    */
-  static async deleteNota(id: number | string, userId: string): Promise<{ success: boolean; error: Error | null }> {
+  static async deleteNota(
+    id: number | string,
+    userId: string | number,
+  ): Promise<{ success: boolean; error: Error | null }> {
     try {
       const supabase = createClient()
 
@@ -326,13 +336,10 @@ export class NoteService {
         throw new Error("ID nota non valido")
       }
 
-      // Validazione UUID utente
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(userId)) {
-        throw new Error("ID utente non valido")
-      }
+      // Validazione e conversione ID utente
+      const validUserId = validateUserId(userId)
 
-      const { error } = await supabase.from("note").delete().eq("id", numericId).eq("id_utente", userId)
+      const { error } = await supabase.from("note").delete().eq("id", numericId).eq("id_utente", validUserId)
 
       if (error) throw error
 
@@ -346,20 +353,17 @@ export class NoteService {
   /**
    * Ottiene le priorità distinte delle note
    */
-  static async getPriorita(userId: string): Promise<{ data: string[] | null; error: Error | null }> {
+  static async getPriorita(userId: string | number): Promise<{ data: string[] | null; error: Error | null }> {
     try {
       const supabase = createClient()
 
-      // Validazione UUID utente
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(userId)) {
-        throw new Error("ID utente non valido")
-      }
+      // Validazione e conversione ID utente
+      const validUserId = validateUserId(userId)
 
       const { data, error } = await supabase
         .from("note")
         .select("priorita")
-        .eq("id_utente", userId)
+        .eq("id_utente", validUserId)
         .not("priorita", "is", null)
         .headers(NO_CACHE_HEADERS)
 
