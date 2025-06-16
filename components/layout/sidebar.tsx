@@ -98,7 +98,7 @@ function SidebarContent({
   return (
     <div className="space-y-4 py-4 h-full flex flex-col">
       <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
+        <h2 className="mb-2 px-2 text-sm font-semibold tracking-tight">
           iStudio
           <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
@@ -142,7 +142,7 @@ function SidebarContent({
         </div>
       </div>
       <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Gestione</h2>
+        <h2 className="mb-2 px-2 text-sm font-semibold tracking-tight">Gestione</h2>
         <ScrollArea className="h-[300px] px-1">
           <div className="space-y-1">
             <Button
@@ -266,7 +266,7 @@ function SidebarContent({
       {/* Sezione Admin */}
       {isAdmin && (
         <div className="px-4 py-2">
-          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Amministrazione</h2>
+          <h2 className="mb-2 px-2 text-sm font-semibold tracking-tight">Amministrazione</h2>
           <div className="space-y-1">
             <Button asChild variant={pathname === "/admin" ? "secondary" : "ghost"} className="w-full justify-start">
               <Link href="/admin">
