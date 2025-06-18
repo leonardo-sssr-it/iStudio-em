@@ -32,6 +32,7 @@ import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
 import { isValid, parseISO } from "date-fns"
+import { TestDatePicker } from "@/components/test-date-picker"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -735,9 +736,15 @@ export default function ItemDetailPage() {
     const isRequired = requiredFields.includes(field)
     const hasError = validationErrors.some((error) => error.includes(label))
 
-    // Debug per verificare lo stato dei campi datetime
+    // Debug dettagliato per i campi datetime
     if (type === "datetime") {
-      console.log(`Campo ${field}: isEditMode=${isEditMode}, readOnly=${readOnly}, type=${type}`)
+      console.log(`=== DEBUG DATETIME FIELD: ${field} ===`)
+      console.log(`isEditMode: ${isEditMode}`)
+      console.log(`readOnly param: ${readOnly}`)
+      console.log(`readOnlyFields includes ${field}: ${readOnlyFields.includes(field)}`)
+      console.log(`value: ${value}`)
+      console.log(`Will render EnhancedDatePicker: ${isEditMode && !readOnly}`)
+      console.log(`=====================================`)
     }
 
     if (!isEditMode || readOnly) {
@@ -794,22 +801,28 @@ export default function ItemDetailPage() {
           </div>
         )
       case "datetime":
+        console.log(`Rendering datetime field ${field} in EDIT mode`)
+        console.log(`Value passed to EnhancedDatePicker: ${value}`)
+
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
               {label} {isRequired && <span className="text-red-500">*</span>}
             </Label>
-            <EnhancedDatePicker
-              id={field}
-              value={value || ""}
-              onChange={(newValue) => {
-                console.log(`EnhancedDatePicker onChange for ${field}:`, newValue) // Debug
-                handleFieldChange(field, newValue)
-              }}
-              placeholder={`Seleziona ${label.toLowerCase()}`}
-              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
-              showTimeSelect={true}
-            />
+            <div className="mt-1">
+              <EnhancedDatePicker
+                id={field}
+                value={value || ""}
+                onChange={(newValue) => {
+                  console.log(`EnhancedDatePicker onChange for ${field}:`, newValue)
+                  handleFieldChange(field, newValue)
+                }}
+                placeholder={`Seleziona ${label.toLowerCase()}`}
+                className={hasError ? "border-red-500" : ""}
+                showTimeSelect={true}
+                disabled={false}
+              />
+            </div>
           </div>
         )
       case "number":
@@ -1376,7 +1389,13 @@ export default function ItemDetailPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>{editedItem && renderFieldGroups()}</CardContent>
+        <CardContent>
+          {/* Componente di test temporaneo - RIMUOVERE DOPO IL DEBUG */}
+          <TestDatePicker />
+          <hr className="my-4" />
+
+          {editedItem && renderFieldGroups()}
+        </CardContent>
       </Card>
     </div>
   )

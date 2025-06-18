@@ -32,6 +32,8 @@ export function EnhancedDatePicker({
   showTimeSelect = true,
   dateFormat = "dd/MM/yyyy HH:mm",
 }: EnhancedDatePickerProps) {
+  console.log(`EnhancedDatePicker rendered for ${id}:`, { value, disabled, showTimeSelect })
+
   const [open, setOpen] = React.useState(false)
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
   const [timeInput, setTimeInput] = React.useState("")
@@ -153,13 +155,22 @@ export function EnhancedDatePicker({
             id={id}
             variant="outline"
             className={cn(
-              "w-full justify-start text-left font-normal h-10",
+              "enhanced-date-picker-trigger w-full justify-start text-left font-normal h-10",
               !selectedDate && "text-muted-foreground",
               disabled && "opacity-50 cursor-not-allowed",
+              className,
             )}
             disabled={disabled}
             type="button"
-            onClick={() => !disabled && setOpen(true)}
+            onClick={(e) => {
+              console.log(`EnhancedDatePicker button clicked for ${id}, disabled: ${disabled}`)
+              e.preventDefault()
+              e.stopPropagation()
+              if (!disabled) {
+                console.log(`Opening popover for ${id}`)
+                setOpen(true)
+              }
+            }}
           >
             <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
             <span className="truncate">{getDisplayValue()}</span>
