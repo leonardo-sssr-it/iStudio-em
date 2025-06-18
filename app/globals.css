@@ -93,7 +93,7 @@ body {
   }
 }
 
-/* Fix critici per EnhancedDatePicker */
+/* Fix critici per EnhancedDatePicker - INTERATTIVITÀ */
 .enhanced-date-picker-trigger {
   pointer-events: auto !important;
   cursor: pointer !important;
@@ -105,22 +105,24 @@ body {
   cursor: not-allowed !important;
 }
 
-/* Forza il popover ad apparire sopra tutto */
+/* Forza il popover ad apparire sopra tutto E ad essere interattivo */
 [data-radix-popper-content-wrapper] {
   z-index: 99999 !important;
   position: fixed !important;
+  pointer-events: auto !important;
 }
 
 [data-radix-popover-content] {
   z-index: 99999 !important;
   position: fixed !important;
+  pointer-events: auto !important;
   background: white !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 8px !important;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Assicura che il contenuto del popover sia visibile */
+/* Assicura che il contenuto del popover sia interattivo */
 .enhanced-date-picker-content {
   background: white !important;
   border: 1px solid #e5e7eb !important;
@@ -128,6 +130,52 @@ body {
   padding: 12px !important;
   min-width: 300px !important;
   max-width: 400px !important;
+  pointer-events: auto !important;
+}
+
+.enhanced-date-picker-content * {
+  pointer-events: auto !important;
+}
+
+/* Fix specifici per il calendario */
+.rdp {
+  margin: 0 !important;
+  pointer-events: auto !important;
+}
+
+.rdp * {
+  pointer-events: auto !important;
+}
+
+.rdp-months {
+  display: flex !important;
+  justify-content: center !important;
+  pointer-events: auto !important;
+}
+
+.rdp-day {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.rdp-day:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.rdp-day_selected {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+
+/* Fix per i bottoni nel popover */
+.enhanced-date-picker-content button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.enhanced-date-picker-content input {
+  pointer-events: auto !important;
+  cursor: text !important;
 }
 
 /* Debug per vedere se il button è cliccabile */
@@ -136,27 +184,19 @@ body {
   border-color: #3b82f6 !important;
 }
 
-/* Fix per container che potrebbero nascondere il popover */
+/* Fix per container che potrebbero bloccare l'interazione */
 .container,
 .card,
 .tabs-content {
   overflow: visible !important;
-}
-
-/* Assicura che i tab content non nascondano i popover */
-[data-radix-tabs-content] {
-  overflow: visible !important;
   position: relative !important;
 }
 
-/* Fix per eventuali problemi con il calendario */
-.rdp {
-  margin: 0 !important;
-}
-
-.rdp-months {
-  display: flex !important;
-  justify-content: center !important;
+/* Assicura che i tab content non blocchino l'interazione */
+[data-radix-tabs-content] {
+  overflow: visible !important;
+  position: relative !important;
+  pointer-events: auto !important;
 }
 
 /* Stili per il dark mode del popover */
@@ -164,10 +204,33 @@ body {
   background: #1f2937 !important;
   border-color: #374151 !important;
   color: white !important;
+  pointer-events: auto !important;
 }
 
 .dark .enhanced-date-picker-content {
   background: #1f2937 !important;
   border-color: #374151 !important;
   color: white !important;
+  pointer-events: auto !important;
+}
+
+/* Fix per eventuali overlay che bloccano l'interazione */
+[data-radix-popover-trigger] {
+  pointer-events: auto !important;
+}
+
+/* Assicura che non ci siano elementi che bloccano l'interazione */
+.enhanced-date-picker-wrapper {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.enhanced-date-picker-wrapper * {
+  pointer-events: auto !important;
+}
+
+/* Fix per scroll del calendario se necessario */
+.rdp-months {
+  max-height: 400px !important;
+  overflow-y: auto !important;
 }

@@ -62,6 +62,7 @@ export function EnhancedDatePicker({
 
   // Gestisce la selezione della data dal calendario
   const handleDateSelect = (date: Date | undefined) => {
+    console.log(`Date selected: ${date}`)
     if (!date) {
       setSelectedDate(undefined)
       return
@@ -80,11 +81,13 @@ export function EnhancedDatePicker({
 
   // Gestisce il cambio dell'orario
   const handleTimeChange = (newTime: string) => {
+    console.log(`Time changed: ${newTime}`)
     setTimeInput(newTime)
   }
 
   // Conferma la selezione e chiude il popover
   const handleConfirm = () => {
+    console.log(`Confirming selection: date=${selectedDate}, time=${timeInput}`)
     if (!selectedDate) {
       onChange("")
       setOpen(false)
@@ -112,12 +115,14 @@ export function EnhancedDatePicker({
     const minute = String(finalDate.getMinutes()).padStart(2, "0")
 
     const isoString = `${year}-${month}-${day}T${hour}:${minute}:00`
+    console.log(`Final ISO string: ${isoString}`)
     onChange(isoString)
     setOpen(false)
   }
 
   // Cancella la selezione
   const handleClear = () => {
+    console.log("Clearing selection")
     setSelectedDate(undefined)
     setTimeInput("")
     onChange("")
@@ -126,6 +131,7 @@ export function EnhancedDatePicker({
 
   // Imposta data e ora corrente
   const handleSetNow = () => {
+    console.log("Setting current date/time")
     const now = new Date()
     setSelectedDate(now)
     const hours = now.getHours().toString().padStart(2, "0")
@@ -148,7 +154,7 @@ export function EnhancedDatePicker({
   }
 
   return (
-    <div className={cn("relative", className)} style={{ zIndex: 1 }}>
+    <div className={cn("enhanced-date-picker-wrapper relative", className)} style={{ zIndex: 1 }}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -167,10 +173,11 @@ export function EnhancedDatePicker({
               e.preventDefault()
               e.stopPropagation()
               if (!disabled) {
-                console.log(`Opening popover for ${id}`)
-                setOpen(!open) // Toggle invece di sempre true
+                console.log(`Toggling popover for ${id}, current state: ${open}`)
+                setOpen(!open)
               }
             }}
+            style={{ pointerEvents: "auto" }}
           >
             <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
             <span className="truncate">{getDisplayValue()}</span>
@@ -185,9 +192,17 @@ export function EnhancedDatePicker({
           style={{
             zIndex: 99999,
             position: "fixed",
+            pointerEvents: "auto",
+          }}
+          onInteractOutside={(e) => {
+            // Previeni la chiusura accidentale quando si clicca sui controlli
+            const target = e.target as Element
+            if (target.closest(".enhanced-date-picker-content")) {
+              e.preventDefault()
+            }
           }}
         >
-          <div className="p-3">
+          <div className="p-3" style={{ pointerEvents: "auto" }}>
             <Calendar
               mode="single"
               selected={selectedDate}
@@ -196,10 +211,11 @@ export function EnhancedDatePicker({
               initialFocus
               locale={it}
               className="rounded-md border-0"
+              style={{ pointerEvents: "auto" }}
             />
 
             {showTimeSelect && (
-              <div className="mt-3 pt-3 border-t space-y-3">
+              <div className="mt-3 pt-3 border-t space-y-3" style={{ pointerEvents: "auto" }}>
                 <div className="flex items-center gap-2">
                   <Label className="text-sm font-medium min-w-[30px]">Ora:</Label>
                   <Input
@@ -208,6 +224,7 @@ export function EnhancedDatePicker({
                     onChange={(e) => handleTimeChange(e.target.value)}
                     className="flex-1"
                     disabled={disabled || !selectedDate}
+                    style={{ pointerEvents: "auto" }}
                   />
                 </div>
 
@@ -216,9 +233,14 @@ export function EnhancedDatePicker({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleSetNow}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleSetNow()
+                    }}
                     className="flex-1"
                     disabled={disabled}
+                    style={{ pointerEvents: "auto" }}
                   >
                     <Clock className="mr-1 h-3 w-3" />
                     Ora
@@ -227,9 +249,14 @@ export function EnhancedDatePicker({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleClear}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleClear()
+                    }}
                     className="flex-1"
                     disabled={disabled}
+                    style={{ pointerEvents: "auto" }}
                   >
                     <X className="mr-1 h-3 w-3" />
                     Cancella
@@ -238,23 +265,33 @@ export function EnhancedDatePicker({
               </div>
             )}
 
-            <div className="flex gap-2 mt-3 pt-3 border-t">
+            <div className="flex gap-2 mt-3 pt-3 border-t" style={{ pointerEvents: "auto" }}>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setOpen(false)
+                }}
                 className="flex-1"
                 disabled={disabled}
+                style={{ pointerEvents: "auto" }}
               >
                 Annulla
               </Button>
               <Button
                 type="button"
                 size="sm"
-                onClick={handleConfirm}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleConfirm()
+                }}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 disabled={disabled}
+                style={{ pointerEvents: "auto" }}
               >
                 <Check className="mr-1 h-3 w-3" />
                 Conferma
