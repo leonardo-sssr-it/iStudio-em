@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import {
@@ -46,6 +46,7 @@ interface TableSchema {
   titleFields: string[]
 }
 
+// Configurazione tabelle con Note incluse e ottimizzata
 const TABLE_CONFIGS = [
   {
     table: "appuntamenti",
@@ -116,15 +117,25 @@ const TABLE_CONFIGS = [
     icon: StickyNote,
     color: "bg-orange-50 border-orange-200",
     textColor: "text-orange-700",
-    preferredDateFields: ["creato_il", "modifica", "data_creazione"],
+    preferredDateFields: ["creato_il", "modifica", "data_creazione", "updated_at"],
     preferredTitleFields: ["titolo", "nome", "contenuto"],
   },
-]
+] as const
 
 /**
- * Ottiene lo schema di una tabella interrogando information_schema
+ * Cache per gli schemi delle tabelle per evitare query ripetute
+ */
+const schemaCache = new Map<string, TableSchema>()
+
+/**
+ * Ottiene lo schema di una tabella con caching
  */
 async function getTableSchema(supabase: any, tableName: string): Promise<TableSchema | null> {
+  // Controlla cache
+  if (schemaCache.has(tableName)) {
+    return schemaCache.get(tableName)!
+  }
+
   try {
     // Prima prova con information_schema
     const { data: schemaData, error: schemaError } = await supabase
@@ -147,12 +158,16 @@ async function getTableSchema(supabase: any, tableName: string): Promise<TableSc
         ["titolo", "nome", "descrizione", "contenuto", "estratto"].includes(col.toLowerCase()),
       )
 
-      return {
+      const schema: TableSchema = {
         table: tableName,
         columns,
         dateFields,
         titleFields,
       }
+
+      // Salva in cache
+      schemaCache.set(tableName, schema)
+      return schema
     }
 
     // Fallback: prova a fare una query sulla tabella per ottenere la struttura
@@ -172,12 +187,16 @@ async function getTableSchema(supabase: any, tableName: string): Promise<TableSc
         ["titolo", "nome", "descrizione", "contenuto", "estratto"].includes(col.toLowerCase()),
       )
 
-      return {
+      const schema: TableSchema = {
         table: tableName,
         columns,
         dateFields,
         titleFields,
       }
+
+      // Salva in cache
+      schemaCache.set(tableName, schema)
+      return schema
     }
 
     return null
@@ -188,14 +207,18 @@ async function getTableSchema(supabase: any, tableName: string): Promise<TableSc
 }
 
 /**
- * Ottiene il titolo da un record, usando campi disponibili
+ * Ottiene il titolo da un record con sanitizzazione
  */
 function getRecordTitle(record: any, availableTitleFields: string[]): string {
   for (const field of availableTitleFields) {
-    if (record[field] && typeof record[field] === "string" && record[field].trim()) {
+    if (record[field] && typeof record[field] === "string") {
       const content = record[field].trim()
-      // Se è contenuto lungo, prendi i primi 50 caratteri
-      return content.length > 50 ? content.substring(0, 50) + "..." : content
+      if (content) {
+        // Sanitizza il contenuto per sicurezza
+        const sanitized = content.replace(/<[^>]*>/g, "").trim()
+        // Se è contenuto lungo, prendi i primi 50 caratteri
+        return sanitized.length > 50 ? sanitized.substring(0, 50) + "..." : sanitized
+      }
     }
   }
   return "Senza titolo"
@@ -228,79 +251,76 @@ export function useUserDashboardSummary() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      if (!supabase || !user?.id) {
-        setIsLoading(false)
-        return
+  const fetchDashboardData = useCallback(async () => {
+    if (!supabase || !user?.id) {
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const userId = Number.parseInt(user.id.toString())
+      if (isNaN(userId)) {
+        throw new Error("ID utente non valido")
       }
 
-      try {
-        setIsLoading(true)
-        setError(null)
+      // Calcola range di date
+      const { todayStart, todayEnd } = getTodayRange()
+      const { tomorrowStart, nextWeekEnd } = getNextWeekRange()
 
-        const userId = Number.parseInt(user.id.toString())
-        if (isNaN(userId)) {
-          throw new Error("ID utente non valido")
-        }
+      // Fetch counts and schema for each table
+      const summaryCounts: SummaryCount[] = []
+      const todaysItems: UpcomingItem[] = []
+      const nextWeekItems: UpcomingItem[] = []
 
-        // Calcola range di date
-        const { todayStart, todayEnd } = getTodayRange()
-        const { tomorrowStart, nextWeekEnd } = getNextWeekRange()
+      // Processa le tabelle in parallelo per migliori performance
+      const tablePromises = TABLE_CONFIGS.map(async (config) => {
+        try {
+          // Ottieni lo schema della tabella
+          const schema = await getTableSchema(supabase, config.table)
+          if (!schema) {
+            console.warn(`Schema non disponibile per ${config.table}`)
+            return null
+          }
 
-        // Fetch counts and schema for each table
-        const summaryCounts: SummaryCount[] = []
-        const todaysItems: UpcomingItem[] = []
-        const nextWeekItems: UpcomingItem[] = []
+          // Verifica se la tabella ha il campo id_utente
+          if (!schema.columns.includes("id_utente")) {
+            console.warn(`Tabella ${config.table} non ha campo id_utente`)
+            return null
+          }
 
-        for (const config of TABLE_CONFIGS) {
-          try {
-            // Ottieni lo schema della tabella
-            const schema = await getTableSchema(supabase, config.table)
-            if (!schema) {
-              console.warn(`Schema non disponibile per ${config.table}`)
-              continue
-            }
+          // Get count
+          const { count, error: countError } = await supabase
+            .from(config.table)
+            .select("*", { count: "exact", head: true })
+            .eq("id_utente", userId)
 
-            // Verifica se la tabella ha il campo id_utente
-            if (!schema.columns.includes("id_utente")) {
-              console.warn(`Tabella ${config.table} non ha campo id_utente`)
-              continue
-            }
+          if (countError) {
+            console.warn(`Errore nel conteggio per ${config.table}:`, countError)
+            return null
+          }
 
-            // Get count
-            const { count, error: countError } = await supabase
-              .from(config.table)
-              .select("*", { count: "exact", head: true })
-              .eq("id_utente", userId)
+          const summaryCount: SummaryCount = {
+            type: config.table,
+            label: config.label,
+            count: count || 0,
+            icon: config.icon,
+            color: config.color,
+            textColor: config.textColor,
+          }
 
-            if (countError) {
-              console.warn(`Errore nel conteggio per ${config.table}:`, countError)
-              continue
-            }
+          // Trova il primo campo data disponibile
+          const availableDateField = config.preferredDateFields.find((field) => schema.dateFields.includes(field))
 
-            summaryCounts.push({
-              type: config.table,
-              label: config.label,
-              count: count || 0,
-              icon: config.icon,
-              color: config.color,
-              textColor: config.textColor,
-            })
+          // Trova i campi titolo disponibili
+          const availableTitleFields = config.preferredTitleFields.filter((field) => schema.titleFields.includes(field))
 
-            // Trova il primo campo data disponibile
-            const availableDateField = config.preferredDateFields.find((field) => schema.dateFields.includes(field))
+          let todayItems: UpcomingItem[] = []
+          let nextWeekItems: UpcomingItem[] = []
 
-            // Trova i campi titolo disponibili
-            const availableTitleFields = config.preferredTitleFields.filter((field) =>
-              schema.titleFields.includes(field),
-            )
-
-            if (!availableDateField || availableTitleFields.length === 0) {
-              console.warn(`Campi necessari non trovati per ${config.table}`)
-              continue
-            }
-
+          if (availableDateField && availableTitleFields.length > 0) {
             // Costruisci la query con campi esistenti
             const selectFields = ["id", availableDateField, ...availableTitleFields].join(", ")
 
@@ -321,7 +341,7 @@ export function useUserDashboardSummary() {
                 .limit(5)
 
               if (!todayError && todayProjects) {
-                const items: UpcomingItem[] = todayProjects.map((item) => ({
+                todayItems = todayProjects.map((item) => ({
                   id_origine: item.id,
                   tabella_origine: config.table,
                   title: getRecordTitle(item, availableTitleFields),
@@ -329,7 +349,6 @@ export function useUserDashboardSummary() {
                   type: config.label.toLowerCase(),
                   color: config.textColor,
                 }))
-                todaysItems.push(...items)
               }
 
               // Progetti che iniziano nella prossima settimana
@@ -343,7 +362,7 @@ export function useUserDashboardSummary() {
                 .limit(5)
 
               if (!nextWeekError && nextWeekProjects) {
-                const items: UpcomingItem[] = nextWeekProjects.map((item) => ({
+                nextWeekItems = nextWeekProjects.map((item) => ({
                   id_origine: item.id,
                   tabella_origine: config.table,
                   title: getRecordTitle(item, availableTitleFields),
@@ -351,7 +370,6 @@ export function useUserDashboardSummary() {
                   type: config.label.toLowerCase(),
                   color: config.textColor,
                 }))
-                nextWeekItems.push(...items)
               }
             } else {
               // Logica normale per altre tabelle
@@ -367,7 +385,7 @@ export function useUserDashboardSummary() {
                 .limit(5)
 
               if (!todayError && todayData) {
-                const items: UpcomingItem[] = todayData.map((item) => ({
+                todayItems = todayData.map((item) => ({
                   id_origine: item.id,
                   tabella_origine: config.table,
                   title: getRecordTitle(item, availableTitleFields),
@@ -375,7 +393,6 @@ export function useUserDashboardSummary() {
                   type: config.label.toLowerCase(),
                   color: config.textColor,
                 }))
-                todaysItems.push(...items)
               }
 
               // Elementi della prossima settimana
@@ -389,7 +406,7 @@ export function useUserDashboardSummary() {
                 .limit(5)
 
               if (!nextWeekError && nextWeekData) {
-                const items: UpcomingItem[] = nextWeekData.map((item) => ({
+                nextWeekItems = nextWeekData.map((item) => ({
                   id_origine: item.id,
                   tabella_origine: config.table,
                   title: getRecordTitle(item, availableTitleFields),
@@ -397,37 +414,62 @@ export function useUserDashboardSummary() {
                   type: config.label.toLowerCase(),
                   color: config.textColor,
                 }))
-                nextWeekItems.push(...items)
               }
             }
-          } catch (err) {
-            console.warn(`Errore nel recupero dati per ${config.table}:`, err)
           }
+
+          return {
+            summaryCount,
+            todayItems,
+            nextWeekItems,
+          }
+        } catch (err) {
+          console.warn(`Errore nel recupero dati per ${config.table}:`, err)
+          return null
         }
+      })
 
-        // Ordina gli elementi per data
-        todaysItems.sort((a, b) => a.date.getTime() - b.date.getTime())
-        nextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+      // Attendi tutti i risultati
+      const results = await Promise.all(tablePromises)
 
-        // Limita il numero di elementi mostrati
-        const finalTodaysItems = todaysItems.slice(0, 10)
-        const finalNextWeekItems = nextWeekItems.slice(0, 10)
-
-        setDashboardData({
-          summaryCounts,
-          todaysItems: finalTodaysItems,
-          nextWeekItems: finalNextWeekItems,
-        })
-      } catch (err: any) {
-        console.error("Errore nel recupero dei dati del dashboard:", err)
-        setError(err.message || "Errore sconosciuto")
-      } finally {
-        setIsLoading(false)
+      // Aggrega i risultati
+      for (const result of results) {
+        if (result) {
+          summaryCounts.push(result.summaryCount)
+          todaysItems.push(...result.todayItems)
+          nextWeekItems.push(...result.nextWeekItems)
+        }
       }
-    }
 
-    fetchDashboardData()
+      // Ordina gli elementi per data
+      todaysItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+      nextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+
+      // Limita il numero di elementi mostrati
+      const finalTodaysItems = todaysItems.slice(0, 10)
+      const finalNextWeekItems = nextWeekItems.slice(0, 10)
+
+      setDashboardData({
+        summaryCounts,
+        todaysItems: finalTodaysItems,
+        nextWeekItems: finalNextWeekItems,
+      })
+    } catch (err: any) {
+      console.error("Errore nel recupero dei dati del dashboard:", err)
+      setError(err.message || "Errore sconosciuto")
+    } finally {
+      setIsLoading(false)
+    }
   }, [supabase, user?.id])
 
-  return { dashboardData, isLoading, error }
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
+
+  return {
+    dashboardData,
+    isLoading,
+    error,
+    refetch: fetchDashboardData,
+  }
 }
