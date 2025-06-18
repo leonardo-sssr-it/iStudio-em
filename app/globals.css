@@ -2,85 +2,70 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Variabili personalizzate per admin */
+    --admin-tab-active-bg: 142 71% 45%;
+    --admin-tab-active-fg: 210 40% 98%;
+    --admin-checkbox-checked: 142 71% 45%;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Variabili personalizzate per admin in dark mode */
+    --admin-tab-active-bg: 142 71% 55%;
+    --admin-tab-active-fg: 222.2 84% 4.9%;
+    --admin-checkbox-checked: 142 71% 55%;
   }
 }
 
@@ -90,147 +75,308 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-/* Fix critici per EnhancedDatePicker - INTERATTIVITÀ */
-.enhanced-date-picker-trigger {
-  pointer-events: auto !important;
-  cursor: pointer !important;
-  position: relative !important;
+/* Nasconde la X di default del DialogContent di shadcn/ui */
+.custom-feed-modal-dialog-content > button[class*="absolute"][class*="right-4"][class*="top-4"] {
+  display: none !important;
 }
 
-.enhanced-date-picker-trigger:disabled {
-  pointer-events: none !important;
-  cursor: not-allowed !important;
+/* Stili per tab attivi nella pagina admin */
+@layer components {
+  .admin-tab-active {
+    background-color: hsl(var(--admin-tab-active-bg)) !important;
+    color: hsl(var(--admin-tab-active-fg)) !important;
+    font-weight: 600;
+  }
+
+  /* Migliora la visibilità dei checkbox */
+  .admin-checkbox[data-state="checked"] {
+    background-color: hsl(var(--admin-checkbox-checked)) !important;
+    border-color: hsl(var(--admin-checkbox-checked)) !important;
+  }
+
+  .admin-checkbox[data-state="checked"] svg {
+    color: white !important;
+    stroke-width: 3px;
+  }
+
+  /* Outline per checkbox non selezionati */
+  .admin-checkbox {
+    border: 2px solid hsl(var(--admin-checkbox-checked));
+  }
+
+  /* Rimuovi effetti di focus persistenti */
+  .focus-visible:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Semplifica gli effetti hover */
+  .hover-simple:hover {
+    background-color: hsl(var(--accent) / 0.5);
+  }
+
+  /* Stili per i popup e dropdown */
+  .popup-layer {
+    @apply z-50;
+  }
+
+  .dropdown-layer {
+    @apply z-40;
+  }
+
+  /* Precaricamento per dropdown e popup */
+  .preload-dropdown {
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    transform: translateY(-10px);
+    transition: none;
+  }
+
+  /* Stili per i toast */
+  .toast {
+    @apply z-[100] bg-background text-foreground border border-border shadow-lg rounded-md;
+  }
 }
 
-/* Forza il popover ad apparire sopra tutto E ad essere interattivo */
-[data-radix-popper-content-wrapper] {
-  z-index: 99999 !important;
-  position: fixed !important;
-  pointer-events: auto !important;
+/* Rimuovi transizioni eccessive */
+* {
+  transition-duration: 200ms;
 }
 
-[data-radix-popover-content] {
-  z-index: 99999 !important;
-  position: fixed !important;
-  pointer-events: auto !important;
-  background: white !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 8px !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+/* Rimuovi focus ring persistenti */
+button:focus:not(:focus-visible) {
+  outline: none;
 }
 
-/* Assicura che il contenuto del popover sia interattivo */
-.enhanced-date-picker-content {
-  background: white !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 8px !important;
-  padding: 12px !important;
-  min-width: 300px !important;
-  max-width: 400px !important;
-  pointer-events: auto !important;
+/* Rimuovi background fissi dalle dashboard */
+.dashboard-container,
+.dashboard-card,
+.dashboard-content {
+  background: transparent !important;
 }
 
-.enhanced-date-picker-content * {
-  pointer-events: auto !important;
+/* Applica background solo ai contenitori principali */
+.main-container {
+  background-color: hsl(var(--background));
 }
 
-/* Fix specifici per il calendario */
-.rdp {
-  margin: 0 !important;
-  pointer-events: auto !important;
+/* Assicura che i contenuti ereditino il tema */
+.content-inherit {
+  color: inherit;
+  background: inherit;
 }
 
-.rdp * {
-  pointer-events: auto !important;
+/* Debug: mostra le variabili CSS applicate */
+.debug-theme::before {
+  content: "BG: " attr(data-bg) " | FG: " attr(data-fg);
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: red;
+  color: white;
+  padding: 5px;
+  font-size: 12px;
+  z-index: 9999;
 }
 
-.rdp-months {
-  display: flex !important;
-  justify-content: center !important;
-  pointer-events: auto !important;
+/* Transizioni per il cambio tema */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-.rdp-day {
-  pointer-events: auto !important;
-  cursor: pointer !important;
+/* Stili personalizzati per l'applicazione */
+.container {
+  @apply mx-auto px-4 sm:px-6 lg:px-8;
 }
 
-.rdp-day:hover {
-  background-color: #f3f4f6 !important;
+/* Stili per le tabelle */
+.table-container {
+  @apply overflow-x-auto rounded-lg border border-border;
 }
 
-.rdp-day_selected {
-  background-color: #3b82f6 !important;
-  color: white !important;
+.table-header {
+  @apply bg-muted/50 text-muted-foreground;
 }
 
-/* Fix per i bottoni nel popover */
-.enhanced-date-picker-content button {
-  pointer-events: auto !important;
-  cursor: pointer !important;
+.table-row {
+  @apply border-b border-border hover:bg-muted/50 transition-colors;
 }
 
-.enhanced-date-picker-content input {
-  pointer-events: auto !important;
-  cursor: text !important;
+.table-cell {
+  @apply px-4 py-2 text-sm;
 }
 
-/* Debug per vedere se il button è cliccabile */
-.enhanced-date-picker-trigger:hover:not(:disabled) {
-  background-color: rgba(0, 0, 0, 0.05) !important;
-  border-color: #3b82f6 !important;
+/* Stili per i form */
+.form-group {
+  @apply space-y-2;
 }
 
-/* Fix per container che potrebbero bloccare l'interazione */
-.container,
-.card,
-.tabs-content {
-  overflow: visible !important;
-  position: relative !important;
+.form-label {
+  @apply text-sm font-medium text-foreground;
 }
 
-/* Assicura che i tab content non blocchino l'interazione */
-[data-radix-tabs-content] {
-  overflow: visible !important;
-  position: relative !important;
-  pointer-events: auto !important;
+.form-input {
+  @apply w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
 }
 
-/* Stili per il dark mode del popover */
-.dark [data-radix-popover-content] {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
-  color: white !important;
-  pointer-events: auto !important;
+/* Stili per le card */
+.card-header {
+  @apply border-b border-border pb-4;
 }
 
-.dark .enhanced-date-picker-content {
-  background: #1f2937 !important;
-  border-color: #374151 !important;
-  color: white !important;
-  pointer-events: auto !important;
+.card-content {
+  @apply pt-4;
 }
 
-/* Fix per eventuali overlay che bloccano l'interazione */
-[data-radix-popover-trigger] {
-  pointer-events: auto !important;
+/* Stili per la sidebar */
+.sidebar {
+  @apply bg-card border-r border-border;
 }
 
-/* Assicura che non ci siano elementi che bloccano l'interazione */
-.enhanced-date-picker-wrapper {
-  position: relative !important;
-  z-index: 1 !important;
+.sidebar-item {
+  @apply flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors;
 }
 
-.enhanced-date-picker-wrapper * {
-  pointer-events: auto !important;
+.sidebar-item.active {
+  @apply bg-primary text-primary-foreground;
 }
 
-/* Fix per scroll del calendario se necessario */
-.rdp-months {
-  max-height: 400px !important;
-  overflow-y: auto !important;
+/* Stili per l'header */
+.header {
+  @apply sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60;
+}
+
+/* Stili per i dropdown */
+.dropdown-content {
+  @apply bg-popover text-popover-foreground border border-border shadow-lg rounded-md z-50;
+}
+
+.dropdown-item {
+  @apply px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors;
+}
+
+/* Stili per i toast */
+.toast {
+  @apply bg-background text-foreground border border-border shadow-lg rounded-md;
+}
+
+.toast.success {
+  @apply border-green-500 bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-100;
+}
+
+.toast.error {
+  @apply border-red-500 bg-red-50 text-red-900 dark:bg-red-900/20 dark:text-red-100;
+}
+
+.toast.warning {
+  @apply border-yellow-500 bg-yellow-50 text-yellow-900 dark:bg-yellow-900/20 dark:text-yellow-400;
+}
+
+/* Stili per i loading spinner */
+.spinner {
+  @apply animate-spin rounded-full border-2 border-muted border-t-primary;
+}
+
+/* Stili per i badge */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge.primary {
+  @apply bg-primary text-primary-foreground;
+}
+
+.badge.secondary {
+  @apply bg-secondary text-secondary-foreground;
+}
+
+.badge.success {
+  @apply bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400;
+}
+
+.badge.error {
+  @apply bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400;
+}
+
+.badge.warning {
+  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400;
+}
+
+/* Stili per i focus ring */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+}
+
+/* Stili per le animazioni */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Stili per il responsive design */
+@media (max-width: 640px) {
+  .container {
+    @apply px-2;
+  }
+
+  .table-cell {
+    @apply px-2 py-1 text-xs;
+  }
+}
+
+/* Stili per la stampa */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}
+
+/* Fix per i popup e dropdown che appaiono sotto altri elementi */
+.popover-content,
+.dropdown-menu-content,
+.dialog-content,
+.select-content,
+.command-dialog,
+.tooltip-content {
+  z-index: 999 !important;
+}
+
+/* Precaricamento per migliorare la reattività dei componenti UI */
+.preload-ui {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-9999px);
 }

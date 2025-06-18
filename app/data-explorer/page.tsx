@@ -43,6 +43,7 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: Briefcase },
   { id: "clienti", label: "Clienti", icon: Users },
   { id: "pagine", label: "Pagine", icon: FileText },
+  { id: "note", label: "Note", icon: FileText }, // Aggiunta tabella "note"
 ]
 
 // Definizione dei campi per ogni tabella (CORRETTA in base alla struttura reale del DB)
@@ -201,6 +202,20 @@ const TABLE_FIELDS = {
       immagine: "string",
       pubblicato: "datetime",
       privato: "boolean",
+    },
+  },
+  note: {
+    // Aggiunta configurazione per la tabella "note"
+    listFields: ["id", "titolo", "priorita"],
+    readOnlyFields: ["id", "modifica", "id_utente"],
+    defaultSort: "priorita",
+    types: {
+      id: "number",
+      modifica: "datetime",
+      id_utente: "number",
+      titolo: "string",
+      contenuto: "text",
+      priorita: "string",
     },
   },
 }

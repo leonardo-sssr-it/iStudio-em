@@ -13,6 +13,7 @@ import {
   LogOut,
   LayoutDashboard,
   Settings,
+  User,
   Shield,
   ArrowRight,
   Lock,
@@ -148,25 +149,14 @@ export const AuthWidget = memo(function AuthWidget() {
     [usernameOrEmail, password, login, validateInputs, isSubmitting],
   )
 
-  // Gestione logout ottimizzata
-  const handleLogout = useCallback(async () => {
-    try {
-      await logout()
-      // Redirect esplicito alla home page
-      router.push("/")
-      toast({
-        title: "Logout effettuato",
-        description: "Arrivederci!",
-      })
-    } catch (error) {
-      console.error("Errore durante il logout:", error)
-      toast({
-        title: "Errore",
-        description: "Errore durante il logout",
-        variant: "destructive",
-      })
-    }
-  }, [logout, router])
+  // Gestione logout
+  const handleLogout = useCallback(() => {
+    logout()
+    toast({
+      title: "Logout effettuato",
+      description: "Arrivederci!",
+    })
+  }, [logout])
 
   // Gestione tasto invio
   const handleKeyDown = useCallback(
@@ -185,7 +175,7 @@ export const AuthWidget = memo(function AuthWidget() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        key={user ? "logged-in" : "logged-out"}
+        key={user ? "logged-in" : "logged-out"} // Aggiungere una key per forzare l'animazione corretta
       >
         <Card className="w-full shadow-md transition-all hover:shadow-lg border-primary/20">
           <CardHeader className="text-center pb-2">
@@ -195,20 +185,18 @@ export const AuthWidget = memo(function AuthWidget() {
           <CardContent className="space-y-4 pt-2">
             <div className="text-center p-4 bg-muted rounded-lg border border-border">
               <div className="flex items-center justify-center space-x-2 text-sm">
-                <Shield className="h-4 w-4 text-primary flex-shrink-0" />
+                <Shield className="h-4 w-4 text-primary" />
                 <span className="font-medium">Ruolo: {isAdmin ? "Amministratore" : "Utente"}</span>
               </div>
             </div>
 
             {/* Pulsanti principali */}
             <div className="space-y-3">
-              <Button variant="outline" className="w-full h-auto min-h-[3rem] p-3" asChild>
-                <Link href={isAdmin ? "/admin" : "/dashboard"} className="flex items-center justify-center gap-2">
-                  <LayoutDashboard className="h-5 w-5 flex-shrink-0" />
-                  <span className="flex-1 text-center">
-                    {isAdmin ? "Vai alla Dashboard Admin" : "Vai alla Dashboard"}
-                  </span>
-                  <ArrowRight className="h-4 w-4 flex-shrink-0" />
+              <Button variant="outline" className="w-full h-12 flex items-center justify-center gap-2" asChild>
+                <Link href={isAdmin ? "/admin" : "/dashboard"}>
+                  <LayoutDashboard className="h-5 w-5" />
+                  <span>{isAdmin ? "Vai alla Dashboard Admin" : "Vai alla Dashboard"}</span>
+                  <ArrowRight className="h-4 w-4 ml-1" />
                 </Link>
               </Button>
 
@@ -219,7 +207,7 @@ export const AuthWidget = memo(function AuthWidget() {
                     variant="outline"
                     className="w-full h-10 flex items-center justify-center gap-1 border-primary/30 hover:bg-primary/10"
                   >
-                    <Settings className="h-4 w-4 flex-shrink-0" />
+                    <Settings className="h-4 w-4" />
                     <span>Profilo</span>
                   </Button>
                 </Link>
@@ -229,7 +217,7 @@ export const AuthWidget = memo(function AuthWidget() {
                   className="w-full h-10 flex items-center justify-center gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={handleLogout}
                 >
-                  <LogOut className="h-4 w-4 flex-shrink-0" />
+                  <LogOut className="h-4 w-4" />
                   <span>Esci</span>
                 </Button>
               </div>
@@ -249,12 +237,12 @@ export const AuthWidget = memo(function AuthWidget() {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      key={user ? "logged-in" : "logged-out"}
+      key={user ? "logged-in" : "logged-out"} // Aggiungere una key per forzare l'animazione corretta
     >
       <Card className="w-full shadow-md transition-all hover:shadow-lg border-primary/20">
         <CardHeader className="text-center pb-2">
           <div className="flex items-center justify-center gap-2">
-            <Database className="h-6 w-6 text-primary flex-shrink-0" />
+            <Database className="h-6 w-6 text-primary" />
             <CardTitle className="text-2xl font-bold">Accedi a iStudio</CardTitle>
           </div>
           <CardDescription className="mt-1">Inserisci le tue credenziali per continuare</CardDescription>
@@ -264,7 +252,7 @@ export const AuthWidget = memo(function AuthWidget() {
             {/* Errore generale */}
             {errors.general && (
               <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <AlertCircle className="h-4 w-4" />
                 <span>{errors.general}</span>
               </div>
             )}
@@ -272,7 +260,7 @@ export const AuthWidget = memo(function AuthWidget() {
             {/* Campo username/email */}
             <div className="space-y-2">
               <Label htmlFor="usernameOrEmail" className="flex items-center gap-1">
-                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                <Mail className="h-3.5 w-3.5" />
                 <span>Username o Email</span>
               </Label>
               <div className="relative">
@@ -302,7 +290,7 @@ export const AuthWidget = memo(function AuthWidget() {
               </div>
               {errors.usernameOrEmail && (
                 <p id="usernameOrEmail-error" className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                  <AlertCircle className="h-3 w-3" />
                   {errors.usernameOrEmail}
                 </p>
               )}
@@ -311,7 +299,7 @@ export const AuthWidget = memo(function AuthWidget() {
             {/* Campo password */}
             <div className="space-y-2">
               <Label htmlFor="password" className="flex items-center gap-1">
-                <Lock className="h-3.5 w-3.5 flex-shrink-0" />
+                <Lock className="h-3.5 w-3.5" />
                 <span>Password</span>
               </Label>
               <div className="relative">
@@ -347,7 +335,7 @@ export const AuthWidget = memo(function AuthWidget() {
               </div>
               {errors.password && (
                 <p id="password-error" className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                  <AlertCircle className="h-3 w-3" />
                   {errors.password}
                 </p>
               )}
@@ -362,13 +350,13 @@ export const AuthWidget = memo(function AuthWidget() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+                  <Loader2 className="h-5 w-5 animate-spin" />
                   <span>Accesso in corso...</span>
                 </>
               ) : (
                 <>
                   <span>Accedi</span>
-                  <ArrowRight className="h-4 w-4 ml-1 flex-shrink-0" />
+                  <ArrowRight className="h-4 w-4 ml-1" />
                 </>
               )}
             </Button>

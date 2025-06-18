@@ -15,10 +15,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, X, AlertCircle, CheckCircle2 } from "lucide-react"
+import { ArrowLeft, X, AlertCircle, CheckCircle2, FileText, Calendar, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
+import { parseISO, formatISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -29,7 +30,6 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: "📊" },
   { id: "clienti", label: "Clienti", icon: "👥" },
   { id: "pagine", label: "Pagine", icon: "📄" },
-  { id: "note", label: "Note", icon: "📄" },  
 ]
 
 // Funzione per pulire i dati prima del salvataggio
@@ -39,6 +39,7 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   // Rimuovi campi di sola lettura per i nuovi elementi
   readOnlyFields.forEach((field) => {
     if (field !== "id_utente") {
+      // Mantieni id_utente
       delete cleaned[field]
     }
   })
@@ -47,15 +48,26 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   Object.keys(cleaned).forEach((key) => {
     const value = cleaned[key]
 
-    if (value === undefined || value === "undefined") {
+    // Rimuovi valori undefined
+    if (value === undefined) {
       delete cleaned[key]
       return
     }
 
-    if (typeof value === "string" && value.trim() === "") {
-      cleaned[key] = null
+    // Rimuovi valori che sono la stringa "undefined"
+    if (value === "undefined") {
+      delete cleaned[key]
+      return
     }
 
+    // Gestisci stringhe vuote
+    if (typeof value === "string") {
+      if (value.trim() === "") {
+        cleaned[key] = null
+      }
+    }
+
+    // Gestisci numeri NaN
     if (typeof value === "number" && isNaN(value)) {
       delete cleaned[key]
     }
@@ -64,7 +76,7 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// Configurazione dei campi per tabella
+// Estendi la configurazione dei campi con più dettagli
 const TABLE_FIELDS = {
   appuntamenti: {
     requiredFields: ["titolo", "data_inizio"],
@@ -72,6 +84,24 @@ const TABLE_FIELDS = {
     defaultValues: {
       stato: "pianificato",
       attivo: true,
+    },
+    fieldGroups: {
+      // Aggiunto per il layout a Card
+      principale: {
+        title: "Informazioni Principali",
+        icon: FileText, // Assicurati che FileText sia importato da lucide-react
+        fields: ["titolo", "descrizione", "stato"],
+      },
+      date: {
+        title: "Date e Orari",
+        icon: Calendar, // Assicurati che Calendar sia importato da lucide-react
+        fields: ["data_inizio", "data_fine"],
+      },
+      dettagli: {
+        title: "Dettagli Aggiuntivi",
+        icon: Settings, // Assicurati che Settings sia importato da lucide-react
+        fields: ["luogo", "note", "tags"],
+      },
     },
     types: {
       id: "number",
@@ -108,6 +138,7 @@ const TABLE_FIELDS = {
       priorita: 3,
       attivo: true,
     },
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -136,12 +167,13 @@ const TABLE_FIELDS = {
     },
   },
   scadenze: {
-    requiredFields: ["titolo", "scadenza"],
+    requiredFields: ["titolo", "data_scadenza"],
     autoFields: ["id", "id_utente", "data_creazione", "modifica"],
     defaultValues: {
       stato: "attivo",
       priorita: 3,
     },
+    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -173,6 +205,7 @@ const TABLE_FIELDS = {
       completato: false,
       priorita: 3,
     },
+    fieldOrder: ["titolo", "descrizione", "scadenza", "priorita", "completato", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -192,7 +225,7 @@ const TABLE_FIELDS = {
     },
   },
   progetti: {
-    requiredFields: ["titolo", "data_inizio"],
+    requiredFields: ["nome", "data_inizio"],
     autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
     defaultValues: {
       stato: "pianificato",
@@ -200,9 +233,21 @@ const TABLE_FIELDS = {
       avanzamento: 0,
       colore: "#3B82F6",
     },
+    fieldOrder: [
+      "nome",
+      "descrizione",
+      "stato",
+      "colore",
+      "gruppo",
+      "budget",
+      "data_inizio",
+      "data_fine",
+      "avanzamento",
+      "note",
+    ],
     types: {
       id: "number",
-      titolo: "string",
+      nome: "string",
       descrizione: "text",
       stato: "select",
       colore: "color",
@@ -226,7 +271,7 @@ const TABLE_FIELDS = {
       ],
     },
     validation: {
-      titolo: { minLength: 3, maxLength: 100 },
+      nome: { minLength: 3, maxLength: 100 },
       avanzamento: { min: 0, max: 100 },
       budget: { min: 0 },
     },
@@ -237,6 +282,7 @@ const TABLE_FIELDS = {
     defaultValues: {
       attivo: true,
     },
+    fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
     types: {
       id: "number",
       nome: "string",
@@ -265,26 +311,26 @@ const TABLE_FIELDS = {
     },
   },
   pagine: {
-    requiredFields: ["titolo", "estratto"],
+    requiredFields: ["titolo", "slug"],
     autoFields: ["id", "id_utente", "data_creazione", "modifica"],
     defaultValues: {
       stato: "bozza",
       privato: false,
       attivo: true,
     },
+    fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
     types: {
       id: "number",
       titolo: "string",
-      estratto: "string",
+      slug: "string",
       contenuto: "richtext",
+      stato: "select",
       privato: "boolean",
       attivo: "boolean",
-      immagine: "string",
-      categoria: "text",
-      tags: "tags",
+      meta_title: "string",
+      meta_description: "text",
       id_utente: "number",
       data_creazione: "datetime",
-      pubblicato: "datetime",
       modifica: "datetime",
     },
     selectOptions: {
@@ -347,6 +393,7 @@ export default function NewItemPage() {
   const requiredFields = tableConfig?.requiredFields || []
   const autoFields = tableConfig?.autoFields || []
   const defaultValues = tableConfig?.defaultValues || {}
+  const fieldGroups = tableConfig?.fieldGroups || {} // Modificato da fieldOrder
   const fieldTypes = tableConfig?.types || {}
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
@@ -373,30 +420,22 @@ export default function NewItemPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
-    console.log(`Campo ${field} cambiato:`, value) // Debug
-
     setFormData((prev: any) => {
       const newData = { ...prev, [field]: value }
 
-      // Preimposta data_fine se data_inizio cambia e data_fine è vuota
-      if (field === "data_inizio" && value && !newData.data_fine) {
+      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
+      if (field === "data_inizio" && value) {
         try {
-          const startDate = new Date(value)
-          if (!isNaN(startDate.getTime())) {
+          const startDate = parseISO(value) // parseISO gestisce stringhe ISO
+          if (!newData.data_fine) {
+            // Solo se data_fine non è già impostata
             const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Aggiungi 1 ora
-            const year = endDate.getFullYear()
-            const month = String(endDate.getMonth() + 1).padStart(2, "0")
-            const day = String(endDate.getDate()).padStart(2, "0")
-            const hour = String(endDate.getHours()).padStart(2, "0")
-            const minute = String(endDate.getMinutes()).padStart(2, "0")
-
-            newData.data_fine = `${year}-${month}-${day}T${hour}:${minute}:00`
+            newData.data_fine = formatISO(endDate) // formatISO per coerenza
           }
         } catch (e) {
           console.warn("Data inizio non valida per calcolare data fine:", value)
         }
       }
-
       return newData
     })
 
@@ -582,8 +621,6 @@ export default function NewItemPage() {
     const error = errors[field]
     const isRequired = requiredFields.includes(field)
 
-    console.log(`Rendering field ${field} of type ${type} with value:`, value) // Debug
-
     const fieldWrapper = (children: React.ReactNode) => (
       <div className="space-y-2" key={field}>
         <Label htmlFor={field} className="flex items-center">
@@ -629,18 +666,13 @@ export default function NewItemPage() {
         )
 
       case "datetime":
-        console.log(`Rendering datetime field ${field}`) // Debug
         return fieldWrapper(
           <EnhancedDatePicker
             id={field}
             value={value || ""}
-            onChange={(val) => {
-              console.log(`EnhancedDatePicker onChange for ${field}:`, val) // Debug
-              handleFieldChange(field, val)
-            }}
+            onChange={(val) => handleFieldChange(field, val)}
             placeholder={`Seleziona ${label.toLowerCase()}`}
             className={cn(error && "border-red-500")}
-            showTimeSelect={true}
           />,
         )
 
@@ -736,6 +768,36 @@ export default function NewItemPage() {
     return table ? table.label : "Nuovo elemento"
   }
 
+  // Renderizza i campi di data, mettendo data_inizio e data_fine sulla stessa linea
+  const renderDateFields = (fields: string[]) => {
+    const dateFields = fields.filter((field) => fieldTypes[field] === "datetime")
+
+    if (dateFields.length === 0) return null
+
+    // Se c'è un solo campo data nel gruppo, rendilo normalmente
+    if (dateFields.length === 1 && fields.length === 1) {
+      return <div className="space-y-4">{renderField(dateFields[0], fieldTypes[dateFields[0]])}</div>
+    }
+
+    // Se ci sono 2 campi data (es. data_inizio e data_fine), mettili sulla stessa linea
+    // e gli altri campi del gruppo sotto.
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {dateFields.map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
+        </div>
+        {/* Renderizza altri campi non-data del gruppo, se presenti */}
+        {fields
+          .filter((field) => fieldTypes[field] !== "datetime")
+          .map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
+      </div>
+    )
+  }
+
   // Se la tabella non è valida, mostra errore
   if (tableName && !isValidTable) {
     return (
@@ -773,7 +835,7 @@ export default function NewItemPage() {
               </CardDescription>
             </div>
 
-            {/* Pulsanti di azione */}
+            {/* Pulsanti di azione - migliorati con background azzurro */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 sm:justify-end">
               <Button
                 onClick={handleSave}
@@ -805,20 +867,13 @@ export default function NewItemPage() {
         </CardHeader>
 
         <CardContent>
-          {/* Debug info */}
-          <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
-            <strong>Debug:</strong> Tabella: {tableName}, Campi: {Object.keys(fieldTypes).length}
-          </div>
-
           {/* Renderizza i campi in base alla configurazione della tabella */}
           <div className="space-y-6">
             {Object.keys(fieldTypes)
               .filter((field) => !autoFields.includes(field))
-              .map((field) => {
-                const fieldType = fieldTypes[field]
-                console.log(`Mapping field ${field} with type ${fieldType}`) // Debug
-                return <div key={field}>{renderField(field, fieldType)}</div>
-              })}
+              .map((field) => (
+                <div key={field}>{renderField(field, fieldTypes[field])}</div>
+              ))}
           </div>
 
           {/* Mostra informazioni sui campi auto-compilati */}

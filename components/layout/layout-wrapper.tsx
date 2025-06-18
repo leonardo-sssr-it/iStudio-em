@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { useSidebarState } from "@/contexts/sidebar-state-context"
 import { Header } from "@/components/layout/header"
@@ -9,39 +10,16 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-provider"
 import { usePathname } from "next/navigation"
-import { Suspense } from "react"
 
-// Configurazione layout ottimizzata
+// Simula la lettura delle configurazioni dal DB
 interface LayoutConfig {
   sidebarCollapsible: boolean
   sidebarPosition: "left" | "right"
-  fullWidth: boolean
 }
 
 const defaultLayoutConfig: LayoutConfig = {
   sidebarCollapsible: true,
   sidebarPosition: "left",
-  fullWidth: false,
-}
-
-// Loading component per Suspense
-function LayoutSkeleton() {
-  return (
-    <div className="flex flex-col min-h-screen bg-background animate-pulse">
-      <div className="h-16 bg-muted border-b" />
-      <div className="flex flex-1">
-        <div className="w-[240px] bg-muted border-r hidden md:block" />
-        <div className="flex-1 p-6">
-          <div className="space-y-4">
-            <div className="h-8 bg-muted rounded" />
-            <div className="h-32 bg-muted rounded" />
-            <div className="h-32 bg-muted rounded" />
-          </div>
-        </div>
-      </div>
-      <div className="h-16 bg-muted border-t" />
-    </div>
-  )
 }
 
 export function LayoutWrapper({
@@ -53,61 +31,106 @@ export function LayoutWrapper({
 }) {
   const { layout: themeLayoutChoice } = useSafeCustomTheme()
   const { user } = useAuth()
-  const { isMobile } = useSidebarState()
-  const pathname = usePathname()
+  const { isCollapsed, setIsCollapsed, isMobile } = useSidebarState()
 
-  // Determina se mostrare la sidebar
   const showSidebar = themeLayoutChoice === "sidebar" && user
 
-  // Determina se è una pagina dashboard
+  const pathname = usePathname()
   const isDashboardPage = pathname.startsWith("/dashboard")
 
-  // Determina se usare full width
-  const useFullWidth = layoutConfig.fullWidth || pathname.includes("/admin") || pathname.includes("/data-explorer")
+  const actualIsCollapsed = layoutConfig.sidebarCollapsible ? isCollapsed : false
+  const sidebarWidth = actualIsCollapsed ? 64 : 256
+
+  const sidebarComponent =
+    showSidebar && !isMobile ? (
+      <motion.div
+        key="sidebar-desktop"
+        layout="position"
+        initial={{ opacity: 0, width: 0 }}
+        animate={{ opacity: 1, width: sidebarWidth }}
+        exit={{ opacity: 0, width: 0 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className={cn(
+          "h-full flex-shrink-0 bg-background border-e dark:border-slate-700", // Aggiunto sfondo e bordo
+          layoutConfig.sidebarPosition === "right" && "border-s dark:border-slate-700 border-e-0",
+        )}
+      >
+        <Sidebar />
+      </motion.div>
+    ) : null
+
+  const mobileSidebarComponent =
+    showSidebar && isMobile ? (
+      <motion.div
+        key="sidebar-mobile"
+        initial={{ x: layoutConfig.sidebarPosition === "left" ? -sidebarWidth : sidebarWidth, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: layoutConfig.sidebarPosition === "left" ? -sidebarWidth : sidebarWidth, opacity: 0 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className={cn(
+          "fixed inset-y-0 z-50 shadow-2xl bg-background",
+          layoutConfig.sidebarPosition === "left" ? "left-0" : "right-0",
+        )}
+        style={{ width: sidebarWidth }}
+      >
+        <Sidebar />
+      </motion.div>
+    ) : null
 
   return (
-    <Suspense fallback={<LayoutSkeleton />}>
-      <div className="flex flex-col min-h-screen bg-background">
-        {/* Header */}
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Header */}
+      <div className="w-full">
+        {" "}
+        {/* Header wrapper per larghezza piena */}
         <Header />
+      </div>
 
-        {/* Main Content Area */}
-        <div className="flex flex-1 min-h-0">
-          {/* Sidebar - Solo su desktop quando necessaria */}
-          {showSidebar && !isMobile && (
-            <aside className="w-[240px] flex-shrink-0 border-r border-border bg-background">
-              <Sidebar />
-            </aside>
+      {/* Corpo Centrale */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {" "}
+        {/* Aggiunto overflow-hidden */}
+        {/* Sidebar Mobile (Overlay) */}
+        <AnimatePresence>
+          {showSidebar && !actualIsCollapsed && isMobile && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => layoutConfig.sidebarCollapsible && setIsCollapsed(true)}
+            />
           )}
-
-          {/* Sidebar Mobile - Gestita internamente dal componente Sidebar */}
-          {showSidebar && isMobile && <Sidebar />}
-
-          {/* Main Content */}
-          <main
-            className={cn("flex-1 min-w-0 overflow-y-auto", "transition-all duration-300 ease-in-out")}
-            role="main"
-            aria-label="Contenuto principale"
+        </AnimatePresence>
+        {mobileSidebarComponent}
+        {/* Sidebar Desktop */}
+        {layoutConfig.sidebarPosition === "left" && sidebarComponent}
+        {/* Contenuto Principale */}
+        <motion.main
+          key="main-content"
+          className="flex-1 min-w-0 overflow-y-auto" // Aggiunto overflow-y-auto
+          layout
+          transition={{ duration: 0.3, type: "spring", bounce: 0.1 }}
+        >
+          <div
+            className={cn(
+              "py-6 h-full",
+              isDashboardPage ? "w-full px-4 sm:px-6 lg:px-8" : "container mx-auto px-4 sm:px-6 lg:px-8 max-w-full",
+            )}
           >
-            <div
-              className={cn(
-                "py-6 h-full",
-                // Gestione responsive del padding
-                useFullWidth
-                  ? "w-full px-4 sm:px-6 lg:px-8"
-                  : isDashboardPage
-                    ? "w-full px-4 sm:px-6 lg:px-8"
-                    : "container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl",
-              )}
-            >
-              {children}
-            </div>
-          </main>
-        </div>
+            {children}
+          </div>
+        </motion.main>
+        {/* Sidebar Desktop (se a destra) */}
+        {layoutConfig.sidebarPosition === "right" && sidebarComponent}
+      </div>
 
-        {/* Footer */}
+      {/* Footer */}
+      <div className="w-full">
+        {" "}
+        {/* Footer wrapper per larghezza piena */}
         <Footer />
       </div>
-    </Suspense>
+    </div>
   )
 }

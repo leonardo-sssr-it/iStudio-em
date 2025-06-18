@@ -33,14 +33,6 @@ export default function NoteListPage() {
   // Ottieni le priorità dalla configurazione
   const priorityOptions = config?.priorita || []
 
-  // Debug: mostra informazioni sull'utente
-  useEffect(() => {
-    if (user) {
-      console.log("User ID:", user.id, "Type:", typeof user.id)
-      console.log("User ID as string:", user.id.toString())
-    }
-  }, [user])
-
   // Carica le note
   useEffect(() => {
     async function loadNote() {
@@ -50,22 +42,14 @@ export default function NoteListPage() {
       setError(null)
 
       try {
-        // Usa sempre l'ID come stringa
-        const userId = user.id.toString()
-        console.log("Querying with userId:", userId, "Type:", typeof userId)
-
         const { data, error: fetchError } = await supabase
           .from("note")
           .select("*")
-          .eq("id_utente", userId)
+          .eq("id_utente", user.id)
           .order("modifica", { ascending: false })
 
-        if (fetchError) {
-          console.error("Supabase error:", fetchError)
-          throw fetchError
-        }
+        if (fetchError) throw fetchError
 
-        console.log("Query successful, data:", data)
         setNote(data || [])
       } catch (err: any) {
         console.error("Errore nel caricamento delle note:", err)
@@ -183,20 +167,6 @@ export default function NoteListPage() {
 
   return (
     <div className="container mx-auto py-6">
-      {/* Debug Info */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="mb-4 p-4 bg-gray-100 rounded">
-          <p>
-            <strong>Debug Info:</strong>
-          </p>
-          <p>
-            User ID: {user?.id} (Type: {typeof user?.id})
-          </p>
-          <p>User ID as string: {user?.id?.toString()}</p>
-          <p>Note count: {note.length}</p>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>

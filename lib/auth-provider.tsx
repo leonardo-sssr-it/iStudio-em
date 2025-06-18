@@ -336,41 +336,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ],
   )
 
-  // Logout ottimizzato con redirect esplicito
   const logout = useCallback(async (): Promise<void> => {
     if (redirectingRef.current) return
+    redirectingRef.current = true
 
-    try {
-      redirectingRef.current = true
+    clearAllAuthCookies()
+    setUser(null)
+    setIsAdmin(false)
+    setSessionChecked(false)
 
-      // Pulisci tutti i cookie e storage
-      clearAllAuthCookies()
-
-      // Reset stato locale
-      setUser(null)
-      setIsAdmin(false)
-      setSessionChecked(false)
-
-      // Reset client Supabase se disponibile
-      if (resetClient) {
-        try {
-          await resetClient()
-        } catch (e) {
-          console.error("Errore nel reset del client Supabase:", e)
-        }
+    if (resetClient) {
+      try {
+        await resetClient()
+      } catch (e) {
+        console.error("Errore nel reset del client Supabase:", e)
       }
-
-      // Non fare redirect automatico qui - lascia che sia il componente chiamante a gestirlo
-    } catch (error) {
-      console.error("Errore durante il logout:", error)
-      throw error
-    } finally {
-      // Reset flag dopo un breve delay per permettere il redirect
-      setTimeout(() => {
-        redirectingRef.current = false
-      }, 100)
     }
-  }, [clearAllAuthCookies, resetClient])
+
+    router.push("/")
+    toast({ title: "Logout effettuato", description: "Hai effettuato il logout con successo." })
+
+    setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.location.reload()
+      }
+    }, 100)
+  }, [router, setUser, setIsAdmin, clearAllAuthCookies, resetClient])
 
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!user?.id || !supabase) return
