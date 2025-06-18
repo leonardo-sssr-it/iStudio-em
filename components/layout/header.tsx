@@ -4,11 +4,16 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-provider"
 import { Button } from "@/components/ui/button"
-import { Menu, X, LayoutDashboard, User, LogOut, Calendar, Settings } from "lucide-react"
+import { Menu, X, LayoutDashboard, User, LogOut, Calendar, Settings, Smartphone } from "lucide-react"
 import { ThemeSelector } from "@/components/theme-selector"
+import { useSidebarState } from "@/contexts/sidebar-state-context"
+import { useRouter } from "next/navigation"
+import { toast } from "@/components/ui/use-toast"
 
 export function Header() {
   const { user, isAdmin, logout } = useAuth()
+  const { toggleMobileView, isMobileView } = useSidebarState()
+  const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [currentDate, setCurrentDate] = useState("")
@@ -31,6 +36,26 @@ export function Header() {
     const interval = setInterval(updateDate, 60000)
     return () => clearInterval(interval)
   }, [])
+
+  // Gestione logout ottimizzata
+  const handleLogout = async () => {
+    try {
+      await logout()
+      // Redirect esplicito alla home page
+      router.push("/")
+      toast({
+        title: "Logout effettuato",
+        description: "Arrivederci!",
+      })
+    } catch (error) {
+      console.error("Errore durante il logout:", error)
+      toast({
+        title: "Errore",
+        description: "Errore durante il logout",
+        variant: "destructive",
+      })
+    }
+  }
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen)
 
@@ -62,13 +87,25 @@ export function Header() {
 
           {/* Center - Date */}
           <div className="hidden md:flex items-center space-x-2 text-sm text-muted-foreground">
-            
+            <Calendar className="h-4 w-4" />
             <span className="font-medium">{currentDate}</span>
           </div>
 
           {/* Right side actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
             <ThemeSelector />
+
+            {/* Mobile View Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMobileView}
+              className="hidden md:flex"
+              title={isMobileView ? "Passa a vista desktop" : "Passa a vista mobile"}
+            >
+              <Smartphone className={`h-4 w-4 ${isMobileView ? "text-primary" : ""}`} />
+            </Button>
+
             {/* Link Admin per utenti autorizzati */}
             {isAdmin && (
               <Link href="/admin">
@@ -78,6 +115,7 @@ export function Header() {
                 </Button>
               </Link>
             )}
+
             {user && (
               <div className="hidden md:flex items-center space-x-2">
                 <Link href="/profile" className="text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -86,18 +124,20 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => logout()}
+                  onClick={handleLogout}
                   className="text-destructive hover:text-destructive"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
               </div>
             )}
+
             <Button variant="ghost" size="icon" className="md:hidden" onClick={toggleMenu}>
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
+
         {isMenuOpen && (
           <nav className="md:hidden py-4 border-t">
             <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground mb-4 pb-3 border-b">
@@ -105,6 +145,19 @@ export function Header() {
               <span className="font-medium">{currentDate}</span>
             </div>
             <div className="flex flex-col space-y-3">
+              {/* Mobile View Toggle */}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  toggleMobileView()
+                  setIsMenuOpen(false)
+                }}
+                className="justify-start"
+              >
+                <Smartphone className="h-4 w-4 mr-2" />
+                {isMobileView ? "Vista Desktop" : "Vista Mobile"}
+              </Button>
+
               {menuItems.map((item) => (
                 <Link
                   key={item.href}
@@ -116,6 +169,7 @@ export function Header() {
                   <span>{item.label}</span>
                 </Link>
               ))}
+
               {/* Link Admin nel menu mobile */}
               {isAdmin && (
                 <Link
@@ -127,6 +181,7 @@ export function Header() {
                   <span>Admin</span>
                 </Link>
               )}
+
               {user && (
                 <>
                   <Link
@@ -141,7 +196,7 @@ export function Header() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      logout()
+                      handleLogout()
                       setIsMenuOpen(false)
                     }}
                     className="justify-start text-destructive hover:text-destructive"
