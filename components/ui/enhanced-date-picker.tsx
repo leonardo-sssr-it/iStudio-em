@@ -1,13 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { format, parseISO, isToday, isSameDay } from "date-fns"
+import { format, parseISO, isValid } from "date-fns"
 import { it } from "date-fns/locale"
-import { CalendarIcon, Clock, Check } from "lucide-react"
+import { CalendarIcon, Clock, Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 interface EnhancedDatePickerProps {
@@ -17,7 +18,8 @@ interface EnhancedDatePickerProps {
   disabled?: boolean
   className?: string
   id?: string
-  showCurrentTime?: boolean
+  showTimeSelect?: boolean
+  dateFormat?: string
 }
 
 export function EnhancedDatePicker({
@@ -27,335 +29,214 @@ export function EnhancedDatePicker({
   disabled = false,
   className,
   id,
-  showCurrentTime = false,
+  showTimeSelect = true,
+  dateFormat = "dd/MM/yyyy HH:mm",
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
-  const [timeValue, setTimeValue] = React.useState("")
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
+  const [timeInput, setTimeInput] = React.useState("")
 
-  const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
-  const [tempTime, setTempTime] = React.useState("")
-
+  // Inizializza il componente con il valore esistente
   React.useEffect(() => {
-    if (value) {
-      const date = parseISO(value)
-      setSelectedDate(date)
-      setTempDate(date)
-      const hours = date.getHours().toString().padStart(2, "0")
-      const minutes = date.getMinutes().toString().padStart(2, "0")
-      setTimeValue(`${hours}:${minutes}`)
-      setTempTime(`${hours}:${minutes}`)
+    if (value && value.trim() !== "") {
+      try {
+        const date = parseISO(value)
+        if (isValid(date)) {
+          setSelectedDate(date)
+          const hours = date.getHours().toString().padStart(2, "0")
+          const minutes = date.getMinutes().toString().padStart(2, "0")
+          setTimeInput(`${hours}:${minutes}`)
+        }
+      } catch (error) {
+        console.warn("Invalid date value:", value)
+        setSelectedDate(undefined)
+        setTimeInput("")
+      }
     } else {
       setSelectedDate(undefined)
-      setTempDate(undefined)
-      setTimeValue("")
-      setTempTime("")
+      setTimeInput("")
     }
   }, [value])
 
-  React.useEffect(() => {
-    if (selectedDate) {
-      const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
-      setTimeValue(`${hours}:${minutes}`)
-    } else {
-      setTimeValue("")
-    }
-  }, [selectedDate])
-
-  // Funzione per arrotondare i minuti ai multipli di 5
-  const roundToNearestFiveMinutes = (minutes: number): number => {
-    return Math.round(minutes / 5) * 5
-  }
-
-  // Genera le opzioni per i minuti in multipli di 5
-  const generateMinuteOptions = (): string[] => {
-    const options: string[] = []
-    for (let i = 0; i < 60; i += 5) {
-      options.push(i.toString().padStart(2, "0"))
-    }
-    return options
-  }
-
+  // Gestisce la selezione della data dal calendario
   const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      let currentHours, currentMinutes
-      if (showCurrentTime && !value) {
-        const now = new Date()
-        currentHours = now.getHours()
-        currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
-      } else if (tempTime && tempTime.includes(":")) {
-        const [hours, minutes] = tempTime.split(":").map(Number)
-        currentHours = hours
-        currentMinutes = minutes
-      } else {
-        currentHours = new Date().getHours()
-        currentMinutes = roundToNearestFiveMinutes(new Date().getMinutes())
-      }
-
-      const newDate = new Date(date)
-      newDate.setHours(currentHours)
-      newDate.setMinutes(currentMinutes)
-      newDate.setSeconds(0)
-      newDate.setMilliseconds(0)
-      setTempDate(newDate)
-
-      const timeString = `${currentHours.toString().padStart(2, "0")}:${currentMinutes.toString().padStart(2, "0")}`
-      setTempTime(timeString)
-    } else {
-      setTempDate(undefined)
-      setTempTime("")
-    }
-  }
-
-  const handleTimeChange = (timeString: string) => {
-    if (timeString && timeString.includes(":")) {
-      const [hours, minutes] = timeString.split(":").map(Number)
-      const roundedMinutes = roundToNearestFiveMinutes(minutes)
-      const adjustedTimeString = `${hours.toString().padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`
-      setTempTime(adjustedTimeString)
-    } else {
-      setTempTime(timeString)
-    }
-  }
-
-  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget
-    const [hours, minutes] = tempTime.split(":").map(Number)
-
-    if (e.key === "Enter") {
-      e.preventDefault()
-      confirmSelection()
+    if (!date) {
+      setSelectedDate(undefined)
       return
     }
 
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault()
-
-      const increment = e.key === "ArrowUp" ? 5 : -5
-      const cursorPosition = input.selectionStart || 0
-
-      let newHours = hours
-      let newMinutes = minutes
-
-      if (cursorPosition <= 2) {
-        newHours = Math.max(0, Math.min(23, hours + (increment > 0 ? 1 : -1)))
-      } else {
-        newMinutes = minutes + increment
-        if (newMinutes >= 60) {
-          newMinutes = 0
-          newHours = Math.min(23, hours + 1)
-        } else if (newMinutes < 0) {
-          newMinutes = 55
-          newHours = Math.max(0, hours - 1)
-        }
-      }
-
-      const newTimeString = `${newHours.toString().padStart(2, "0")}:${newMinutes.toString().padStart(2, "0")}`
-      setTempTime(newTimeString)
-    }
-  }
-
-  const setCurrentDateTime = () => {
-    const now = new Date()
-    const minutes = roundToNearestFiveMinutes(now.getMinutes())
-    now.setMinutes(minutes)
-    now.setSeconds(0)
-    now.setMilliseconds(0)
-    setTempDate(now)
-    setTempTime(`${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`)
-  }
-
-  const clearDateTime = () => {
-    setTempDate(undefined)
-    setTempTime("")
-  }
-
-  const confirmSelection = () => {
-    if (tempDate) {
-      const finalDate = new Date(tempDate)
-
-      if (tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
-        const [hours, minutes] = tempTime.split(":").map(Number)
-        finalDate.setHours(hours)
-        finalDate.setMinutes(minutes)
-      }
-
-      finalDate.setSeconds(0)
-      finalDate.setMilliseconds(0)
-
-      setSelectedDate(finalDate)
-
-      // Crea stringa ISO locale senza conversione timezone
-      const year = finalDate.getFullYear()
-      const month = String(finalDate.getMonth() + 1).padStart(2, "0")
-      const day = String(finalDate.getDate()).padStart(2, "0")
-      const hour = String(finalDate.getHours()).padStart(2, "0")
-      const minute = String(finalDate.getMinutes()).padStart(2, "0")
-
-      const localISOString = `${year}-${month}-${day}T${hour}:${minute}:00`
-      onChange(localISOString)
-    } else {
-      setSelectedDate(undefined)
-      onChange("")
-    }
-    setOpen(false)
-  }
-
-  const cancelSelection = () => {
-    setTempDate(selectedDate)
-    if (selectedDate) {
-      const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
-      setTempTime(`${hours}:${minutes}`)
-    } else {
-      setTempTime("")
-    }
-    setOpen(false)
-  }
-
-  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault()
-      setOpen(!open)
-    }
-  }
-
-  React.useEffect(() => {
-    if (showCurrentTime && !value && open && !tempDate) {
-      setCurrentDateTime()
-    }
-  }, [showCurrentTime, value, open, tempDate])
-
-  React.useEffect(() => {
-    if (open && !tempDate && !value) {
-      // Quando si apre il picker senza valore, imposta data corrente
+    // Se non c'è un orario impostato, usa l'ora corrente
+    if (!timeInput || !timeInput.match(/^\d{2}:\d{2}$/)) {
       const now = new Date()
-      const minutes = roundToNearestFiveMinutes(now.getMinutes())
-      now.setMinutes(minutes)
-      now.setSeconds(0)
-      now.setMilliseconds(0)
-
-      setTempDate(now)
-      setTempTime(`${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`)
+      const hours = now.getHours().toString().padStart(2, "0")
+      const minutes = now.getMinutes().toString().padStart(2, "0")
+      setTimeInput(`${hours}:${minutes}`)
     }
-  }, [open, tempDate, value])
 
-  const modifiers = React.useMemo(() => {
-    const today = new Date()
-    return {
-      today: (date: Date) => isToday(date),
-      selected: (date: Date) => (tempDate ? isSameDay(date, tempDate) : false),
+    setSelectedDate(date)
+  }
+
+  // Gestisce il cambio dell'orario
+  const handleTimeChange = (newTime: string) => {
+    setTimeInput(newTime)
+  }
+
+  // Conferma la selezione e chiude il popover
+  const handleConfirm = () => {
+    if (!selectedDate) {
+      onChange("")
+      setOpen(false)
+      return
     }
-  }, [tempDate])
 
-  const modifiersStyles = React.useMemo(
-    () => ({
-      today: {
-        backgroundColor: "#dcfce7",
-        color: "#166534",
-        fontWeight: "bold",
-      },
-      selected: {
-        backgroundColor: "#22c55e",
-        color: "white",
-        fontWeight: "bold",
-      },
-    }),
-    [],
-  )
+    const finalDate = new Date(selectedDate)
+
+    // Applica l'orario se presente e valido
+    if (showTimeSelect && timeInput && timeInput.match(/^\d{2}:\d{2}$/)) {
+      const [hours, minutes] = timeInput.split(":").map(Number)
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        finalDate.setHours(hours, minutes, 0, 0)
+      }
+    } else if (!showTimeSelect) {
+      // Se non mostra l'orario, imposta a mezzanotte
+      finalDate.setHours(0, 0, 0, 0)
+    }
+
+    // Crea stringa ISO locale
+    const year = finalDate.getFullYear()
+    const month = String(finalDate.getMonth() + 1).padStart(2, "0")
+    const day = String(finalDate.getDate()).padStart(2, "0")
+    const hour = String(finalDate.getHours()).padStart(2, "0")
+    const minute = String(finalDate.getMinutes()).padStart(2, "0")
+
+    const isoString = `${year}-${month}-${day}T${hour}:${minute}:00`
+    onChange(isoString)
+    setOpen(false)
+  }
+
+  // Cancella la selezione
+  const handleClear = () => {
+    setSelectedDate(undefined)
+    setTimeInput("")
+    onChange("")
+    setOpen(false)
+  }
+
+  // Imposta data e ora corrente
+  const handleSetNow = () => {
+    const now = new Date()
+    setSelectedDate(now)
+    const hours = now.getHours().toString().padStart(2, "0")
+    const minutes = now.getMinutes().toString().padStart(2, "0")
+    setTimeInput(`${hours}:${minutes}`)
+  }
+
+  // Formatta la data per la visualizzazione
+  const getDisplayValue = () => {
+    if (!selectedDate) return placeholder
+
+    try {
+      if (showTimeSelect && timeInput) {
+        return `${format(selectedDate, "dd/MM/yyyy", { locale: it })} ${timeInput}`
+      }
+      return format(selectedDate, "dd/MM/yyyy", { locale: it })
+    } catch {
+      return placeholder
+    }
+  }
 
   return (
-    <div className={cn("flex flex-col sm:flex-row gap-2", className)}>
+    <div className={cn("relative", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
             variant="outline"
-            className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
-            disabled={disabled}
-            onKeyDown={handleTriggerKeyDown}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {selectedDate ? (
-              <div className="flex items-center gap-2">
-                <span>{format(selectedDate, "PPP", { locale: it })}</span>
-                <span className="text-muted-foreground">•</span>
-                <span>{timeValue}</span>
-              </div>
-            ) : (
-              <span>{placeholder}</span>
+            className={cn(
+              "w-full justify-start text-left font-normal h-10",
+              !selectedDate && "text-muted-foreground",
+              disabled && "opacity-50 cursor-not-allowed",
             )}
+            disabled={disabled}
+            type="button"
+            onClick={() => !disabled && setOpen(true)}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+            <span className="truncate">{getDisplayValue()}</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={tempDate}
-            onSelect={handleDateSelect}
-            disabled={disabled}
-            initialFocus
-            locale={it}
-            modifiers={modifiers}
-            modifiersStyles={modifiersStyles}
-            className="rounded-md border"
-          />
-          <div className="p-3 border-t space-y-3">
-            <div className="flex items-center gap-2">
-              <Label htmlFor={`${id}-time-popover`} className="text-sm font-medium">
-                Ora:
-              </Label>
-              <div className="flex gap-1">
-                <select
-                  value={tempTime.split(":")[0] || "00"}
-                  onChange={(e) => {
-                    const hours = e.target.value
-                    const minutes = tempTime.split(":")[1] || "00"
-                    setTempTime(`${hours}:${minutes}`)
-                  }}
-                  className="px-2 py-1 border rounded text-sm"
-                  disabled={disabled || !tempDate}
-                >
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i.toString().padStart(2, "0")}>
-                      {i.toString().padStart(2, "0")}
-                    </option>
-                  ))}
-                </select>
-                <span className="py-1">:</span>
-                <select
-                  value={tempTime.split(":")[1] || "00"}
-                  onChange={(e) => {
-                    const hours = tempTime.split(":")[0] || "00"
-                    const minutes = e.target.value
-                    setTempTime(`${hours}:${minutes}`)
-                  }}
-                  className="px-2 py-1 border rounded text-sm"
-                  disabled={disabled || !tempDate}
-                >
-                  {generateMinuteOptions().map((minute) => (
-                    <option key={minute} value={minute}>
-                      {minute}
-                    </option>
-                  ))}
-                </select>
+
+        <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom">
+          <div className="p-3">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={handleDateSelect}
+              disabled={disabled}
+              initialFocus
+              locale={it}
+              className="rounded-md border-0"
+            />
+
+            {showTimeSelect && (
+              <div className="mt-3 pt-3 border-t space-y-3">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm font-medium min-w-[30px]">Ora:</Label>
+                  <Input
+                    type="time"
+                    value={timeInput}
+                    onChange={(e) => handleTimeChange(e.target.value)}
+                    className="flex-1"
+                    disabled={disabled || !selectedDate}
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSetNow}
+                    className="flex-1"
+                    disabled={disabled}
+                  >
+                    <Clock className="mr-1 h-3 w-3" />
+                    Ora
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClear}
+                    className="flex-1"
+                    disabled={disabled}
+                  >
+                    <X className="mr-1 h-3 w-3" />
+                    Cancella
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1">
-                <Clock className="mr-2 h-4 w-4" />
-                Ora
-              </Button>
-              <Button variant="outline" size="sm" onClick={clearDateTime} className="flex-1">
-                Cancella
-              </Button>
-            </div>
-            <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1">
+            )}
+
+            <div className="flex gap-2 mt-3 pt-3 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setOpen(false)}
+                className="flex-1"
+                disabled={disabled}
+              >
                 Annulla
               </Button>
-              <Button size="sm" onClick={confirmSelection} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-                <Check className="mr-2 h-4 w-4" />
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleConfirm}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={disabled}
+              >
+                <Check className="mr-1 h-3 w-3" />
                 Conferma
               </Button>
             </div>
