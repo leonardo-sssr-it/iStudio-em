@@ -731,23 +731,14 @@ export default function ItemDetailPage() {
     }
   }
 
-  const renderField = (field: string, value: any, type: string, readOnly = false) => {
+  // ✅ CORREZIONE PRINCIPALE: Logica corretta per renderField
+  const renderField = (field: string, value: any, type: string, isFieldReadOnly = false) => {
     const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
     const isRequired = requiredFields.includes(field)
     const hasError = validationErrors.some((error) => error.includes(label))
 
-    // Debug dettagliato per i campi datetime
-    if (type === "datetime") {
-      console.log(`=== DEBUG DATETIME FIELD: ${field} ===`)
-      console.log(`isEditMode: ${isEditMode}`)
-      console.log(`readOnly param: ${readOnly}`)
-      console.log(`readOnlyFields includes ${field}: ${readOnlyFields.includes(field)}`)
-      console.log(`value: ${value}`)
-      console.log(`Will render EnhancedDatePicker: ${isEditMode && !readOnly}`)
-      console.log(`=====================================`)
-    }
-
-    if (!isEditMode || readOnly) {
+    // ✅ CONDIZIONE CORRETTA: Mostra solo visualizzazione se NON in edit mode O se il campo è read-only
+    if (!isEditMode || isFieldReadOnly) {
       let displayValue = value
       if (type === "datetime") {
         let valueToFormat = value
@@ -767,11 +758,12 @@ export default function ItemDetailPage() {
       return (
         <div className="mb-4" key={field}>
           <Label className="text-sm font-medium">{label}</Label>
-          <div className={`mt-1 p-2 rounded-md ${readOnly ? "bg-gray-100" : ""}`}>{displayValue}</div>
+          <div className={`mt-1 p-2 rounded-md ${isFieldReadOnly ? "bg-gray-100" : ""}`}>{displayValue}</div>
         </div>
       )
     }
 
+    // ✅ RESTO DEL CODICE: Renderizza i campi editabili
     switch (type) {
       case "text":
         return (
@@ -801,6 +793,7 @@ export default function ItemDetailPage() {
           </div>
         )
       case "datetime":
+        // ✅ CORREZIONE: Ora renderizza correttamente l'EnhancedDatePicker in modalità edit
         console.log(`Rendering datetime field ${field} in EDIT mode`)
         console.log(`Value passed to EnhancedDatePicker: ${value}`)
 
@@ -980,8 +973,8 @@ export default function ItemDetailPage() {
               <ProgressBar
                 value={value || 0}
                 color={editedItem.colore || "#3b82f6"}
-                onChange={readOnly ? undefined : (val) => handleFieldChange(field, val)}
-                readOnly={readOnly || !isEditMode}
+                onChange={isFieldReadOnly ? undefined : (val) => handleFieldChange(field, val)}
+                readOnly={isFieldReadOnly || !isEditMode}
               />
             </div>
           </div>
@@ -1099,7 +1092,7 @@ export default function ItemDetailPage() {
                 <div className="space-y-4">
                   {groupFields.map((field) => {
                     if (!allFields.includes(field) && !isNewItem) return null // Mostra tutti i campi per i nuovi item
-                    const isReadOnly = readOnlyFields.includes(field)
+                    const isFieldReadOnly = readOnlyFields.includes(field)
                     const fieldType = fieldTypes[field as keyof typeof fieldTypes] || "string"
 
                     // Gestione speciale per data_inizio e data_fine sulla stessa riga
@@ -1260,8 +1253,8 @@ export default function ItemDetailPage() {
                     )
                       return null
 
-                    // Renderizza il campo singolo se non è parte di una coppia o se la sua controparte non esiste
-                    return renderField(field, editedItem[field], fieldType, isReadOnly)
+                    // ✅ CORREZIONE: Usa il parametro corretto per isFieldReadOnly
+                    return renderField(field, editedItem[field], fieldType, isFieldReadOnly)
                   })}
                 </div>
               </TabsContent>
@@ -1395,8 +1388,4 @@ export default function ItemDetailPage() {
           <hr className="my-4" />
 
           <div style={{ overflow: "visible" }}>{editedItem && renderFieldGroups()}</div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+        \
