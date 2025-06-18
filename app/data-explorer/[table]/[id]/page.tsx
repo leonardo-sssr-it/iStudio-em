@@ -48,7 +48,7 @@ const AVAILABLE_TABLES = [
 const TABLE_FIELDS = {
   appuntamenti: {
     listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_att", "id_cli", "data_creazione"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica", "id_pro", "id_att", "id_cli"], // Rimosso "attivo"
     requiredFields: ["titolo"],
     defaultSort: "data_inizio",
     types: {
@@ -93,7 +93,7 @@ const TABLE_FIELDS = {
   },
   attivita: {
     listFields: ["id", "titolo", "data_inizio", "stato", "priorita", "attivo"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica", "id_pro", "id_app", "id_cli"], // Rimosso "attivo"
     requiredFields: ["titolo"],
     defaultSort: "data_inizio",
     types: {
@@ -124,7 +124,7 @@ const TABLE_FIELDS = {
   },
   scadenze: {
     listFields: ["id", "titolo", "scadenza", "stato", "priorita", "privato"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"], // Rimosso campi che dovrebbero essere modificabili
     requiredFields: ["titolo"],
     defaultSort: "scadenza",
     types: {
@@ -157,7 +157,7 @@ const TABLE_FIELDS = {
   },
   todolist: {
     listFields: ["id", "titolo", "completato", "priorita", "scadenza"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"], // Rimosso campi che dovrebbero essere modificabili
     requiredFields: ["titolo", "descrizione"],
     defaultSort: "priorita",
     types: {
@@ -200,7 +200,7 @@ const TABLE_FIELDS = {
   },
   progetti: {
     listFields: ["id", "titolo", "stato", "data_inizio", "data_fine", "budget"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica", "id_att", "id_app", "id_cli", "id_sca"], // Rimosso "attivo"
     requiredFields: ["titolo", "stato"],
     defaultSort: "data_inizio",
     types: {
@@ -250,7 +250,7 @@ const TABLE_FIELDS = {
   },
   clienti: {
     listFields: ["id", "nome", "cognome", "email", "societa", "citta"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"], // Rimosso "attivo"
     requiredFields: ["nome", "cognome", "email"],
     defaultSort: "cognome",
     types: {
@@ -285,7 +285,7 @@ const TABLE_FIELDS = {
   },
   pagine: {
     listFields: ["id", "titolo", "slug", "stato", "data_creazione"],
-    readOnlyFields: ["id", "id_utente", "modifica"],
+    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"], // Rimosso campi che dovrebbero essere modificabili
     requiredFields: ["titolo"],
     defaultSort: "data_creazione",
     types: {
@@ -734,6 +734,11 @@ export default function ItemDetailPage() {
     const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
     const isRequired = requiredFields.includes(field)
     const hasError = validationErrors.some((error) => error.includes(label))
+
+    // Debug per verificare lo stato dei campi datetime
+    if (type === "datetime") {
+      console.log(`Campo ${field}: isEditMode=${isEditMode}, readOnly=${readOnly}, type=${type}`)
+    }
 
     if (!isEditMode || readOnly) {
       let displayValue = value
