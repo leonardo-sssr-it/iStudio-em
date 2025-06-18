@@ -1388,4 +1388,8 @@ export default function ItemDetailPage() {
           <hr className="my-4" />
 
           <div style={{ overflow: "visible" }}>{editedItem && renderFieldGroups()}</div>
-        \
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
