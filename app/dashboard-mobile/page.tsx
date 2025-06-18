@@ -4,7 +4,17 @@ import { useAuth } from "@/lib/auth-provider"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import Link from "next/link"
-import { Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, FileText, LayoutGrid } from "lucide-react"
+import {
+  Calendar,
+  CheckSquare,
+  Clock,
+  ListTodo,
+  Briefcase,
+  Users,
+  FileText,
+  LayoutGrid,
+  StickyNote,
+} from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { DailySummaryCard } from "@/components/daily-summary-card"
 
@@ -30,6 +40,7 @@ function DashboardMobileContent() {
     { name: "progetti", label: "Progetti", icon: Briefcase },
     { name: "clienti", label: "Clienti", icon: Users },
     { name: "pagine", label: "Pagine", icon: FileText },
+    { name: "note", label: "Note", icon: StickyNote },
   ]
 
   return (

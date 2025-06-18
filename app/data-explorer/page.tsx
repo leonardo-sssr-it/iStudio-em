@@ -29,6 +29,7 @@ import {
   FileText,
   Grid3X3,
   List,
+  StickyNote,
 } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -43,6 +44,7 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: Briefcase },
   { id: "clienti", label: "Clienti", icon: Users },
   { id: "pagine", label: "Pagine", icon: FileText },
+  { id: "note", label: "Note", icon: StickyNote },
 ]
 
 // Definizione dei campi per ogni tabella (CORRETTA in base alla struttura reale del DB)
@@ -201,6 +203,24 @@ const TABLE_FIELDS = {
       immagine: "string",
       pubblicato: "datetime",
       privato: "boolean",
+    },
+  },
+  note: {
+    listFields: ["id", "titolo", "creato_il", "modifica", "priorita"],
+    readOnlyFields: ["id", "creato_il", "modifica", "id_utente"],
+    defaultSort: "creato_il",
+    types: {
+      id: "number",
+      titolo: "string",
+      contenuto: "text",
+      creato_il: "datetime",
+      modifica: "datetime",
+      tags: "array",
+      priorita: "string",
+      notifica: "datetime",
+      notebook_id: "string",
+      id_utente: "string",
+      synced: "boolean",
     },
   },
 }
