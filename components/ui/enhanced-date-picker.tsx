@@ -84,26 +84,27 @@ export function EnhancedDatePicker({
         const now = new Date()
         currentHours = now.getHours()
         currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
+      } else if (tempTime && tempTime.includes(":")) {
+        const [hours, minutes] = tempTime.split(":").map(Number)
+        currentHours = hours
+        currentMinutes = minutes
       } else {
-        currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
-        currentMinutes = tempDate
-          ? roundToNearestFiveMinutes(tempDate.getMinutes())
-          : roundToNearestFiveMinutes(new Date().getMinutes())
+        currentHours = new Date().getHours()
+        currentMinutes = roundToNearestFiveMinutes(new Date().getMinutes())
       }
 
-      date.setHours(currentHours)
-      date.setMinutes(currentMinutes)
-      date.setSeconds(0)
-      date.setMilliseconds(0)
-      setTempDate(date)
+      const newDate = new Date(date)
+      newDate.setHours(currentHours)
+      newDate.setMinutes(currentMinutes)
+      newDate.setSeconds(0)
+      newDate.setMilliseconds(0)
+      setTempDate(newDate)
 
-      if (!tempTime || (showCurrentTime && !value)) {
-        const hours = date.getHours().toString().padStart(2, "0")
-        const minutes = date.getMinutes().toString().padStart(2, "0")
-        setTempTime(`${hours}:${minutes}`)
-      }
+      const timeString = `${currentHours.toString().padStart(2, "0")}:${currentMinutes.toString().padStart(2, "0")}`
+      setTempTime(timeString)
     } else {
       setTempDate(undefined)
+      setTempTime("")
     }
   }
 
@@ -171,27 +172,30 @@ export function EnhancedDatePicker({
   }
 
   const confirmSelection = () => {
-    if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
-      const [hours, minutes] = tempTime.split(":").map(Number)
+    if (tempDate) {
       const finalDate = new Date(tempDate)
-      finalDate.setHours(hours)
-      finalDate.setMinutes(minutes)
+
+      if (tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
+        const [hours, minutes] = tempTime.split(":").map(Number)
+        finalDate.setHours(hours)
+        finalDate.setMinutes(minutes)
+      }
+
       finalDate.setSeconds(0)
       finalDate.setMilliseconds(0)
 
       setSelectedDate(finalDate)
 
-      // Formatta la data senza conversione timezone
+      // Crea stringa ISO locale senza conversione timezone
       const year = finalDate.getFullYear()
       const month = String(finalDate.getMonth() + 1).padStart(2, "0")
       const day = String(finalDate.getDate()).padStart(2, "0")
       const hour = String(finalDate.getHours()).padStart(2, "0")
       const minute = String(finalDate.getMinutes()).padStart(2, "0")
-      const second = String(finalDate.getSeconds()).padStart(2, "0")
 
-      const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+      const localISOString = `${year}-${month}-${day}T${hour}:${minute}:00`
       onChange(localISOString)
-    } else if (!tempDate && !tempTime) {
+    } else {
       setSelectedDate(undefined)
       onChange("")
     }
@@ -222,6 +226,20 @@ export function EnhancedDatePicker({
       setCurrentDateTime()
     }
   }, [showCurrentTime, value, open, tempDate])
+
+  React.useEffect(() => {
+    if (open && !tempDate && !value) {
+      // Quando si apre il picker senza valore, imposta data corrente
+      const now = new Date()
+      const minutes = roundToNearestFiveMinutes(now.getMinutes())
+      now.setMinutes(minutes)
+      now.setSeconds(0)
+      now.setMilliseconds(0)
+
+      setTempDate(now)
+      setTempTime(`${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`)
+    }
+  }, [open, tempDate, value])
 
   const modifiers = React.useMemo(() => {
     const today = new Date()

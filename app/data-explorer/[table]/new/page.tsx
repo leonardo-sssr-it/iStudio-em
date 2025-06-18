@@ -19,7 +19,6 @@ import { ArrowLeft, X, AlertCircle, CheckCircle2, FileText, Calendar, Settings }
 import { cn } from "@/lib/utils"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
-import { parseISO, formatISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -423,19 +422,25 @@ export default function NewItemPage() {
     setFormData((prev: any) => {
       const newData = { ...prev, [field]: value }
 
-      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
-      if (field === "data_inizio" && value) {
+      // Preimposta data_fine se data_inizio cambia e data_fine è vuota
+      if (field === "data_inizio" && value && !newData.data_fine) {
         try {
-          const startDate = parseISO(value) // parseISO gestisce stringhe ISO
-          if (!newData.data_fine) {
-            // Solo se data_fine non è già impostata
+          const startDate = new Date(value)
+          if (!isNaN(startDate.getTime())) {
             const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Aggiungi 1 ora
-            newData.data_fine = formatISO(endDate) // formatISO per coerenza
+            const year = endDate.getFullYear()
+            const month = String(endDate.getMonth() + 1).padStart(2, "0")
+            const day = String(endDate.getDate()).padStart(2, "0")
+            const hour = String(endDate.getHours()).padStart(2, "0")
+            const minute = String(endDate.getMinutes()).padStart(2, "0")
+
+            newData.data_fine = `${year}-${month}-${day}T${hour}:${minute}:00`
           }
         } catch (e) {
           console.warn("Data inizio non valida per calcolare data fine:", value)
         }
       }
+
       return newData
     })
 
@@ -673,6 +678,7 @@ export default function NewItemPage() {
             onChange={(val) => handleFieldChange(field, val)}
             placeholder={`Seleziona ${label.toLowerCase()}`}
             className={cn(error && "border-red-500")}
+            showCurrentTime={!value} // Mostra ora corrente solo se non c'è valore
           />,
         )
 
