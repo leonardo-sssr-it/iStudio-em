@@ -796,14 +796,14 @@ export default function ItemDetailPage() {
             </Label>
             <EnhancedDatePicker
               id={field}
-              // EnhancedDatePicker si aspetta una stringa ISO o un oggetto Date.
-              // `value` qui dovrebbe essere una stringa ISO dal database o da una modifica precedente.
               value={value || ""}
-              onChange={(newValue) => handleFieldChange(field, newValue)} // newValue è stringa ISO o Date
+              onChange={(newValue) => {
+                console.log(`EnhancedDatePicker onChange for ${field}:`, newValue) // Debug
+                handleFieldChange(field, newValue)
+              }}
               placeholder={`Seleziona ${label.toLowerCase()}`}
               className={`mt-1 ${hasError ? "border-red-500" : ""}`}
-              showTimeSelect // Abilita sempre la selezione dell'orario
-              dateFormat="dd/MM/yyyy HH:mm" // Mostra l'orario nel formato
+              showTimeSelect={true}
             />
           </div>
         )
