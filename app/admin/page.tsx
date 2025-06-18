@@ -428,7 +428,7 @@ const AdminDashboardContent = memo(() => {
       {activeTab === "database" && (
         <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AdminCard
-            href="/data-explorer"
+            href="/table-explorer"
             icon={Database}
             title="Esplora Database"
             description="Visualizza e gestisci tutte le tabelle del database"
