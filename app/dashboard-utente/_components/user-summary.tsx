@@ -70,7 +70,7 @@ const UpcomingItemsList = ({
                   </span>
                   <Badge
                     variant="outline"
-                    className={`${item.color?.replace("text-", "border-").replace("600", "400")} ${item.color?.replace("text-", "bg-").replace("600", "50")} ${item.color}`}
+                    className={`${item.color?.replace("text-", "border-").replace("600", "400")} ${item.color?.replace("text-", "bg-").replace("600", "50")} text-white font-bold`}
                   >
                     {format(item.date, "dd MMM HH:mm", { locale: it })}
                   </Badge>
