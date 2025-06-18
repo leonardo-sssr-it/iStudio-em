@@ -30,6 +30,7 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: "📊" },
   { id: "clienti", label: "Clienti", icon: "👥" },
   { id: "pagine", label: "Pagine", icon: "📄" },
+  { id: "note", label: "Note", icon: "📝" },
 ]
 
 // Funzione per pulire i dati prima del salvataggio
@@ -347,6 +348,40 @@ const TABLE_FIELDS = {
       meta_description: { maxLength: 160 },
     },
   },
+  note: {
+    requiredFields: ["titolo", "contenuto"],
+    autoFields: ["id", "data_creazione", "modifica", "id_utente"],
+    defaultValues: {
+      priorita: "media",
+      synced: false,
+    },
+    fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
+    types: {
+      id: "number",
+      titolo: "string",
+      contenuto: "text",
+      data_creazione: "datetime",
+      modifica: "datetime",
+      tags: "array",
+      priorita: "select",
+      notifica: "datetime",
+      notebook_id: "string",
+      id_utente: "string",
+      synced: "boolean",
+    },
+    selectOptions: {
+      priorita: [
+        { value: "bassa", label: "Bassa" },
+        { value: "media", label: "Media" },
+        { value: "alta", label: "Alta" },
+        { value: "urgente", label: "Urgente" },
+      ],
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      contenuto: { minLength: 1, maxLength: 10000 },
+    },
+  },
 }
 
 // Componente per il color picker
@@ -412,6 +447,13 @@ export default function NewItemPage() {
         initialData.descrizione = ""
         initialData.completato = false
         initialData.priorita = 3
+      }
+
+      if (tableName === "note") {
+        initialData.titolo = ""
+        initialData.contenuto = ""
+        initialData.priorita = "media"
+        initialData.synced = false
       }
 
       setFormData(initialData)
@@ -715,6 +757,16 @@ export default function NewItemPage() {
         return fieldWrapper(<ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />)
 
       case "tags":
+        return fieldWrapper(
+          <TagInput
+            id={field}
+            value={value || []}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Aggiungi ${label.toLowerCase()}`}
+          />,
+        )
+
+      case "array":
         return fieldWrapper(
           <TagInput
             id={field}
