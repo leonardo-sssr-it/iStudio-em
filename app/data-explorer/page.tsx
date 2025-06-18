@@ -206,14 +206,14 @@ const TABLE_FIELDS = {
     },
   },
   note: {
-    listFields: ["id", "titolo", "creato_il", "modifica", "priorita"],
-    readOnlyFields: ["id", "creato_il", "modifica", "id_utente"],
-    defaultSort: "creato_il",
+    listFields: ["id", "titolo", "data_creazione", "modifica", "priorita"],
+    readOnlyFields: ["id", "data_creazione", "modifica", "id_utente"],
+    defaultSort: "data_creazione",
     types: {
       id: "number",
       titolo: "string",
       contenuto: "text",
-      creato_il: "datetime",
+      data_creazione: "datetime",
       modifica: "datetime",
       tags: "array",
       priorita: "string",
