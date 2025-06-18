@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import type React from "react"
+
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,10 +14,12 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
-import { ArrowLeft, Save, X, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, X, AlertCircle, CheckCircle2, FileText, Calendar, Settings } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
-import { normalizeDate } from "@/lib/date-utils"
+import { parseISO, formatISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -26,47 +30,115 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: "📊" },
   { id: "clienti", label: "Clienti", icon: "👥" },
   { id: "pagine", label: "Pagine", icon: "📄" },
-  { id: "note", label: "Note", icon: "📄" },
 ]
 
-// Definizione dei campi per ogni tabella
+// Funzione per pulire i dati prima del salvataggio
+function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
+  const cleaned = { ...data }
+
+  // Rimuovi campi di sola lettura per i nuovi elementi
+  readOnlyFields.forEach((field) => {
+    if (field !== "id_utente") {
+      // Mantieni id_utente
+      delete cleaned[field]
+    }
+  })
+
+  // Pulisci tutti i campi
+  Object.keys(cleaned).forEach((key) => {
+    const value = cleaned[key]
+
+    // Rimuovi valori undefined
+    if (value === undefined) {
+      delete cleaned[key]
+      return
+    }
+
+    // Rimuovi valori che sono la stringa "undefined"
+    if (value === "undefined") {
+      delete cleaned[key]
+      return
+    }
+
+    // Gestisci stringhe vuote
+    if (typeof value === "string") {
+      if (value.trim() === "") {
+        cleaned[key] = null
+      }
+    }
+
+    // Gestisci numeri NaN
+    if (typeof value === "number" && isNaN(value)) {
+      delete cleaned[key]
+    }
+  })
+
+  return cleaned
+}
+
+// Estendi la configurazione dei campi con più dettagli
 const TABLE_FIELDS = {
   appuntamenti: {
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica", "id_pro", "id_att", "id_cli"],
-    requiredFields: ["titolo"],
+    requiredFields: ["titolo", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "pianificato",
+      attivo: true,
+    },
+    fieldGroups: {
+      // Aggiunto per il layout a Card
+      principale: {
+        title: "Informazioni Principali",
+        icon: FileText, // Assicurati che FileText sia importato da lucide-react
+        fields: ["titolo", "descrizione", "stato"],
+      },
+      date: {
+        title: "Date e Orari",
+        icon: Calendar, // Assicurati che Calendar sia importato da lucide-react
+        fields: ["data_inizio", "data_fine"],
+      },
+      dettagli: {
+        title: "Dettagli Aggiuntivi",
+        icon: Settings, // Assicurati che Settings sia importato da lucide-react
+        fields: ["luogo", "note", "tags"],
+      },
+    },
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      luogo: "text",
       data_inizio: "datetime",
       data_fine: "datetime",
-      data_creazione: "datetime",
       stato: "select",
-      priorita: "priority_select",
       note: "text",
-      tags: "json",
+      luogo: "string",
+      tags: "tags",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
-      notifica: "datetime",
     },
     selectOptions: {
       stato: [
-        { value: "da_pianificare", label: "Da pianificare" },
         { value: "pianificato", label: "Pianificato" },
         { value: "in_corso", label: "In corso" },
         { value: "completato", label: "Completato" },
-        { value: "sospeso", label: "Sospeso" },
+        { value: "annullato", label: "Annullato" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
     },
   },
   attivita: {
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica", "id_pro", "id_app", "id_cli"],
-    requiredFields: ["titolo"],
+    requiredFields: ["titolo", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "da_fare",
+      priorita: 3,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -74,9 +146,11 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "priority_select",
+      priorita: "number",
       note: "text",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
     selectOptions: {
@@ -87,28 +161,30 @@ const TABLE_FIELDS = {
         { value: "sospeso", label: "Sospeso" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      priorita: { min: 1, max: 5 },
     },
   },
   scadenze: {
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
-    requiredFields: ["titolo"],
+    requiredFields: ["titolo", "data_scadenza"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "attivo",
+      priorita: 3,
+    },
+    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "priorita", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
       scadenza: "datetime",
       stato: "select",
-      priorita: "priority_select",
+      priorita: "number",
       note: "text",
       id_utente: "number",
-      id_pro: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
-      notifica: "datetime",
-      privato: "boolean",
-      tags: "json",
     },
     selectOptions: {
       stato: [
@@ -117,187 +193,160 @@ const TABLE_FIELDS = {
         { value: "scaduto", label: "Scaduto" },
       ],
     },
-    groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "scadenza"],
-      Dettagli: ["note", "tags", "notifica", "privato", "id_pro"],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      priorita: { min: 1, max: 5 },
     },
   },
   todolist: {
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
     requiredFields: ["titolo", "descrizione"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      completato: false,
+      priorita: 3,
+    },
+    fieldOrder: ["titolo", "descrizione", "scadenza", "priorita", "completato", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
       completato: "boolean",
-      priorita: "priority_select",
+      priorita: "number",
       scadenza: "datetime",
-      notifica: "datetime",
       note: "text",
-      stato: "text",
-      tags: "json",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
-    selectOptions: {
-      stato: [
-        { value: "da_pianificare", label: "Da pianificare" },
-        { value: "pianificato", label: "Pianificato" },
-        { value: "in_corso", label: "In corso" },
-        { value: "completato", label: "Completato" },
-        { value: "sospeso", label: "Sospeso" },
-      ],
-    },
-    groups: {
-      "Informazioni principali": [
-        "titolo",
-        "descrizione",
-        "completato",
-        "stato",
-        "priorita",
-        "scadenza",
-        "note",
-        "notifica",
-        "tags",
-      ],
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      descrizione: { minLength: 3, maxLength: 500 },
+      priorita: { min: 1, max: 5 },
     },
   },
   progetti: {
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica", "id_att", "id_app", "id_cli", "id_sca"],
-    requiredFields: ["titolo", "stato"],
+    requiredFields: ["nome", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "pianificato",
+      attivo: true,
+      avanzamento: 0,
+      colore: "#3B82F6",
+    },
+    fieldOrder: [
+      "nome",
+      "descrizione",
+      "stato",
+      "colore",
+      "gruppo",
+      "budget",
+      "data_inizio",
+      "data_fine",
+      "avanzamento",
+      "note",
+    ],
     types: {
       id: "number",
-      titolo: "string",
+      nome: "string",
       descrizione: "text",
       stato: "select",
-      priorita: "priority_select",
+      colore: "color",
+      gruppo: "string",
+      budget: "number",
       data_inizio: "datetime",
       data_fine: "datetime",
-      budget: "number",
+      avanzamento: "number",
       note: "text",
+      attivo: "boolean",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
-      colore: "color",
-      gruppo: "group_select",
-      avanzamento: "progress",
-      tags: "json",
-      allegati: "json",
-      notifica: "datetime",
     },
     selectOptions: {
       stato: [
-        { value: "da_pianificare", label: "Da pianificare" },
         { value: "pianificato", label: "Pianificato" },
         { value: "in_corso", label: "In corso" },
         { value: "completato", label: "Completato" },
         { value: "sospeso", label: "Sospeso" },
       ],
     },
-    groups: {
-      "Informazioni principali": [
-        "titolo",
-        "descrizione",
-        "stato",
-        "colore",
-        "priorita",
-        "gruppo",
-        "budget",
-        "data_inizio",
-        "data_fine",
-        "avanzamento",
-      ],
-      "Note e dettagli": ["note", "allegati", "notifica", "tags"],
+    validation: {
+      nome: { minLength: 3, maxLength: 100 },
+      avanzamento: { min: 0, max: 100 },
+      budget: { min: 0 },
     },
   },
   clienti: {
-    readOnlyFields: ["id", "id_utente", "modifica"],
-    requiredFields: ["nome", "cognome", "email"],
+    requiredFields: ["nome", "cognome"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      attivo: true,
+    },
+    fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
     types: {
       id: "number",
       nome: "string",
       cognome: "string",
-      email: "string",
-      indirizzo: "string",
+      email: "email",
+      telefono: "tel",
       citta: "string",
+      indirizzo: "string",
       cap: "string",
-      codicefiscale: "string",
-      rappresentante: "boolean",
-      societa: "string",
-      indirizzosocieta: "string",
-      cittasocieta: "string",
-      partitaiva: "string",
-      recapiti: "text",
+      piva: "string",
+      codfisc: "string",
       note: "text",
       attivo: "boolean",
-      qr: "string",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
     },
-    groups: {
-      "Dati personali": ["nome", "cognome", "email", "codicefiscale", "rappresentante"],
-      "Indirizzo personale": ["indirizzo", "citta", "cap"],
-      "Dati azienda": ["societa", "partitaiva"],
-      "Indirizzo azienda": ["indirizzosocieta", "cittasocieta"],
-      "Contatti e note": ["recapiti", "note", "qr"],
+    validation: {
+      nome: { minLength: 2, maxLength: 50 },
+      cognome: { minLength: 2, maxLength: 50 },
+      email: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
+      telefono: { pattern: "^[+]?[0-9\\s-()]+$" },
+      cap: { pattern: "^[0-9]{5}$" },
+      piva: { pattern: "^[0-9]{11}$" },
+      codfisc: { pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$" },
     },
   },
   pagine: {
-    readOnlyFields: ["id", "id_utente", "data_creazione", "modifica"],
-    requiredFields: ["titolo"],
+    requiredFields: ["titolo", "slug"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "bozza",
+      privato: false,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
     types: {
       id: "number",
       titolo: "string",
       slug: "string",
-      contenuto: "text",
+      contenuto: "richtext",
       stato: "select",
+      privato: "boolean",
+      attivo: "boolean",
       meta_title: "string",
       meta_description: "text",
       id_utente: "number",
+      data_creazione: "datetime",
       modifica: "datetime",
-      estratto: "text",
-      categoria: "string",
-      tags: "json",
-      immagine: "string",
-      pubblicato: "datetime",
-      privato: "boolean",
-      attivo: "boolean",
     },
-    groups: {
-      "Informazioni principali": ["titolo", "slug", "stato", "categoria", "pubblicato", "privato", "attivo"],
-      Contenuto: ["estratto", "contenuto", "immagine"],
-      SEO: ["meta_title", "meta_description", "tags"],
+    selectOptions: {
+      stato: [
+        { value: "bozza", label: "Bozza" },
+        { value: "pubblicato", label: "Pubblicato" },
+        { value: "archiviato", label: "Archiviato" },
+      ],
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      slug: { pattern: "^[a-z0-9-]+$", minLength: 3, maxLength: 100 },
+      meta_title: { maxLength: 60 },
+      meta_description: { maxLength: 160 },
     },
   },
-  note: {
-    readOnlyFields: ["id", "modifica", "id_utente"],
-    requiredFields: ["titolo"],
-    types: {
-      id: "number",
-      modifica: "datetime",
-      id_utente: "number",
-      titolo: "string",
-      contenuto: "text",
-      priorita: "string",
-    },
-    groups: {
-      "Informazioni principali": ["titolo", "contenuto", "priorita"],
-    },
-  },
-}
-
-// Funzione per pulire i dati prima del salvataggio
-function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
-  const cleaned = { ...data }
-  readOnlyFields.forEach((field) => {
-    if (field !== "id_utente") delete cleaned[field]
-  })
-  Object.keys(cleaned).forEach((key) => {
-    const value = cleaned[key]
-    if (value === undefined) delete cleaned[key]
-    else if (typeof value === "string" && value.trim() === "") cleaned[key] = null
-    else if (typeof value === "number" && isNaN(value)) delete cleaned[key]
-  })
-  return cleaned
 }
 
 // Componente per il color picker
@@ -322,63 +371,6 @@ const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: str
   )
 }
 
-// Componente per la barra di avanzamento
-const ProgressBar = ({
-  value,
-  color,
-  onChange,
-}: {
-  value: number
-  color: string
-  onChange: (value: number) => void
-}) => {
-  const [localValue, setLocalValue] = useState(value || 0)
-  useEffect(() => setLocalValue(value || 0), [value])
-  const handleSliderChange = (newValue: number[]) => {
-    const val = newValue[0]
-    setLocalValue(val)
-    onChange(val)
-  }
-  const progressColor = color || "#3b82f6"
-  const percentage = Math.min(Math.max(localValue, 0), 100)
-  const textInColoredPart = percentage > 50
-
-  return (
-    <div className="w-full space-y-3">
-      <div className="relative w-full h-8 bg-gray-200 rounded-lg overflow-hidden">
-        <div
-          className="h-full transition-all duration-300 ease-in-out"
-          style={{ width: `${percentage}%`, backgroundColor: progressColor }}
-        />
-        <div
-          className={`absolute inset-0 flex items-center justify-center text-sm font-medium transition-colors duration-300 ${
-            textInColoredPart ? "text-white" : "text-gray-700"
-          }`}
-        >
-          {percentage}%
-        </div>
-      </div>
-      <div className="px-2">
-        <input
-          type="range"
-          min="0"
-          max="100"
-          step="1"
-          value={localValue}
-          onChange={(e) => handleSliderChange([Number.parseInt(e.target.value)])}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-          style={{
-            background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`,
-          }}
-        />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>0%</span> <span>50%</span> <span>100%</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // Componente principale
 export default function NewItemPage() {
   const { supabase } = useSupabase()
@@ -386,127 +378,232 @@ export default function NewItemPage() {
   const router = useRouter()
   const params = useParams()
 
-  const [saving, setSaving] = useState<boolean>(false)
-  const [newItem, setNewItem] = useState<any>({})
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
-  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
-  const [groupOptions, setGroupOptions] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
+  const [formData, setFormData] = useState<any>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Estrai il nome della tabella
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
+
+  // Verifica che la tabella sia valida
   const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
 
-  if (!isValidTable && tableName) console.error(`Tabella non valida: ${tableName}`)
-
+  // Ottieni la configurazione della tabella
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
-  const readOnlyFields = tableConfig?.readOnlyFields || []
   const requiredFields = tableConfig?.requiredFields || []
+  const autoFields = tableConfig?.autoFields || []
+  const defaultValues = tableConfig?.defaultValues || {}
+  const fieldGroups = tableConfig?.fieldGroups || {} // Modificato da fieldOrder
   const fieldTypes = tableConfig?.types || {}
-  const fieldGroups = tableConfig?.groups || {}
   const selectOptions = tableConfig?.selectOptions || {}
+  const validation = tableConfig?.validation || {}
 
-  const loadPriorityOptions = useCallback(async () => {
-    if (!supabase) return
-    try {
-      const { data, error } = await supabase.from("configurazione").select("priorita").single()
-      if (error) throw error
-      let priorityArray = null
-      if (data?.priorita) {
-        if (Array.isArray(data.priorita)) priorityArray = data.priorita
-        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
-        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
-      }
-      if (!priorityArray || priorityArray.length === 0) {
-        setPriorityOptions([])
-        return
-      }
-      const mappedPriorities = priorityArray.map((item: any) => ({
-        value: item.livello || item.value,
-        nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
-        descrizione: item.descrizione || item.description || "",
-      }))
-      setPriorityOptions(mappedPriorities)
-    } catch (error: any) {
-      console.error("Errore nel caricamento delle priorità:", error)
-      setPriorityOptions([])
-    }
-  }, [supabase])
-
-  const loadGroupOptions = useCallback(async () => {
-    if (!supabase) return
-    try {
-      const { data, error } = await supabase.from("configurazione").select("gruppi").single()
-      if (error) throw error
-      let groupArray = null
-      if (data?.gruppi) {
-        if (Array.isArray(data.gruppi)) groupArray = data.gruppi
-        else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) groupArray = data.gruppi.gruppi
-      }
-      if (!groupArray || groupArray.length === 0) {
-        setGroupOptions([])
-        return
-      }
-      const mappedGroups = groupArray.map((item: any) => ({
-        value: item.nome || item.value,
-        nome: item.nome || item.label || `Gruppo ${item.value}`,
-        descrizione: item.descrizione || item.description || "",
-      }))
-      setGroupOptions(mappedGroups)
-    } catch (error: any) {
-      console.error("Errore nel caricamento dei gruppi:", error)
-      setGroupOptions([])
-    }
-  }, [supabase])
-
+  // Inizializza i dati del form
   useEffect(() => {
-    if (user?.id) {
-      setNewItem({ id_utente: user.id })
-    }
-  }, [user?.id])
-
-  useEffect(() => {
-    loadPriorityOptions()
-    loadGroupOptions()
-  }, [loadPriorityOptions, loadGroupOptions])
-
-  const validateForm = (): boolean => {
-    const errors: string[] = []
-    requiredFields.forEach((field) => {
-      const value = newItem[field]
-      if (!value || (typeof value === "string" && value.trim() === "")) {
-        errors.push(`Il campo "${field}" è obbligatorio`)
+    if (tableConfig && user) {
+      const initialData = {
+        ...defaultValues,
+        id_utente: user.id,
       }
+
+      // Imposta valori di default specifici per tabella
+      if (tableName === "todolist") {
+        initialData.titolo = ""
+        initialData.descrizione = ""
+        initialData.completato = false
+        initialData.priorita = 3
+      }
+
+      setFormData(initialData)
+    }
+  }, [tableConfig, user, tableName])
+
+  // Gestisce il cambio di un campo
+  const handleFieldChange = (field: string, value: any) => {
+    setFormData((prev: any) => {
+      const newData = { ...prev, [field]: value }
+
+      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
+      if (field === "data_inizio" && value) {
+        try {
+          const startDate = parseISO(value) // parseISO gestisce stringhe ISO
+          if (!newData.data_fine) {
+            // Solo se data_fine non è già impostata
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Aggiungi 1 ora
+            newData.data_fine = formatISO(endDate) // formatISO per coerenza
+          }
+        } catch (e) {
+          console.warn("Data inizio non valida per calcolare data fine:", value)
+        }
+      }
+      return newData
     })
-    setValidationErrors(errors)
-    return errors.length === 0
+
+    // Rimuovi l'errore quando il campo viene modificato
+    if (errors[field]) {
+      setErrors((prevErrors) => {
+        const newErrors = { ...prevErrors }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+
+    // Validazione in tempo reale per alcuni campi
+    validateField(field, value)
   }
 
+  // Valida un singolo campo
+  const validateField = (field: string, value: any): boolean => {
+    const rules = validation[field]
+    if (!rules) return true
+
+    let error = ""
+
+    // Validazione lunghezza minima
+    if (rules.minLength && (!value || value.length < rules.minLength)) {
+      error = `Minimo ${rules.minLength} caratteri`
+    }
+
+    // Validazione lunghezza massima
+    if (rules.maxLength && value && value.length > rules.maxLength) {
+      error = `Massimo ${rules.maxLength} caratteri`
+    }
+
+    // Validazione valore minimo
+    if (rules.min !== undefined && value < rules.min) {
+      error = `Valore minimo: ${rules.min}`
+    }
+
+    // Validazione valore massimo
+    if (rules.max !== undefined && value > rules.max) {
+      error = `Valore massimo: ${rules.max}`
+    }
+
+    // Validazione pattern
+    if (rules.pattern && value) {
+      const regex = new RegExp(rules.pattern)
+      if (!regex.test(value)) {
+        error = getPatternErrorMessage(field, fieldTypes[field])
+      }
+    }
+
+    if (error) {
+      setErrors((prev) => ({ ...prev, [field]: error }))
+      return false
+    }
+
+    return true
+  }
+
+  // Ottieni il messaggio di errore per il pattern
+  const getPatternErrorMessage = (field: string, type: string): string => {
+    switch (type) {
+      case "email":
+        return "Email non valida"
+      case "tel":
+        return "Numero di telefono non valido"
+      case "string":
+        if (field === "slug") return "Solo lettere minuscole, numeri e trattini"
+        if (field === "cap") return "CAP deve essere di 5 cifre"
+        if (field === "piva") return "P.IVA deve essere di 11 cifre"
+        if (field === "codfisc") return "Codice fiscale non valido"
+        return "Formato non valido"
+      default:
+        return "Formato non valido"
+    }
+  }
+
+  // Valida tutti i campi
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Controlla i campi richiesti
+    requiredFields.forEach((field) => {
+      if (!formData[field] || (typeof formData[field] === "string" && !formData[field].trim())) {
+        newErrors[field] = "Campo obbligatorio"
+      }
+    })
+
+    // Valida tutti i campi con regole
+    Object.keys(formData).forEach((field) => {
+      if (!autoFields.includes(field) && !validateField(field, formData[field])) {
+        // L'errore è già stato impostato da validateField
+      }
+    })
+
+    // Validazioni speciali
+    if (tableName === "appuntamenti" || tableName === "attivita" || tableName === "progetti") {
+      if (formData.data_fine && formData.data_inizio && new Date(formData.data_fine) < new Date(formData.data_inizio)) {
+        newErrors.data_fine = "La data di fine deve essere successiva alla data di inizio"
+      }
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // Salva il nuovo elemento
   const handleSave = async () => {
-    if (!supabase || !tableName || !user?.id) return
+    if (!supabase || !tableName || !user?.id || !isValidTable) return
+
+    // Valida il form
     if (!validateForm()) {
       toast({
-        title: "Errori di validazione",
-        description: "Correggi gli errori evidenziati prima di salvare",
+        title: "Errore di validazione",
+        description: "Controlla i campi evidenziati in rosso",
         variant: "destructive",
       })
       return
     }
+
     setSaving(true)
     try {
-      const dataToSave = cleanDataForSave(newItem, readOnlyFields)
+      // Prepara i dati da salvare usando la funzione di pulizia
+      const dataToSave = cleanDataForSave(formData, autoFields)
+
+      // Aggiorna i campi di sistema
       dataToSave.id_utente = user.id
+      dataToSave.data_creazione = new Date().toISOString()
       dataToSave.modifica = new Date().toISOString()
-      const { data, error } = await supabase.from(tableName).insert([dataToSave]).select().single()
-      if (error) throw error
+
+      console.log(`Inserimento nuovo elemento in tabella: ${tableName}`, dataToSave)
+
+      // Inserisci nel database
+      const { data, error } = await supabase.from(tableName).insert(dataToSave).select()
+
+      if (error) {
+        console.error("Errore inserimento:", error)
+
+        // Gestisci errori specifici del database
+        let errorMessage = error.message
+        if (error.message.includes("check constraint")) {
+          if (error.message.includes("descrizione_check")) {
+            errorMessage =
+              "La descrizione non rispetta i requisiti del database. Assicurati che sia compilata correttamente."
+          }
+        }
+
+        throw new Error(errorMessage)
+      }
+
       toast({
-        title: "Successo",
-        description: "Elemento creato con successo",
+        title: "Elemento creato con successo!",
+        description: "Il nuovo elemento è stato salvato nel database",
+        action: (
+          <div className="flex items-center">
+            <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+            <span>Creato</span>
+          </div>
+        ),
       })
-      router.push(`/data-explorer/${tableName}/${data.id}`)
+
+      // Reindirizza alla pagina di dettaglio
+      router.push(`/data-explorer/${tableName}/${data[0].id}`)
     } catch (error: any) {
-      console.error("Errore nel salvataggio:", error)
+      console.error(`Errore nell'inserimento:`, error)
       toast({
-        title: "Errore",
-        description: `Impossibile salvare: ${error.message}`,
+        title: "Errore durante il salvataggio",
+        description: `Impossibile creare l'elemento: ${error.message}`,
         variant: "destructive",
       })
     } finally {
@@ -514,101 +611,95 @@ export default function NewItemPage() {
     }
   }
 
-  const handleCancel = () => {
-    router.push(`/data-explorer?table=${tableName}`)
-  }
+  // Renderizza un campo in base al tipo
+  const renderField = (field: string, type: string) => {
+    // Salta i campi auto-generati
+    if (autoFields.includes(field)) return null
 
-  const handleFieldChange = (fieldName: string, value: any) => {
-    setNewItem((prev: any) => ({ ...prev, [fieldName]: value }))
-    if (validationErrors.length > 0) {
-      setValidationErrors((prev) => prev.filter((error) => !error.includes(fieldName)))
-    }
-  }
+    const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+    const value = formData[field]
+    const error = errors[field]
+    const isRequired = requiredFields.includes(field)
 
-  const renderFieldInput = (fieldName: string, fieldType: string, value: any) => {
-    const isRequired = requiredFields.includes(fieldName)
-    const hasError = validationErrors.some((error) => error.includes(fieldName))
-    const commonProps = {
-      id: fieldName,
-      className: hasError ? "border-red-500" : "",
-    }
+    const fieldWrapper = (children: React.ReactNode) => (
+      <div className="space-y-2" key={field}>
+        <Label htmlFor={field} className="flex items-center">
+          {label}
+          {isRequired && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+        {children}
+        {error && (
+          <div className="flex items-center text-sm text-red-500">
+            <AlertCircle size={14} className="mr-1" />
+            {error}
+          </div>
+        )}
+      </div>
+    )
 
-    switch (fieldType) {
-      case "string":
-        return (
-          <Input
-            {...commonProps}
-            type="text"
-            value={value || ""}
-            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-            placeholder={isRequired ? `${fieldName} (obbligatorio)` : fieldName}
-          />
-        )
-
+    switch (type) {
       case "text":
-        return (
+      case "richtext":
+        return fieldWrapper(
           <Textarea
-            {...commonProps}
+            id={field}
             value={value || ""}
-            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-            placeholder={isRequired ? `${fieldName} (obbligatorio)` : fieldName}
-            rows={4}
-          />
-        )
-
-      case "number":
-        return (
-          <Input
-            {...commonProps}
-            type="number"
-            value={value || ""}
-            onChange={(e) => handleFieldChange(fieldName, Number.parseFloat(e.target.value) || null)}
-            placeholder={isRequired ? `${fieldName} (obbligatorio)` : fieldName}
-          />
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            rows={type === "richtext" ? 8 : 4}
+            placeholder={`Inserisci ${label.toLowerCase()}`}
+          />,
         )
 
       case "boolean":
-        return (
+        return fieldWrapper(
           <div className="flex items-center space-x-2">
             <Switch
-              id={fieldName}
-              checked={Boolean(value)}
-              onCheckedChange={(checked) => handleFieldChange(fieldName, checked)}
+              id={field}
+              checked={value || false}
+              onCheckedChange={(checked) => handleFieldChange(field, checked)}
             />
-            <Label htmlFor={fieldName} className="text-sm">
+            <Label htmlFor={field} className="font-normal cursor-pointer">
               {value ? "Sì" : "No"}
             </Label>
-          </div>
+          </div>,
         )
 
       case "datetime":
-        return (
+        return fieldWrapper(
           <EnhancedDatePicker
-            date={value ? new Date(value) : undefined}
-            onChange={(date) => handleFieldChange(fieldName, date ? date.toISOString() : null)}
-            placeholder={isRequired ? `${fieldName} (obbligatorio)` : fieldName}
-            showTimeSelect={true}
-          />
+            id={field}
+            value={value || ""}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Seleziona ${label.toLowerCase()}`}
+            className={cn(error && "border-red-500")}
+          />,
         )
 
-      case "date":
-        return (
-          <EnhancedDatePicker
-            date={value ? new Date(value) : undefined}
-            onChange={(date) => handleFieldChange(fieldName, date ? normalizeDate(date).toISOString() : null)}
-            placeholder={isRequired ? `${fieldName} (obbligatorio)` : fieldName}
-            showTimeSelect={false}
-          />
+      case "number":
+        const validationRules = validation[field] || {}
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="number"
+            value={value || ""}
+            onChange={(e) => {
+              const numValue = e.target.value ? Number(e.target.value) : null
+              handleFieldChange(field, numValue)
+            }}
+            className={cn(error && "border-red-500")}
+            min={validationRules.min}
+            max={validationRules.max}
+            placeholder={`Inserisci ${label.toLowerCase()}`}
+          />,
         )
 
       case "select":
-        const options = selectOptions[fieldName] || []
-        return (
-          <Select value={value || ""} onValueChange={(newValue) => handleFieldChange(fieldName, newValue)}>
-            <SelectTrigger className={hasError ? "border-red-500" : ""}>
-              <SelectValue
-                placeholder={isRequired ? `Seleziona ${fieldName} (obbligatorio)` : `Seleziona ${fieldName}`}
-              />
+        const options = selectOptions[field] || []
+        return fieldWrapper(
+          <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
+            <SelectTrigger className={cn(error && "border-red-500")}>
+              <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
               {options.map((option: any) => (
@@ -617,137 +708,108 @@ export default function NewItemPage() {
                 </SelectItem>
               ))}
             </SelectContent>
-          </Select>
-        )
-
-      case "priority_select":
-        return (
-          <Select value={value || ""} onValueChange={(newValue) => handleFieldChange(fieldName, newValue)}>
-            <SelectTrigger className={hasError ? "border-red-500" : ""}>
-              <SelectValue
-                placeholder={isRequired ? `Seleziona ${fieldName} (obbligatorio)` : `Seleziona ${fieldName}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {priorityOptions.map((option: any) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )
-
-      case "group_select":
-        return (
-          <Select value={value || ""} onValueChange={(newValue) => handleFieldChange(fieldName, newValue)}>
-            <SelectTrigger className={hasError ? "border-red-500" : ""}>
-              <SelectValue
-                placeholder={isRequired ? `Seleziona ${fieldName} (obbligatorio)` : `Seleziona ${fieldName}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {groupOptions.map((option: any) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          </Select>,
         )
 
       case "color":
-        return <ColorPicker value={value || ""} onChange={(newValue) => handleFieldChange(fieldName, newValue)} />
+        return fieldWrapper(<ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />)
 
-      case "progress":
-        return (
-          <ProgressBar
-            value={value || 0}
-            color={newItem?.colore || "#3b82f6"}
-            onChange={(newValue) => handleFieldChange(fieldName, newValue)}
-          />
+      case "tags":
+        return fieldWrapper(
+          <TagInput
+            id={field}
+            value={value || []}
+            onChange={(val) => handleFieldChange(field, val)}
+            placeholder={`Aggiungi ${label.toLowerCase()}`}
+          />,
         )
 
-      case "json":
-        if (fieldName === "tags" || fieldName === "tag") {
-          return (
-            <TagInput
-              value={Array.isArray(value) ? value : []}
-              onChange={(newTags) => handleFieldChange(fieldName, newTags)}
-              placeholder={isRequired ? `Aggiungi ${fieldName} (obbligatorio)` : `Aggiungi ${fieldName}`}
-            />
-          )
-        }
-        return (
-          <Textarea
-            {...commonProps}
-            value={value ? JSON.stringify(value, null, 2) : ""}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value)
-                handleFieldChange(fieldName, parsed)
-              } catch {
-                // Ignora errori di parsing durante la digitazione
-              }
-            }}
-            placeholder={isRequired ? `${fieldName} JSON (obbligatorio)` : `${fieldName} JSON`}
-            rows={4}
-          />
+      case "email":
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="email"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            placeholder="esempio@email.com"
+          />,
+        )
+
+      case "tel":
+        return fieldWrapper(
+          <Input
+            id={field}
+            type="tel"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            placeholder="+39 123 456 7890"
+          />,
         )
 
       default:
-        return (
+        return fieldWrapper(
           <Input
-            {...commonProps}
+            id={field}
             type="text"
             value={value || ""}
-            onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-            placeholder={isRequired ? `${fieldName} (obbligatorio)` : fieldName}
-          />
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            className={cn(error && "border-red-500")}
+            placeholder={`Inserisci ${label.toLowerCase()}`}
+          />,
         )
     }
   }
 
-  const renderFieldGroup = (groupName: string, fields: string[]) => {
-    const availableFields = fields.filter((field) => !readOnlyFields.includes(field))
+  // Ottieni il titolo della tabella
+  const getTableTitle = () => {
+    const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
+    return table ? table.label : "Nuovo elemento"
+  }
 
-    if (availableFields.length === 0) return null
+  // Renderizza i campi di data, mettendo data_inizio e data_fine sulla stessa linea
+  const renderDateFields = (fields: string[]) => {
+    const dateFields = fields.filter((field) => fieldTypes[field] === "datetime")
 
+    if (dateFields.length === 0) return null
+
+    // Se c'è un solo campo data nel gruppo, rendilo normalmente
+    if (dateFields.length === 1 && fields.length === 1) {
+      return <div className="space-y-4">{renderField(dateFields[0], fieldTypes[dateFields[0]])}</div>
+    }
+
+    // Se ci sono 2 campi data (es. data_inizio e data_fine), mettili sulla stessa linea
+    // e gli altri campi del gruppo sotto.
     return (
-      <div key={groupName} className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">{groupName}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {availableFields.map((fieldName) => {
-            const fieldType = fieldTypes[fieldName] || "string"
-            const value = newItem[fieldName]
-            const isRequired = requiredFields.includes(fieldName)
-
-            return (
-              <div key={fieldName} className="space-y-2">
-                <Label htmlFor={fieldName} className="text-sm font-medium">
-                  {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-                  {isRequired && <span className="text-red-500 ml-1">*</span>}
-                </Label>
-                {renderFieldInput(fieldName, fieldType, value)}
-              </div>
-            )
-          })}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {dateFields.map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
         </div>
+        {/* Renderizza altri campi non-data del gruppo, se presenti */}
+        {fields
+          .filter((field) => fieldTypes[field] !== "datetime")
+          .map((field) => (
+            <div key={field}>{renderField(field, fieldTypes[field])}</div>
+          ))}
       </div>
     )
   }
 
-  if (!isValidTable) {
+  // Se la tabella non è valida, mostra errore
+  if (tableName && !isValidTable) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto py-6">
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Tabella non trovata</h2>
-            <p className="text-gray-600 mb-4">La tabella "{tableName}" non è disponibile.</p>
-            <Button onClick={() => router.push("/data-explorer")} variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Torna all'esploratore
+          <CardHeader>
+            <CardTitle className="text-2xl text-red-600">Errore</CardTitle>
+            <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/data-explorer")}>
+              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
             </Button>
           </CardContent>
         </Card>
@@ -755,80 +817,103 @@ export default function NewItemPage() {
     )
   }
 
-  const tableLabel = AVAILABLE_TABLES.find((t) => t.id === tableName)?.label || tableName
-
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
+    <div className="container mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" size="sm" onClick={() => router.push(`/data-explorer?table=${tableName}`)}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Torna alla lista
-                </Button>
-              </div>
-              <CardTitle className="text-xl sm:text-2xl">Nuovo {tableLabel}</CardTitle>
-              <CardDescription>Crea un nuovo elemento in {tableLabel}</CardDescription>
+          <div className="space-y-4">
+            {/* Pulsante torna indietro sempre in alto */}
+            <Button variant="ghost" onClick={() => router.push(`/data-explorer`)} className="w-fit">
+              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+            </Button>
+
+            {/* Titolo e descrizione */}
+            <div>
+              <CardTitle className="text-xl sm:text-2xl">Nuovo {getTableTitle().slice(0, -1)}</CardTitle>
+              <CardDescription className="text-sm sm:text-base">
+                Compila i campi per creare un nuovo elemento
+              </CardDescription>
             </div>
 
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-              <Button onClick={handleCancel} variant="outline" disabled={saving}>
-                <X className="h-4 w-4 mr-2" />
-                Annulla
+            {/* Pulsanti di azione - migliorati con background azzurro */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 sm:justify-end">
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full sm:w-auto order-1 sm:order-1 bg-blue-600 hover:bg-blue-700 text-white"
+                size="lg"
+              >
+                {saving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Salvataggio...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} className="mr-2" />
+                    Crea e Salva
+                  </>
+                )}
               </Button>
-              <Button onClick={handleSave} disabled={saving}>
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? "Salvataggio..." : "Salva"}
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/data-explorer`)}
+                className="w-full sm:w-auto order-2 sm:order-2"
+              >
+                <X size={16} className="mr-2" /> Annulla
               </Button>
             </div>
           </div>
-
-          {/* Errori di validazione */}
-          {validationErrors.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <AlertCircle className="h-5 w-5 text-red-500" />
-                <h4 className="text-sm font-medium text-red-800">Errori di validazione</h4>
-              </div>
-              <ul className="text-sm text-red-700 space-y-1">
-                {validationErrors.map((error, index) => (
-                  <li key={index}>• {error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </CardHeader>
 
         <CardContent>
-          {Object.keys(fieldGroups).length > 0 ? (
-            <div className="space-y-8">
-              {Object.entries(fieldGroups).map(([groupName, fields]) => renderFieldGroup(groupName, fields))}
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {Object.keys(fieldTypes)
-                .filter((fieldName) => !readOnlyFields.includes(fieldName))
-                .map((fieldName) => {
-                  const fieldType = fieldTypes[fieldName] || "string"
-                  const value = newItem[fieldName]
-                  const isRequired = requiredFields.includes(fieldName)
+          {/* Renderizza i campi in base alla configurazione della tabella */}
+          <div className="space-y-6">
+            {Object.keys(fieldTypes)
+              .filter((field) => !autoFields.includes(field))
+              .map((field) => (
+                <div key={field}>{renderField(field, fieldTypes[field])}</div>
+              ))}
+          </div>
 
-                  return (
-                    <div key={fieldName} className="space-y-2">
-                      <Label htmlFor={fieldName} className="text-sm font-medium">
-                        {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-                        {isRequired && <span className="text-red-500 ml-1">*</span>}
-                      </Label>
-                      {renderFieldInput(fieldName, fieldType, value)}
-                    </div>
-                  )
-                })}
-            </div>
-          )}
+          {/* Mostra informazioni sui campi auto-compilati */}
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Campi compilati automaticamente:
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {autoFields.map((field) => (
+                      <Badge key={field} variant="secondary">
+                        {field}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+                  <span>
+                    I campi con <span className="text-red-500 mx-1">*</span> sono obbligatori
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </CardContent>
+
+        <CardFooter className="border-t bg-gray-50 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full text-sm text-gray-600 space-y-2 sm:space-y-0">
+            <div className="flex items-center">
+              <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+              <span>
+                I campi contrassegnati con <span className="text-red-500 mx-1">*</span> sono obbligatori
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground">iStudio v0.4 - Sistema di gestione dati</div>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   )

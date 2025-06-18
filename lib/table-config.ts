@@ -1,5 +1,3 @@
-import { Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, FolderKanban, FileText } from "lucide-react"
-
 // Configurazione dei campi predefiniti per ogni tipo di tabella
 
 // Definizione del tipo per la configurazione delle tabelle
@@ -7,9 +5,8 @@ export interface TableFieldConfig {
   displayName: string // Nome visualizzato nell'interfaccia
   fields: string[] // Campi da visualizzare
   sortField?: string // Campo predefinito per l'ordinamento
-  dateFields?: string // Campi data per la formattazione
+  dateFields?: string[] // Campi data per la formattazione
   keyField?: string // Campo chiave primaria
-  icon?: any
 }
 
 // Configurazione predefinita per tabelle generiche
@@ -19,7 +16,6 @@ const defaultConfig: TableFieldConfig = {
   sortField: "modifica",
   dateFields: ["modifica"],
   keyField: "id",
-  icon: FileText,
 }
 
 // Configurazione specifica per tipo di tabella
@@ -31,7 +27,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "cognome",
     dateFields: ["data_creazione", "modifica"],
     keyField: "id",
-    icon: Users,
   },
 
   // Tabella attività
@@ -41,7 +36,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "data_inizio",
     dateFields: ["data_inizio", "data_fine", "modifica", "notifica"],
     keyField: "id",
-    icon: CheckSquare,
   },
 
   // Tabella progetti
@@ -51,7 +45,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "data_inizio",
     dateFields: ["data_inizio", "data_fine", "modifica", "notifica"],
     keyField: "id",
-    icon: Briefcase,
   },
 
   // Tabella appuntamenti
@@ -61,7 +54,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "data",
     dateFields: ["modifica", "data_inizio", "data_fine", "notifica"],
     keyField: "id",
-    icon: Calendar,
   },
 
   // Tabella todolist
@@ -71,17 +63,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "scadenza",
     dateFields: ["scadenza", "modifica", "notifica"],
     keyField: "id",
-    icon: ListTodo,
-  },
-
-  // Tabella note
-  note: {
-    displayName: "Note",
-    fields: ["id", "titolo", "id_utente", "priorita"],
-    sortField: "priorita",
-    dateFields: ["data_creazione", "modifica", "notifica"],
-    keyField: "id",
-    icon: FileText,
   },
 
   // Tabella scadenze
@@ -91,7 +72,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "scadenza",
     dateFields: ["scadenza", "modifica", "notifica"],
     keyField: "id",
-    icon: Clock,
   },
 
   // Tabella pagine
@@ -101,7 +81,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "it",
     dateFields: ["pubblicato", "modifica"],
     keyField: "id",
-    icon: FileText,
   },
 
   // Tabella clienti
@@ -111,7 +90,6 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     sortField: "id_utente",
     dateFields: ["modifica"],
     keyField: "id",
-    icon: Users,
   },
 }
 
@@ -129,7 +107,6 @@ export function getTableConfig(tableName: string): TableFieldConfig {
     tableConfigs[cleanTableName] || {
       ...defaultConfig,
       displayName: tableName,
-      icon: FolderKanban,
     }
   )
 }
