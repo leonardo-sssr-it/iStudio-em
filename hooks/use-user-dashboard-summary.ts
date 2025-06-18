@@ -46,8 +46,9 @@ const TABLE_CONFIGS = [
     icon: Calendar,
     color: "bg-blue-50 border-blue-200",
     textColor: "text-blue-700",
-    dateField: "data_appuntamento",
+    dateField: "data_inizio", // Campo principale per filtrare
     titleField: "titolo",
+    fallbackFields: ["descrizione", "contenuto"], // Campi alternativi per il titolo
   },
   {
     table: "attivita",
@@ -55,8 +56,9 @@ const TABLE_CONFIGS = [
     icon: ClipboardList,
     color: "bg-green-50 border-green-200",
     textColor: "text-green-700",
-    dateField: "data_scadenza",
+    dateField: "data_inizio", // Campo principale
     titleField: "titolo",
+    fallbackFields: ["descrizione", "contenuto"],
   },
   {
     table: "scadenze",
@@ -64,8 +66,9 @@ const TABLE_CONFIGS = [
     icon: Clock,
     color: "bg-red-50 border-red-200",
     textColor: "text-red-700",
-    dateField: "data_scadenza",
+    dateField: "scadenza", // Campo scadenza
     titleField: "titolo",
+    fallbackFields: ["descrizione", "contenuto"],
   },
   {
     table: "todolist",
@@ -73,8 +76,9 @@ const TABLE_CONFIGS = [
     icon: CheckSquare,
     color: "bg-yellow-50 border-yellow-200",
     textColor: "text-yellow-700",
-    dateField: "data_scadenza",
+    dateField: "scadenza", // Campo scadenza
     titleField: "titolo",
+    fallbackFields: ["descrizione", "contenuto"],
   },
   {
     table: "progetti",
@@ -82,8 +86,10 @@ const TABLE_CONFIGS = [
     icon: BarChart3,
     color: "bg-purple-50 border-purple-200",
     textColor: "text-purple-700",
-    dateField: "data_fine",
+    dateField: "data_inizio", // Useremo logica speciale per progetti attivi
     titleField: "nome",
+    fallbackFields: ["descrizione", "contenuto"],
+    hasDateRange: true, // Flag per progetti con data_inizio e data_fine
   },
   {
     table: "clienti",
@@ -93,6 +99,7 @@ const TABLE_CONFIGS = [
     textColor: "text-indigo-700",
     dateField: "data_creazione",
     titleField: "nome",
+    fallbackFields: ["descrizione", "contenuto"],
   },
   {
     table: "pagine",
@@ -102,6 +109,7 @@ const TABLE_CONFIGS = [
     textColor: "text-teal-700",
     dateField: "pubblicato",
     titleField: "titolo",
+    fallbackFields: ["estratto", "contenuto"],
   },
   {
     table: "note",
@@ -109,10 +117,52 @@ const TABLE_CONFIGS = [
     icon: StickyNote,
     color: "bg-orange-50 border-orange-200",
     textColor: "text-orange-700",
-    dateField: "data_creazione",
+    dateField: "creato_il",
     titleField: "titolo",
+    fallbackFields: ["contenuto"],
   },
 ]
+
+/**
+ * Ottiene il titolo da un record, usando campi alternativi se il principale è vuoto
+ */
+function getRecordTitle(record: any, titleField: string, fallbackFields: string[] = []): string {
+  // Prova il campo principale
+  if (record[titleField] && record[titleField].trim()) {
+    return record[titleField].trim()
+  }
+
+  // Prova i campi alternativi
+  for (const field of fallbackFields) {
+    if (record[field] && record[field].trim()) {
+      const content = record[field].trim()
+      // Se è contenuto lungo, prendi i primi 50 caratteri
+      return content.length > 50 ? content.substring(0, 50) + "..." : content
+    }
+  }
+
+  return "Senza titolo"
+}
+
+/**
+ * Crea le date per oggi (inizio e fine giornata)
+ */
+function getTodayRange() {
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  return { todayStart, todayEnd }
+}
+
+/**
+ * Crea le date per la prossima settimana (da domani a +7 giorni)
+ */
+function getNextWeekRange() {
+  const now = new Date()
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0)
+  const nextWeekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 23, 59, 59, 999)
+  return { tomorrowStart, nextWeekEnd }
+}
 
 export function useUserDashboardSummary() {
   const { supabase } = useSupabase()
@@ -132,9 +182,20 @@ export function useUserDashboardSummary() {
         setIsLoading(true)
         setError(null)
 
+        const userId = Number.parseInt(user.id.toString())
+        if (isNaN(userId)) {
+          throw new Error("ID utente non valido")
+        }
+
+        // Calcola range di date
+        const { todayStart, todayEnd } = getTodayRange()
+        const { tomorrowStart, nextWeekEnd } = getNextWeekRange()
+        const now = new Date()
+
         // Fetch counts for each table
         const summaryCounts: SummaryCount[] = []
-        const allUpcomingItems: UpcomingItem[] = []
+        const todaysItems: UpcomingItem[] = []
+        const nextWeekItems: UpcomingItem[] = []
 
         for (const config of TABLE_CONFIGS) {
           try {
@@ -142,7 +203,7 @@ export function useUserDashboardSummary() {
             const { count, error: countError } = await supabase
               .from(config.table)
               .select("*", { count: "exact", head: true })
-              .eq("id_utente", user.id)
+              .eq("id_utente", userId)
 
             if (countError) {
               console.warn(`Errore nel conteggio per ${config.table}:`, countError)
@@ -158,32 +219,107 @@ export function useUserDashboardSummary() {
               textColor: config.textColor,
             })
 
-            // Get upcoming items (only if table has date field)
+            // Get upcoming items (solo per tabelle con campi data)
             if (config.dateField) {
-              const today = new Date()
-              const nextWeek = new Date()
-              nextWeek.setDate(today.getDate() + 7)
+              // Costruisci la query base
+              const baseFields = [
+                "id",
+                config.titleField,
+                config.dateField,
+                ...config.fallbackFields.filter((field) => field !== config.titleField),
+              ].join(", ")
 
-              const { data: upcomingData, error: upcomingError } = await supabase
-                .from(config.table)
-                .select(`id, ${config.titleField}, ${config.dateField}`)
-                .eq("id_utente", user.id)
-                .gte(config.dateField, today.toISOString())
-                .lte(config.dateField, nextWeek.toISOString())
-                .order(config.dateField, { ascending: true })
-                .limit(5)
+              // Logica speciale per progetti (data_inizio <= now <= data_fine)
+              if (config.hasDateRange && config.table === "progetti") {
+                // Progetti attivi oggi
+                const { data: todayProjects, error: todayError } = await supabase
+                  .from(config.table)
+                  .select(`id, ${config.titleField}, data_inizio, data_fine, ${config.fallbackFields.join(", ")}`)
+                  .eq("id_utente", userId)
+                  .lte("data_inizio", todayEnd.toISOString())
+                  .gte("data_fine", todayStart.toISOString())
+                  .order("data_inizio", { ascending: true })
+                  .limit(5)
 
-              if (!upcomingError && upcomingData) {
-                const items: UpcomingItem[] = upcomingData.map((item) => ({
-                  id_origine: item.id,
-                  tabella_origine: config.table,
-                  title: item[config.titleField] || "Senza titolo",
-                  date: new Date(item[config.dateField]),
-                  type: config.label.toLowerCase(),
-                  color: config.textColor,
-                }))
+                if (!todayError && todayProjects) {
+                  const items: UpcomingItem[] = todayProjects.map((item) => ({
+                    id_origine: item.id,
+                    tabella_origine: config.table,
+                    title: getRecordTitle(item, config.titleField, config.fallbackFields),
+                    date: new Date(item.data_inizio),
+                    type: config.label.toLowerCase(),
+                    color: config.textColor,
+                  }))
+                  todaysItems.push(...items)
+                }
 
-                allUpcomingItems.push(...items)
+                // Progetti che iniziano nella prossima settimana
+                const { data: nextWeekProjects, error: nextWeekError } = await supabase
+                  .from(config.table)
+                  .select(`id, ${config.titleField}, data_inizio, data_fine, ${config.fallbackFields.join(", ")}`)
+                  .eq("id_utente", userId)
+                  .gte("data_inizio", tomorrowStart.toISOString())
+                  .lte("data_inizio", nextWeekEnd.toISOString())
+                  .order("data_inizio", { ascending: true })
+                  .limit(5)
+
+                if (!nextWeekError && nextWeekProjects) {
+                  const items: UpcomingItem[] = nextWeekProjects.map((item) => ({
+                    id_origine: item.id,
+                    tabella_origine: config.table,
+                    title: getRecordTitle(item, config.titleField, config.fallbackFields),
+                    date: new Date(item.data_inizio),
+                    type: config.label.toLowerCase(),
+                    color: config.textColor,
+                  }))
+                  nextWeekItems.push(...items)
+                }
+              } else {
+                // Logica normale per altre tabelle
+
+                // Elementi di oggi
+                const { data: todayData, error: todayError } = await supabase
+                  .from(config.table)
+                  .select(baseFields)
+                  .eq("id_utente", userId)
+                  .gte(config.dateField, todayStart.toISOString())
+                  .lte(config.dateField, todayEnd.toISOString())
+                  .order(config.dateField, { ascending: true })
+                  .limit(5)
+
+                if (!todayError && todayData) {
+                  const items: UpcomingItem[] = todayData.map((item) => ({
+                    id_origine: item.id,
+                    tabella_origine: config.table,
+                    title: getRecordTitle(item, config.titleField, config.fallbackFields),
+                    date: new Date(item[config.dateField]),
+                    type: config.label.toLowerCase(),
+                    color: config.textColor,
+                  }))
+                  todaysItems.push(...items)
+                }
+
+                // Elementi della prossima settimana
+                const { data: nextWeekData, error: nextWeekError } = await supabase
+                  .from(config.table)
+                  .select(baseFields)
+                  .eq("id_utente", userId)
+                  .gte(config.dateField, tomorrowStart.toISOString())
+                  .lte(config.dateField, nextWeekEnd.toISOString())
+                  .order(config.dateField, { ascending: true })
+                  .limit(5)
+
+                if (!nextWeekError && nextWeekData) {
+                  const items: UpcomingItem[] = nextWeekData.map((item) => ({
+                    id_origine: item.id,
+                    tabella_origine: config.table,
+                    title: getRecordTitle(item, config.titleField, config.fallbackFields),
+                    date: new Date(item[config.dateField]),
+                    type: config.label.toLowerCase(),
+                    color: config.textColor,
+                  }))
+                  nextWeekItems.push(...items)
+                }
               }
             }
           } catch (err) {
@@ -191,23 +327,18 @@ export function useUserDashboardSummary() {
           }
         }
 
-        // Sort upcoming items by date
-        allUpcomingItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+        // Ordina gli elementi per data
+        todaysItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+        nextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
 
-        // Separate today's items from next week's items
-        const today = new Date()
-        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-        const todayEnd = new Date(todayStart)
-        todayEnd.setDate(todayEnd.getDate() + 1)
-
-        const todaysItems = allUpcomingItems.filter((item) => item.date >= todayStart && item.date < todayEnd)
-
-        const nextWeekItems = allUpcomingItems.filter((item) => item.date >= todayEnd).slice(0, 10)
+        // Limita il numero di elementi mostrati
+        const finalTodaysItems = todaysItems.slice(0, 10)
+        const finalNextWeekItems = nextWeekItems.slice(0, 10)
 
         setDashboardData({
           summaryCounts,
-          todaysItems,
-          nextWeekItems,
+          todaysItems: finalTodaysItems,
+          nextWeekItems: finalNextWeekItems,
         })
       } catch (err: any) {
         console.error("Errore nel recupero dei dati del dashboard:", err)
