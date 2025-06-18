@@ -29,6 +29,7 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: "📊" },
   { id: "clienti", label: "Clienti", icon: "👥" },
   { id: "pagine", label: "Pagine", icon: "📄" },
+  { id: "note", label: "Note", icon: "📄" },  
 ]
 
 // Funzione per pulire i dati prima del salvataggio
