@@ -1320,8 +1320,8 @@ export default function ItemDetailPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <Card>
+    <div className="container mx-auto py-6" style={{ overflow: "visible" }}>
+      <Card style={{ overflow: "visible" }}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -1389,12 +1389,12 @@ export default function ItemDetailPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent style={{ overflow: "visible" }}>
           {/* Componente di test temporaneo - RIMUOVERE DOPO IL DEBUG */}
           <TestDatePicker />
           <hr className="my-4" />
 
-          {editedItem && renderFieldGroups()}
+          <div style={{ overflow: "visible" }}>{editedItem && renderFieldGroups()}</div>
         </CardContent>
       </Card>
     </div>

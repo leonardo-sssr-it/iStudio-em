@@ -93,10 +93,11 @@ body {
   }
 }
 
-/* Fix per EnhancedDatePicker */
+/* Fix critici per EnhancedDatePicker */
 .enhanced-date-picker-trigger {
   pointer-events: auto !important;
   cursor: pointer !important;
+  position: relative !important;
 }
 
 .enhanced-date-picker-trigger:disabled {
@@ -104,12 +105,69 @@ body {
   cursor: not-allowed !important;
 }
 
-/* Assicura che il popover sia sopra tutto */
+/* Forza il popover ad apparire sopra tutto */
 [data-radix-popper-content-wrapper] {
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+[data-radix-popover-content] {
+  z-index: 99999 !important;
+  position: fixed !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Assicura che il contenuto del popover sia visibile */
+.enhanced-date-picker-content {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  min-width: 300px !important;
+  max-width: 400px !important;
 }
 
 /* Debug per vedere se il button è cliccabile */
 .enhanced-date-picker-trigger:hover:not(:disabled) {
   background-color: rgba(0, 0, 0, 0.05) !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Fix per container che potrebbero nascondere il popover */
+.container,
+.card,
+.tabs-content {
+  overflow: visible !important;
+}
+
+/* Assicura che i tab content non nascondano i popover */
+[data-radix-tabs-content] {
+  overflow: visible !important;
+  position: relative !important;
+}
+
+/* Fix per eventuali problemi con il calendario */
+.rdp {
+  margin: 0 !important;
+}
+
+.rdp-months {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Stili per il dark mode del popover */
+.dark [data-radix-popover-content] {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+  color: white !important;
+}
+
+.dark .enhanced-date-picker-content {
+  background: #1f2937 !important;
+  border-color: #374151 !important;
+  color: white !important;
 }

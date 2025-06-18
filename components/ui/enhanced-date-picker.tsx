@@ -148,7 +148,7 @@ export function EnhancedDatePicker({
   }
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative", className)} style={{ zIndex: 1 }}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -168,7 +168,7 @@ export function EnhancedDatePicker({
               e.stopPropagation()
               if (!disabled) {
                 console.log(`Opening popover for ${id}`)
-                setOpen(true)
+                setOpen(!open) // Toggle invece di sempre true
               }
             }}
           >
@@ -177,7 +177,16 @@ export function EnhancedDatePicker({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-auto p-0 z-50" align="start" side="bottom">
+        <PopoverContent
+          className="enhanced-date-picker-content w-auto p-0"
+          align="start"
+          side="bottom"
+          sideOffset={4}
+          style={{
+            zIndex: 99999,
+            position: "fixed",
+          }}
+        >
           <div className="p-3">
             <Calendar
               mode="single"
