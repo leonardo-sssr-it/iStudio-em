@@ -65,6 +65,15 @@ const tableConfigs: Record<string, TableFieldConfig> = {
     keyField: "id",
   },
 
+  // Tabella note
+  note: {
+    displayName: "Note",
+    fields: ["id", "titolo", "id_utente", "priorita"],
+    sortField: "priorita",
+    dateFields: ["data_creazione", "modifica", "notifica"],
+    keyField: "id",
+  },
+
   // Tabella scadenze
   scadenze: {
     displayName: "Scadenze",
