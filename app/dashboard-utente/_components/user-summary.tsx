@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import type { LucideIcon } from "lucide-react"
 import { memo, useCallback, useMemo } from "react"
 
-// Memoized SummaryCard per evitare re-render inutili
+// Memoized SummaryCard - SEMPRE mostrata anche con count 0
 const SummaryCard = memo(({ type, label, count, icon: Icon, color, textColor }: SummaryCount) => {
   const href = useMemo(() => `/data-explorer?table=${encodeURIComponent(type)}`, [type])
 
@@ -32,7 +32,9 @@ const SummaryCard = memo(({ type, label, count, icon: Icon, color, textColor }: 
           <div className={`text-3xl font-bold ${textColor}`} aria-label={`${count} elementi`}>
             {count.toLocaleString("it-IT")}
           </div>
-          <p className={`text-xs ${textColor} opacity-70 mt-1`}>Elementi totali</p>
+          <p className={`text-xs ${textColor} opacity-70 mt-1`}>
+            {count === 0 ? "Nessun elemento" : "Elementi totali"}
+          </p>
         </CardContent>
       </Card>
     </Link>
@@ -95,6 +97,9 @@ const UpcomingItemsList = memo(
             <CardTitle className="text-lg flex items-center">
               <Icon className="h-5 w-5 mr-2 text-gray-500" aria-hidden="true" />
               {title}
+              <Badge variant="secondary" className="ml-2">
+                0
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -139,7 +144,7 @@ export function UserSummary() {
     }
   }, [refetch])
 
-  // Memoized loading skeleton
+  // Memoized loading skeleton per tutte le 8 tabelle
   const loadingSkeleton = useMemo(
     () => (
       <div className="space-y-6">
@@ -225,7 +230,7 @@ export function UserSummary() {
 
   return (
     <div className="space-y-6">
-      {/* Sezione contatori */}
+      {/* Sezione contatori - SEMPRE tutte le 8 tabelle anche con count 0 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
         {dashboardData.summaryCounts.map((summary) => (
           <SummaryCard key={summary.type} {...summary} />
