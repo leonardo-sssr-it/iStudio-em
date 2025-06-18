@@ -438,3 +438,6 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
     </Card>
   )
 }
+
+// Export with English name for compatibility
+export { NotaForm as NoteForm }
