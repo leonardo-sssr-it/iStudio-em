@@ -12,6 +12,7 @@ import { UserTablesTab } from "@/components/user-tables-tab"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { AgendaWidget } from "@/components/agenda-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
+import { QuickNotesWidget } from "@/components/quick-notes-widget"
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
@@ -108,7 +109,14 @@ export default function DashboardPage() {
                 </TabsContent>
 
                 <TabsContent value="agenda" className="space-y-4 min-w-full">
-                  <AgendaWidget />
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <div className="lg:col-span-3">
+                      <AgendaWidget />
+                    </div>
+                    <div className="lg:col-span-1">
+                      <QuickNotesWidget />
+                    </div>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="kanban" className="space-y-4 min-w-full">
