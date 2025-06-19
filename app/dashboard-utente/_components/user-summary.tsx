@@ -15,13 +15,13 @@ const SummaryCard = ({ type, label, count, icon: Icon, color, textColor }: Summa
     <Card
       className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color} cursor-pointer transform hover:scale-105 transition-transform`}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className={`text-sm font-medium ${textColor}`}>{label}</CardTitle>
-        <Icon className={`h-5 w-5 ${textColor} opacity-80`} />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+        <CardTitle className={`text-xs font-medium ${textColor} truncate`}>{label}</CardTitle>
+        <Icon className={`h-4 w-4 ${textColor} opacity-80 flex-shrink-0`} />
       </CardHeader>
-      <CardContent>
-        <div className={`text-3xl font-bold ${textColor}`}>{count}</div>
-        <p className={`text-xs ${textColor} opacity-70 mt-1`}>Elementi totali</p>
+      <CardContent className="pt-1">
+        <div className={`text-xl font-bold ${textColor}`}>{count}</div>
+        <p className={`text-[10px] ${textColor} opacity-70 mt-0.5`}>Elementi totali</p>
       </CardContent>
     </Card>
   </Link>
@@ -35,14 +35,14 @@ const UpcomingItemsList = ({
   if (!items.length) {
     return (
       <Card className="col-span-1">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center">
-            <Icon className="h-5 w-5 mr-2 text-gray-500" />
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center">
+            <Icon className="h-4 w-4 mr-2 text-gray-500" />
             {title}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-500">Nessun elemento imminente.</p>
+        <CardContent className="pt-0">
+          <p className="text-xs text-gray-500">Nessun elemento imminente.</p>
         </CardContent>
       </Card>
     )
@@ -50,32 +50,32 @@ const UpcomingItemsList = ({
 
   return (
     <Card className="col-span-1 shadow-md">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center">
-          <Icon className="h-5 w-5 mr-2 text-primary" />
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center">
+          <Icon className="h-4 w-4 mr-2 text-primary" />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-2">
+      <CardContent className="pt-0">
+        <ul className="space-y-1.5">
           {items.map((item) => (
-            <li key={`${item.tabella_origine}-${item.id_origine}`} className="text-sm border-b pb-1 last:border-b-0">
+            <li key={`${item.tabella_origine}-${item.id_origine}`} className="text-xs border-b pb-1 last:border-b-0">
               <Link
                 href={`/data-explorer/${item.tabella_origine}/${item.id_origine}`}
                 className="hover:underline group"
               >
-                <div className="flex justify-between items-center">
-                  <span className="font-medium group-hover:text-primary truncate" title={item.title}>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="font-medium group-hover:text-primary truncate flex-1" title={item.title}>
                     {item.title}
                   </span>
                   <Badge
                     variant="outline"
-                    className={`${item.color?.replace("text-", "border-").replace("600", "400")} ${item.color?.replace("text-", "bg-").replace("600", "50")} ${item.color}`}
+                    className={`${item.color?.replace("text-", "border-").replace("600", "400")} ${item.color?.replace("text-", "bg-").replace("600", "50")} text-white text-[10px] px-1.5 py-0.5 flex-shrink-0`}
                   >
                     {format(item.date, "dd MMM HH:mm", { locale: it })}
                   </Badge>
                 </div>
-                <span className={`text-xs ${item.color} opacity-90 capitalize`}>{item.type}</span>
+                <span className={`text-[10px] ${item.color} opacity-90 capitalize`}>{item.type}</span>
               </Link>
             </li>
           ))}
@@ -91,34 +91,34 @@ export function UserSummary() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
           {Array.from({ length: 8 }).map((_, i) => (
             <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-5 w-24" />
+              <CardHeader className="pb-1">
+                <Skeleton className="h-4 w-20" />
               </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-12" />
-                <Skeleton className="h-4 w-20 mt-1" />
+              <CardContent className="pt-1">
+                <Skeleton className="h-6 w-10" />
+                <Skeleton className="h-3 w-16 mt-0.5" />
               </CardContent>
             </Card>
           ))}
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
+            <CardHeader className="pb-2">
+              <Skeleton className="h-5 w-28" />
             </CardHeader>
-            <CardContent>
-              <Skeleton className="h-20 w-full" />
+            <CardContent className="pt-0">
+              <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
           <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
+            <CardHeader className="pb-2">
+              <Skeleton className="h-5 w-28" />
             </CardHeader>
-            <CardContent>
-              <Skeleton className="h-20 w-full" />
+            <CardContent className="pt-0">
+              <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
         </div>
@@ -129,25 +129,25 @@ export function UserSummary() {
   if (error) {
     return (
       <Card className="bg-destructive/10 border-destructive">
-        <CardHeader className="flex flex-row items-center space-x-2">
-          <AlertCircle className="h-5 w-5 text-destructive" />
-          <CardTitle className="text-destructive">Errore nel caricamento del riepilogo</CardTitle>
+        <CardHeader className="flex flex-row items-center space-x-2 pb-2">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-destructive text-base">Errore nel caricamento del riepilogo</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-destructive">{error}</p>
-          <p className="text-sm text-destructive-foreground/80 mt-1">Prova a ricaricare la pagina.</p>
+        <CardContent className="pt-0">
+          <p className="text-xs text-destructive">{error}</p>
+          <p className="text-xs text-destructive-foreground/80 mt-1">Prova a ricaricare la pagina.</p>
         </CardContent>
       </Card>
     )
   }
 
   if (!dashboardData) {
-    return <p>Nessun dato disponibile per il riepilogo.</p>
+    return <p className="text-sm">Nessun dato disponibile per il riepilogo.</p>
   }
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
         {dashboardData.summaryCounts.map((summary) => (
           <SummaryCard key={summary.type} {...summary} />
         ))}

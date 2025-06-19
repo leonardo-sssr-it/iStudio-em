@@ -46,7 +46,7 @@ const TABLE_CONFIGS = [
     icon: Calendar,
     color: "bg-blue-50 border-blue-200",
     textColor: "text-blue-700",
-    dateField: "data_inizio", // CORRETTO: era "data_appuntamento"
+    dateField: "data_inizio",
     titleField: "titolo",
   },
   {
@@ -83,7 +83,7 @@ const TABLE_CONFIGS = [
     color: "bg-purple-50 border-purple-200",
     textColor: "text-purple-700",
     dateField: "data_fine",
-    titleField: "nome", // CORRETTO: era "nome"
+    titleField: "nome",
   },
   {
     table: "clienti",
@@ -92,7 +92,7 @@ const TABLE_CONFIGS = [
     color: "bg-indigo-50 border-indigo-200",
     textColor: "text-indigo-700",
     dateField: "data_creazione",
-    titleField: "ragione_sociale", // CORRETTO: era "nome"
+    titleField: "ragione_sociale",
   },
   {
     table: "pagine",
@@ -170,6 +170,8 @@ export function useUserDashboardSummary() {
 
         for (const config of TABLE_CONFIGS) {
           try {
+            console.log(`Dashboard Summary - Processando tabella: ${config.table}`)
+
             // Get count
             const { count, error: countError } = await supabase
               .from(config.table)
@@ -181,6 +183,8 @@ export function useUserDashboardSummary() {
               continue
             }
 
+            console.log(`Dashboard Summary - Count per ${config.table}: ${count}`)
+
             summaryCounts.push({
               type: config.table,
               label: config.label,
@@ -190,8 +194,10 @@ export function useUserDashboardSummary() {
               textColor: config.textColor,
             })
 
-            // Get today's items
-            if (config.dateField) {
+            // Get today's items solo se ci sono elementi nella tabella
+            if (config.dateField && count && count > 0) {
+              console.log(`Dashboard Summary - Cercando elementi di oggi per ${config.table}`)
+
               // Costruisci la query per oggi
               const todayQuery = supabase
                 .from(config.table)
@@ -203,8 +209,13 @@ export function useUserDashboardSummary() {
 
               const { data: todayData, error: todayError } = await todayQuery
 
-              if (!todayError && todayData && todayData.length > 0) {
-                console.log(`Dashboard Summary - Elementi di oggi per ${config.table}:`, todayData.length)
+              if (todayError) {
+                console.warn(`Errore nel recupero oggi per ${config.table}:`, todayError)
+              } else if (todayData && todayData.length > 0) {
+                console.log(
+                  `Dashboard Summary - Trovati ${todayData.length} elementi di oggi per ${config.table}:`,
+                  todayData,
+                )
 
                 const items: UpcomingItem[] = todayData
                   .filter((item) => item[config.dateField])
@@ -218,11 +229,14 @@ export function useUserDashboardSummary() {
                   }))
 
                 allTodayItems.push(...items)
-              } else if (todayError) {
-                console.warn(`Errore nel recupero oggi per ${config.table}:`, todayError)
+                console.log(`Dashboard Summary - Aggiunti ${items.length} elementi di oggi da ${config.table}`)
+              } else {
+                console.log(`Dashboard Summary - Nessun elemento di oggi per ${config.table}`)
               }
 
               // Get next week's items
+              console.log(`Dashboard Summary - Cercando elementi prossima settimana per ${config.table}`)
+
               const nextWeekQuery = supabase
                 .from(config.table)
                 .select(`id, ${config.titleField}, ${config.dateField}`)
@@ -234,8 +248,13 @@ export function useUserDashboardSummary() {
 
               const { data: nextWeekData, error: nextWeekError } = await nextWeekQuery
 
-              if (!nextWeekError && nextWeekData && nextWeekData.length > 0) {
-                console.log(`Dashboard Summary - Elementi prossima settimana per ${config.table}:`, nextWeekData.length)
+              if (nextWeekError) {
+                console.warn(`Errore nel recupero prossima settimana per ${config.table}:`, nextWeekError)
+              } else if (nextWeekData && nextWeekData.length > 0) {
+                console.log(
+                  `Dashboard Summary - Trovati ${nextWeekData.length} elementi prossima settimana per ${config.table}:`,
+                  nextWeekData,
+                )
 
                 const items: UpcomingItem[] = nextWeekData
                   .filter((item) => item[config.dateField])
@@ -249,12 +268,19 @@ export function useUserDashboardSummary() {
                   }))
 
                 allNextWeekItems.push(...items)
-              } else if (nextWeekError) {
-                console.warn(`Errore nel recupero prossima settimana per ${config.table}:`, nextWeekError)
+                console.log(
+                  `Dashboard Summary - Aggiunti ${items.length} elementi prossima settimana da ${config.table}`,
+                )
+              } else {
+                console.log(`Dashboard Summary - Nessun elemento prossima settimana per ${config.table}`)
               }
+            } else {
+              console.log(
+                `Dashboard Summary - Saltando ricerca date per ${config.table} (count: ${count}, dateField: ${config.dateField})`,
+              )
             }
           } catch (err) {
-            console.warn(`Errore nel recupero dati per ${config.table}:`, err)
+            console.error(`Errore nel recupero dati per ${config.table}:`, err)
           }
         }
 
@@ -262,8 +288,13 @@ export function useUserDashboardSummary() {
         allTodayItems.sort((a, b) => a.date.getTime() - b.date.getTime())
         allNextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
 
-        console.log("Dashboard Summary - Totale elementi di oggi:", allTodayItems.length)
-        console.log("Dashboard Summary - Totale elementi prossima settimana:", allNextWeekItems.length)
+        console.log("Dashboard Summary - RISULTATI FINALI:")
+        console.log("- Totale elementi di oggi:", allTodayItems.length)
+        console.log("- Totale elementi prossima settimana:", allNextWeekItems.length)
+        console.log(
+          "- Summary counts:",
+          summaryCounts.map((s) => `${s.label}: ${s.count}`),
+        )
 
         setDashboardData({
           summaryCounts,
