@@ -10,12 +10,12 @@ import {
   endOfMonth,
   eachDayOfInterval,
   isSameDay,
-  isToday,
   isWithinInterval,
   addWeeks,
   addMonths,
   subWeeks,
   subMonths,
+  isToday,
 } from "date-fns"
 import { it } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -904,48 +904,39 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
 
   const { startDate, endDate } = useMemo(() => {
     let start: Date, end: Date
+
     switch (view) {
       case "daily":
         start = new Date(currentDate)
-        start.setHours(0, 0, 0, 0)
+        start.setHours(0, 0, 0, 1) // 00:00:00.001
         end = new Date(currentDate)
-        end.setHours(23, 59, 59, 999)
+        end.setHours(23, 59, 59, 999) // 23:59:59.999
         break
       case "weekly":
-        start = startOfWeek(currentDate, { weekStartsOn: 1 })
-        start.setHours(0, 0, 0, 0)
-        end = endOfWeek(currentDate, { weekStartsOn: 1 })
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
+        start = new Date(weekStart)
+        start.setHours(0, 0, 0, 1)
+        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
+        end = new Date(weekEnd)
         end.setHours(23, 59, 59, 999)
         break
       case "monthly":
-        start = startOfMonth(currentDate)
-        start.setHours(0, 0, 0, 0)
-        end = endOfMonth(currentDate)
+        const monthStart = startOfMonth(currentDate)
+        start = new Date(monthStart)
+        start.setHours(0, 0, 0, 1)
+        const monthEnd = endOfMonth(currentDate)
+        end = new Date(monthEnd)
         end.setHours(23, 59, 59, 999)
         break
       default:
         start = new Date(currentDate)
-        start.setHours(0, 0, 0, 0)
+        start.setHours(0, 0, 0, 1)
         end = new Date(currentDate)
         end.setHours(23, 59, 59, 999)
     }
-    if (!(start instanceof Date) || isNaN(start.getTime())) {
-      if (isDebugAllowed) console.error("startDate non è un oggetto Date valido", start)
-      start = new Date()
-      start.setHours(0, 0, 0, 0)
-    }
-    if (!(end instanceof Date) || isNaN(end.getTime())) {
-      if (isDebugAllowed) console.error("endDate non è un oggetto Date valido", end)
-      end = new Date()
-      end.setHours(23, 59, 59, 999)
-    }
-    conditionalLog(
-      "AgendaWidget - Date calcolate:",
-      { view, currentDate: currentDate.toISOString(), startDate: start.toISOString(), endDate: end.toISOString() },
-      isDebugAllowed,
-    )
+
     return { startDate: start, endDate: end }
-  }, [currentDate, view, isDebugAllowed])
+  }, [currentDate, view]) // Rimuovere isDebugAllowed dalle dipendenze!
 
   const addLog = useCallback(
     (message: string) => {
@@ -958,29 +949,34 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
 
   useEffect(() => {
     if (items && items.length > 0 && isDebugAllowed) {
-      const invalidItems = checkInvalidDates(items)
-      if (invalidItems.length > 0) {
-        console.warn("AgendaWidget - Elementi con date non valide:", invalidItems)
-        addLog(`Trovati ${invalidItems.length} elementi con date non valide`)
-      }
-      const debugData = items.map((item) => ({
-        id: item.id,
-        titolo: item.titolo,
-        tipo: item.tipo,
-        generale: item.generale,
-        data_inizio: formatDateForDebug(item.data_inizio),
-        data_fine: formatDateForDebug(item.data_fine),
-        data_scadenza: formatDateForDebug(item.data_scadenza),
-        tabella_origine: item.tabella_origine,
-        matchesCurrentDate: item.data_inizio instanceof Date && isSameDay(item.data_inizio, currentDate),
-      }))
-      setDebugItems(debugData)
-      conditionalLog("AgendaWidget - Dettagli elementi:", debugData, isDebugAllowed)
-      addLog(
-        `Caricati ${items.length} elementi, di cui ${debugData.filter((i) => i.matchesCurrentDate).length} corrispondono alla data corrente`,
-      )
+      // Aggiungi un debounce per evitare loop
+      const timeoutId = setTimeout(() => {
+        const invalidItems = checkInvalidDates(items)
+        if (invalidItems.length > 0) {
+          console.warn("AgendaWidget - Elementi con date non valide:", invalidItems)
+          addLog(`Trovati ${invalidItems.length} elementi con date non valide`)
+        }
+        const debugData = items.map((item) => ({
+          id: item.id,
+          titolo: item.titolo,
+          tipo: item.tipo,
+          generale: item.generale,
+          data_inizio: formatDateForDebug(item.data_inizio),
+          data_fine: formatDateForDebug(item.data_fine),
+          data_scadenza: formatDateForDebug(item.data_scadenza),
+          tabella_origine: item.tabella_origine,
+          matchesCurrentDate: item.data_inizio instanceof Date && isSameDay(item.data_inizio, currentDate),
+        }))
+        setDebugItems(debugData)
+        conditionalLog("AgendaWidget - Dettagli elementi:", debugData, isDebugAllowed)
+        addLog(
+          `Caricati ${items.length} elementi, di cui ${debugData.filter((i) => i.matchesCurrentDate).length} corrispondono alla data corrente`,
+        )
+      }, 100)
+
+      return () => clearTimeout(timeoutId)
     }
-  }, [items, currentDate, isDebugAllowed, addLog])
+  }, [items, isDebugAllowed, addLog]) // Rimuovere currentDate dalle dipendenze!
 
   useEffect(() => {
     if (isDebugAllowed) {
