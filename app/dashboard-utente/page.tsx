@@ -55,6 +55,13 @@ export default function UserDashboardPage() {
             <p className="text-muted-foreground">Ecco una panoramica delle tue attività e impegni.</p>
           </div>
 
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight mb-4">Riepilogo Attività</h2>
+            <UserSummary />
+          </div>
+
+          <Separator className="my-6" />
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h2 className="text-2xl font-semibold tracking-tight">Widget Disponibili</h2>
@@ -93,13 +100,6 @@ export default function UserDashboardPage() {
                 </CardContent>
               </Card>
             )}
-          </div>
-
-          <Separator className="my-6" />
-
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight mb-4">Riepilogo Attività</h2>
-            <UserSummary />
           </div>
         </div>
       </div>
