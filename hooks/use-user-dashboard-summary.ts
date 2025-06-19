@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { normalizeDate } from "@/lib/date-utils"
 import {
   Calendar,
   ClipboardList,
@@ -47,7 +46,7 @@ const TABLE_CONFIGS = [
     icon: Calendar,
     color: "bg-blue-50 border-blue-200",
     textColor: "text-blue-700",
-    dateField: "data_appuntamento",
+    dateField: "data_inizio", // CORRETTO: era "data_appuntamento"
     titleField: "titolo",
   },
   {
@@ -84,7 +83,7 @@ const TABLE_CONFIGS = [
     color: "bg-purple-50 border-purple-200",
     textColor: "text-purple-700",
     dateField: "data_fine",
-    titleField: "nome",
+    titleField: "nome", // CORRETTO: era "nome"
   },
   {
     table: "clienti",
@@ -93,7 +92,7 @@ const TABLE_CONFIGS = [
     color: "bg-indigo-50 border-indigo-200",
     textColor: "text-indigo-700",
     dateField: "data_creazione",
-    titleField: "nome",
+    titleField: "ragione_sociale", // CORRETTO: era "nome"
   },
   {
     table: "pagine",
@@ -133,31 +132,35 @@ export function useUserDashboardSummary() {
         setIsLoading(true)
         setError(null)
 
-        // Calcolo date usando normalizeDate
+        // Calcolo date CORRETTE senza timezone
         const today = new Date()
-        const todayStart = normalizeDate(today, "start") // 00:00:00.000
-        const todayEnd = normalizeDate(today, "end") // 23:59:59.999
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 1)
+        const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
 
         const tomorrow = new Date(today)
         tomorrow.setDate(today.getDate() + 1)
-        const tomorrowStart = normalizeDate(tomorrow, "start") // 00:00:00.001 del giorno dopo
+        const tomorrowStart = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), 0, 0, 0, 1)
 
         const nextWeekEnd = new Date(today)
         nextWeekEnd.setDate(today.getDate() + 7)
-        const nextWeekEndNormalized = normalizeDate(nextWeekEnd, "end") // 23:59:59.999 tra 7 giorni
+        const nextWeekEndNormalized = new Date(
+          nextWeekEnd.getFullYear(),
+          nextWeekEnd.getMonth(),
+          nextWeekEnd.getDate(),
+          23,
+          59,
+          59,
+          999,
+        )
 
-        // Aggiungo 1 millisecondo per evitare sovrapposizioni
-        const todayStartPlusOne = new Date(todayStart!.getTime() + 1)
-        const tomorrowStartPlusOne = new Date(tomorrowStart!.getTime() + 1)
-
-        console.log("Date range per oggi:", {
-          start: todayStartPlusOne.toISOString(),
-          end: todayEnd?.toISOString(),
+        console.log("Dashboard Summary - Date range per oggi:", {
+          start: todayStart.toLocaleString(),
+          end: todayEnd.toLocaleString(),
         })
 
-        console.log("Date range per prossima settimana:", {
-          start: tomorrowStartPlusOne.toISOString(),
-          end: nextWeekEndNormalized?.toISOString(),
+        console.log("Dashboard Summary - Date range per prossima settimana:", {
+          start: tomorrowStart.toLocaleString(),
+          end: nextWeekEndNormalized.toLocaleString(),
         })
 
         // Fetch counts for each table
@@ -167,7 +170,7 @@ export function useUserDashboardSummary() {
 
         for (const config of TABLE_CONFIGS) {
           try {
-            // Get count (mantieni questa parte)
+            // Get count
             const { count, error: countError } = await supabase
               .from(config.table)
               .select("*", { count: "exact", head: true })
@@ -188,17 +191,20 @@ export function useUserDashboardSummary() {
             })
 
             // Get today's items
-            if (config.dateField && todayStartPlusOne && todayEnd) {
-              const { data: todayData, error: todayError } = await supabase
+            if (config.dateField) {
+              // Costruisci la query per oggi
+              const todayQuery = supabase
                 .from(config.table)
                 .select(`id, ${config.titleField}, ${config.dateField}`)
                 .eq("id_utente", user.id)
-                .gte(config.dateField, todayStartPlusOne.toISOString())
+                .gte(config.dateField, todayStart.toISOString())
                 .lte(config.dateField, todayEnd.toISOString())
                 .order(config.dateField, { ascending: true })
 
+              const { data: todayData, error: todayError } = await todayQuery
+
               if (!todayError && todayData && todayData.length > 0) {
-                console.log(`Elementi di oggi per ${config.table}:`, todayData.length)
+                console.log(`Dashboard Summary - Elementi di oggi per ${config.table}:`, todayData.length)
 
                 const items: UpcomingItem[] = todayData
                   .filter((item) => item[config.dateField])
@@ -212,22 +218,24 @@ export function useUserDashboardSummary() {
                   }))
 
                 allTodayItems.push(...items)
+              } else if (todayError) {
+                console.warn(`Errore nel recupero oggi per ${config.table}:`, todayError)
               }
-            }
 
-            // Get next week's items
-            if (config.dateField && tomorrowStartPlusOne && nextWeekEndNormalized) {
-              const { data: nextWeekData, error: nextWeekError } = await supabase
+              // Get next week's items
+              const nextWeekQuery = supabase
                 .from(config.table)
                 .select(`id, ${config.titleField}, ${config.dateField}`)
                 .eq("id_utente", user.id)
-                .gte(config.dateField, tomorrowStartPlusOne.toISOString())
+                .gte(config.dateField, tomorrowStart.toISOString())
                 .lte(config.dateField, nextWeekEndNormalized.toISOString())
                 .order(config.dateField, { ascending: true })
                 .limit(10)
 
+              const { data: nextWeekData, error: nextWeekError } = await nextWeekQuery
+
               if (!nextWeekError && nextWeekData && nextWeekData.length > 0) {
-                console.log(`Elementi prossima settimana per ${config.table}:`, nextWeekData.length)
+                console.log(`Dashboard Summary - Elementi prossima settimana per ${config.table}:`, nextWeekData.length)
 
                 const items: UpcomingItem[] = nextWeekData
                   .filter((item) => item[config.dateField])
@@ -241,6 +249,8 @@ export function useUserDashboardSummary() {
                   }))
 
                 allNextWeekItems.push(...items)
+              } else if (nextWeekError) {
+                console.warn(`Errore nel recupero prossima settimana per ${config.table}:`, nextWeekError)
               }
             }
           } catch (err) {
@@ -252,8 +262,8 @@ export function useUserDashboardSummary() {
         allTodayItems.sort((a, b) => a.date.getTime() - b.date.getTime())
         allNextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
 
-        console.log("Totale elementi di oggi:", allTodayItems.length)
-        console.log("Totale elementi prossima settimana:", allNextWeekItems.length)
+        console.log("Dashboard Summary - Totale elementi di oggi:", allTodayItems.length)
+        console.log("Dashboard Summary - Totale elementi prossima settimana:", allNextWeekItems.length)
 
         setDashboardData({
           summaryCounts,

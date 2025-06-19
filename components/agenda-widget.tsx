@@ -903,40 +903,35 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
   const isDebugAllowed = isAdmin && isDebugEnabled && !isDebugConfigLoading
 
   const { startDate, endDate } = useMemo(() => {
+    // Crea date stabili usando solo i valori numerici
+    const currentDateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`
+
     let start: Date, end: Date
 
     switch (view) {
       case "daily":
-        start = new Date(currentDate)
-        start.setHours(0, 0, 0, 1) // 00:00:00.001
-        end = new Date(currentDate)
-        end.setHours(23, 59, 59, 999) // 23:59:59.999
+        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
+        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
         break
       case "weekly":
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
-        start = new Date(weekStart)
-        start.setHours(0, 0, 0, 1)
+        start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 1)
         const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
-        end = new Date(weekEnd)
-        end.setHours(23, 59, 59, 999)
+        end = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999)
         break
       case "monthly":
         const monthStart = startOfMonth(currentDate)
-        start = new Date(monthStart)
-        start.setHours(0, 0, 0, 1)
+        start = new Date(monthStart.getFullYear(), monthStart.getMonth(), monthStart.getDate(), 0, 0, 0, 1)
         const monthEnd = endOfMonth(currentDate)
-        end = new Date(monthEnd)
-        end.setHours(23, 59, 59, 999)
+        end = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59, 999)
         break
       default:
-        start = new Date(currentDate)
-        start.setHours(0, 0, 0, 1)
-        end = new Date(currentDate)
-        end.setHours(23, 59, 59, 999)
+        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
+        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
     }
 
     return { startDate: start, endDate: end }
-  }, [currentDate, view]) // Rimuovere isDebugAllowed dalle dipendenze!
+  }, [currentDate.getTime(), view]) // Usa getTime() per dipendenza stabile
 
   const addLog = useCallback(
     (message: string) => {
