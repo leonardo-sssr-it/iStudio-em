@@ -98,10 +98,7 @@ function SidebarContent({
   return (
     <div className="space-y-4 py-4 h-full flex flex-col">
       <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
-          iStudio
-          <span className="text-xs text-muted-foreground ml-1">v0.4</span>
-        </h2>
+        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">iStudio</h2>
         <div className="space-y-1">
           <Button asChild variant={pathname === "/dashboard" ? "secondary" : "ghost"} className="w-full justify-start">
             <Link href="/dashboard">
