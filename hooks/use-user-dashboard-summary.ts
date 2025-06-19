@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
+import { normalizeDate } from "@/lib/date-utils"
 import {
   Calendar,
   ClipboardList,
@@ -132,9 +133,37 @@ export function useUserDashboardSummary() {
         setIsLoading(true)
         setError(null)
 
+        // Calcolo date usando normalizeDate
+        const today = new Date()
+        const todayStart = normalizeDate(today, "start") // 00:00:00.000
+        const todayEnd = normalizeDate(today, "end") // 23:59:59.999
+
+        const tomorrow = new Date(today)
+        tomorrow.setDate(today.getDate() + 1)
+        const tomorrowStart = normalizeDate(tomorrow, "start") // 00:00:00.001 del giorno dopo
+
+        const nextWeekEnd = new Date(today)
+        nextWeekEnd.setDate(today.getDate() + 7)
+        const nextWeekEndNormalized = normalizeDate(nextWeekEnd, "end") // 23:59:59.999 tra 7 giorni
+
+        // Aggiungo 1 millisecondo per evitare sovrapposizioni
+        const todayStartPlusOne = new Date(todayStart!.getTime() + 1)
+        const tomorrowStartPlusOne = new Date(tomorrowStart!.getTime() + 1)
+
+        console.log("Date range per oggi:", {
+          start: todayStartPlusOne.toISOString(),
+          end: todayEnd?.toISOString(),
+        })
+
+        console.log("Date range per prossima settimana:", {
+          start: tomorrowStartPlusOne.toISOString(),
+          end: nextWeekEndNormalized?.toISOString(),
+        })
+
         // Fetch counts for each table
         const summaryCounts: SummaryCount[] = []
-        const allUpcomingItems: UpcomingItem[] = []
+        const allTodayItems: UpcomingItem[] = []
+        const allNextWeekItems: UpcomingItem[] = []
 
         for (const config of TABLE_CONFIGS) {
           try {
@@ -158,42 +187,60 @@ export function useUserDashboardSummary() {
               textColor: config.textColor,
             })
 
-            // Get upcoming items - VERSIONE CORRETTA
-            if (config.dateField) {
-              const now = new Date()
-              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-              const nextWeek = new Date(today)
-              nextWeek.setDate(today.getDate() + 7)
-
-              // Query per elementi futuri (incluso oggi)
-              const { data: upcomingData, error: upcomingError } = await supabase
+            // Get today's items
+            if (config.dateField && todayStartPlusOne && todayEnd) {
+              const { data: todayData, error: todayError } = await supabase
                 .from(config.table)
                 .select(`id, ${config.titleField}, ${config.dateField}`)
                 .eq("id_utente", user.id)
-                .gte(config.dateField, today.toISOString())
+                .gte(config.dateField, todayStartPlusOne.toISOString())
+                .lte(config.dateField, todayEnd.toISOString())
                 .order(config.dateField, { ascending: true })
-                .limit(20) // Aumentiamo il limite per avere più dati
 
-              if (!upcomingError && upcomingData && upcomingData.length > 0) {
-                console.log(`Dati trovati per ${config.table}:`, upcomingData.length) // Debug
+              if (!todayError && todayData && todayData.length > 0) {
+                console.log(`Elementi di oggi per ${config.table}:`, todayData.length)
 
-                const items: UpcomingItem[] = upcomingData
-                  .filter((item) => item[config.dateField]) // Filtra elementi con data valida
-                  .map((item) => {
-                    const itemDate = new Date(item[config.dateField])
-                    return {
-                      id_origine: item.id,
-                      tabella_origine: config.table,
-                      title: item[config.titleField] || "Senza titolo",
-                      date: itemDate,
-                      type: config.label.toLowerCase(),
-                      color: config.textColor,
-                    }
-                  })
+                const items: UpcomingItem[] = todayData
+                  .filter((item) => item[config.dateField])
+                  .map((item) => ({
+                    id_origine: item.id,
+                    tabella_origine: config.table,
+                    title: item[config.titleField] || "Senza titolo",
+                    date: new Date(item[config.dateField]),
+                    type: config.label.toLowerCase(),
+                    color: config.textColor,
+                  }))
 
-                allUpcomingItems.push(...items)
-              } else if (upcomingError) {
-                console.warn(`Errore nel recupero upcoming per ${config.table}:`, upcomingError)
+                allTodayItems.push(...items)
+              }
+            }
+
+            // Get next week's items
+            if (config.dateField && tomorrowStartPlusOne && nextWeekEndNormalized) {
+              const { data: nextWeekData, error: nextWeekError } = await supabase
+                .from(config.table)
+                .select(`id, ${config.titleField}, ${config.dateField}`)
+                .eq("id_utente", user.id)
+                .gte(config.dateField, tomorrowStartPlusOne.toISOString())
+                .lte(config.dateField, nextWeekEndNormalized.toISOString())
+                .order(config.dateField, { ascending: true })
+                .limit(10)
+
+              if (!nextWeekError && nextWeekData && nextWeekData.length > 0) {
+                console.log(`Elementi prossima settimana per ${config.table}:`, nextWeekData.length)
+
+                const items: UpcomingItem[] = nextWeekData
+                  .filter((item) => item[config.dateField])
+                  .map((item) => ({
+                    id_origine: item.id,
+                    tabella_origine: config.table,
+                    title: item[config.titleField] || "Senza titolo",
+                    date: new Date(item[config.dateField]),
+                    type: config.label.toLowerCase(),
+                    color: config.textColor,
+                  }))
+
+                allNextWeekItems.push(...items)
               }
             }
           } catch (err) {
@@ -201,38 +248,17 @@ export function useUserDashboardSummary() {
           }
         }
 
-        // Debug: mostra quanti elementi abbiamo trovato
-        console.log("Tutti gli elementi trovati:", allUpcomingItems.length)
+        // Sort items by date
+        allTodayItems.sort((a, b) => a.date.getTime() - b.date.getTime())
+        allNextWeekItems.sort((a, b) => a.date.getTime() - b.date.getTime())
 
-        // Sort upcoming items by date
-        allUpcomingItems.sort((a, b) => a.date.getTime() - b.date.getTime())
-
-        // Separate today's items from next week's items - LOGICA CORRETTA
-        const now = new Date()
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const todayEnd = new Date(todayStart)
-        todayEnd.setDate(todayEnd.getDate() + 1)
-
-        const nextWeekEnd = new Date(todayStart)
-        nextWeekEnd.setDate(todayStart.getDate() + 7)
-
-        const todaysItems = allUpcomingItems.filter((item) => {
-          return item.date >= todayStart && item.date < todayEnd
-        })
-
-        const nextWeekItems = allUpcomingItems
-          .filter((item) => {
-            return item.date >= todayEnd && item.date <= nextWeekEnd
-          })
-          .slice(0, 10)
-
-        console.log("Elementi di oggi:", todaysItems.length) // Debug
-        console.log("Elementi prossima settimana:", nextWeekItems.length) // Debug
+        console.log("Totale elementi di oggi:", allTodayItems.length)
+        console.log("Totale elementi prossima settimana:", allNextWeekItems.length)
 
         setDashboardData({
           summaryCounts,
-          todaysItems,
-          nextWeekItems,
+          todaysItems: allTodayItems,
+          nextWeekItems: allNextWeekItems,
         })
       } catch (err: any) {
         console.error("Errore nel recupero dei dati del dashboard:", err)
