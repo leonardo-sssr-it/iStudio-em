@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
@@ -273,11 +273,12 @@ export default function DataExplorerPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [filteredData, setFilteredData] = useState<any[]>([])
   const [view, setView] = useState<"list" | "grid">("list")
+  const [activeTab, setActiveTab] = useState<"columns" | "filters">("columns")
 
   // Leggi il parametro 'table' dalla query string all'inizializzazione
   useEffect(() => {
     const tableParam = searchParams.get("table")
-    if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam)) {
+    if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam) && !selectedTable) {
       setSelectedTable(tableParam)
     }
   }, [searchParams])
@@ -296,7 +297,6 @@ export default function DataExplorerPage() {
     }
   }, [searchTerm, data, sortField, sortDirection])
 
-  // Carica i dati dalla tabella selezionata
   const loadTableData = async () => {
     if (!supabase || !selectedTable || !user?.id) return
 
@@ -306,22 +306,33 @@ export default function DataExplorerPage() {
       const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
       const defaultSort = tableConfig?.defaultSort || "id"
 
+      // Determina il tipo di id_utente per questa tabella
+      const userIdType = tableConfig?.types?.id_utente
+      const userId = userIdType === "string" ? String(user.id) : user.id
+
+      console.log(`[DataExplorer] Caricamento dati da ${selectedTable} per utente ${userId} (tipo: ${userIdType})`)
+
       // Esegui la query
       const { data, error } = await supabase
         .from(selectedTable)
         .select("*")
-        .eq("id_utente", user.id)
+        .eq("id_utente", userId)
         .order(defaultSort, { ascending: true })
 
       if (error) {
         throw error
       }
 
+      console.log(`[DataExplorer] Caricati ${data?.length || 0} elementi da ${selectedTable}`)
       setData(data || [])
       setSortField(defaultSort)
       setSortDirection("asc")
     } catch (error: any) {
       console.error(`Errore nel caricamento dei dati da ${selectedTable}:`, error)
+
+      // Non resettare selectedTable in caso di errore, mantieni la selezione
+      setData([]) // Imposta array vuoto invece di undefined
+
       toast({
         title: "Errore",
         description: `Impossibile caricare i dati: ${error.message}`,
@@ -692,6 +703,13 @@ export default function DataExplorerPage() {
     return <Icon className="h-5 w-5" />
   }
 
+  // Gestisce la selezione di una tabella
+  const handleTableSelect = useCallback((tableName: string) => {
+    console.log(`[DataExplorer] Selezione tabella: ${tableName}`)
+    setSelectedTable(tableName)
+    setActiveTab("columns")
+  }, [])
+
   return (
     <div className="w-full max-w-none space-y-6">
       <Card className="border-border/50">
@@ -714,7 +732,13 @@ export default function DataExplorerPage() {
           <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-4">
             {/* Selezione tabella */}
             <div className="w-full lg:w-1/3">
-              <Select value={selectedTable} onValueChange={setSelectedTable}>
+              <Select
+                value={selectedTable}
+                onValueChange={(value) => {
+                  console.log(`[DataExplorer] Select onChange: ${value}`)
+                  setSelectedTable(value)
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleziona una tabella" />
                 </SelectTrigger>
@@ -807,7 +831,7 @@ export default function DataExplorerPage() {
                     key={table.id}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors"
-                    onClick={() => setSelectedTable(table.id)}
+                    onClick={() => handleTableSelect(table.id)}
                   >
                     <table.icon className="h-6 w-6" />
                     <span className="text-xs font-medium">{table.label}</span>
