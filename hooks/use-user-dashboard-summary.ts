@@ -9,7 +9,6 @@ import {
   Clock,
   CheckSquare,
   BarChart3,
-  Users,
   FileText,
   StickyNote,
   type LucideIcon,
@@ -55,7 +54,7 @@ const TABLE_CONFIGS = [
     icon: ClipboardList,
     color: "bg-green-50 border-green-200",
     textColor: "text-green-700",
-    dateField: "data_scadenza",
+    dateField: "data_inizio", // CORRETTO: era "data_scadenza"
     titleField: "titolo",
   },
   {
@@ -64,7 +63,7 @@ const TABLE_CONFIGS = [
     icon: Clock,
     color: "bg-red-50 border-red-200",
     textColor: "text-red-700",
-    dateField: "data_scadenza",
+    dateField: "scadenza", // CORRETTO: era "data_scadenza"
     titleField: "titolo",
   },
   {
@@ -73,7 +72,7 @@ const TABLE_CONFIGS = [
     icon: CheckSquare,
     color: "bg-yellow-50 border-yellow-200",
     textColor: "text-yellow-700",
-    dateField: "data_scadenza",
+    dateField: "scadenza", // CORRETTO: era "data_scadenza"
     titleField: "titolo",
   },
   {
@@ -83,17 +82,9 @@ const TABLE_CONFIGS = [
     color: "bg-purple-50 border-purple-200",
     textColor: "text-purple-700",
     dateField: "data_fine",
-    titleField: "nome",
+    titleField: "titolo", // CORRETTO: era "nome"
   },
-  {
-    table: "clienti",
-    label: "Clienti",
-    icon: Users,
-    color: "bg-indigo-50 border-indigo-200",
-    textColor: "text-indigo-700",
-    dateField: "data_creazione",
-    titleField: "ragione_sociale",
-  },
+  // RIMOSSO: clienti (come richiesto)
   {
     table: "pagine",
     label: "Pagine",
