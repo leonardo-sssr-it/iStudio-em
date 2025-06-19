@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-provider"
+import { useSupabase } from "@/lib/supabase-provider"
 import { Loader2 } from "lucide-react"
 
 // Definizione dei ruoli e delle autorizzazioni
@@ -28,6 +29,7 @@ const pathPermissions: Record<string, Permission> = {
   "/dashboard": "read",
   "/dashboard-u": "read", // Aggiungi autorizzazione per dashboard-u
   "/dashboard-mobile": "read", // Aggiungi autorizzazione per dashboard-mobile
+  "/dashboard-utente": "read", // Aggiungi autorizzazione per dashboard-mobile
   // Aggiungi altri percorsi secondo necessità
 }
 
@@ -39,6 +41,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, adminOnly = false, requiredPermission }: ProtectedRouteProps) {
   const { user, isLoading, isAdmin, checkSession } = useAuth()
+  const { isInitializing: supabaseInitializing } = useSupabase()
   const router = useRouter()
   const pathname = usePathname()
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -62,46 +65,54 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
 
   // Utilizziamo un effetto per verificare l'autorizzazione una sola volta
   useEffect(() => {
-    // Evita verifiche multiple
-    if (authCheckCompletedRef.current) return
+    const checkAuthorizationLogic = async () => {
+      console.log("ProtectedRoute: Evaluating authorization...", {
+        pathname,
+        isLoading,
+        supabaseInitializing,
+        user: !!user,
+        isAdmin,
+      })
 
-    // Funzione per gestire l'autorizzazione
-    const checkAuthorization = async () => {
-      console.log("ProtectedRoute: Inizio verifica autorizzazione", { isLoading, user: !!user })
-
-      // Se stiamo ancora caricando, non facciamo nulla
-      if (isLoading) {
-        console.log("ProtectedRoute: Ancora in caricamento, aspetto...")
+      // Aspetta che Supabase sia inizializzato
+      if (supabaseInitializing) {
+        console.log("ProtectedRoute: Supabase is initializing, waiting...")
         return
       }
 
-      // Verifichiamo se l'utente è autenticato
-      if (!user) {
-        // Prima di reindirizzare, proviamo a verificare la sessione una volta
-        console.log("ProtectedRoute: Utente non trovato, verifico la sessione...")
+      if (isLoading) {
+        console.log("ProtectedRoute: Auth state is loading. Current isAuthorized:", isAuthorized)
+        return
+      }
 
+      // Scenario 1: No user object
+      if (!user) {
+        setIsAuthorized(false)
+        console.log("ProtectedRoute: No user. Attempting session recovery or redirecting to login.")
         try {
-          const sessionValid = await checkSession()
-          if (sessionValid) {
-            console.log("ProtectedRoute: Sessione valida trovata, aspetto aggiornamento utente...")
-            return // Aspetta che l'utente venga aggiornato
+          const sessionIsValid = await checkSession() // checkSession from useAuth
+          if (sessionIsValid) {
+            // AuthProvider will update user, this effect will re-run.
+            console.log("ProtectedRoute: Session recovery successful, awaiting user state update.")
+            return // Wait for re-run with user object
           }
         } catch (error) {
-          console.error("ProtectedRoute: Errore nella verifica della sessione:", error)
+          console.error("ProtectedRoute: Error during session recovery:", error)
+          // Fall through to redirect if session recovery fails
         }
 
-        // L'utente non è autenticato, reindirizza al login
-        console.log("ProtectedRoute: Utente non autenticato, reindirizzamento al login")
+        console.log("ProtectedRoute: No user and no valid session. Redirecting to /.")
         if (!redirectingRef.current) {
           redirectingRef.current = true
-          router.push("/login")
+          router.push("/")
         }
         return
       }
 
-      // Se adminOnly è true, verifichiamo se l'utente è admin
+      // Scenario 2: User object exists, check permissions
       if (adminOnly && !isAdmin) {
-        console.log("ProtectedRoute: Accesso riservato agli admin, reindirizzamento alla dashboard")
+        setIsAuthorized(false)
+        console.log("ProtectedRoute: Admin access required, user is not admin. Redirecting to /dashboard.")
         if (!redirectingRef.current) {
           redirectingRef.current = true
           router.push("/dashboard")
@@ -109,17 +120,12 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
         return
       }
 
-      // Se è specificato un permesso richiesto, verifichiamo se l'utente lo ha
+      // Check for specific permission if adminOnly is not the primary guard
       if (requiredPermission) {
-        const userHasPermission = hasPermission(user.ruolo, requiredPermission)
-        console.log(
-          `ProtectedRoute: Verifica permesso ${requiredPermission} per ruolo ${user.ruolo}: ${userHasPermission}`,
-        )
-
-        if (!userHasPermission) {
-          console.log(
-            `ProtectedRoute: Utente non autorizzato per ${requiredPermission}, reindirizzamento alla dashboard`,
-          )
+        const userHasRequiredPermission = hasPermission(user.ruolo, requiredPermission)
+        if (!userHasRequiredPermission) {
+          setIsAuthorized(false)
+          console.log(`ProtectedRoute: Permission '${requiredPermission}' denied for user. Redirecting to /dashboard.`)
           if (!redirectingRef.current) {
             redirectingRef.current = true
             router.push("/dashboard")
@@ -128,30 +134,30 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
         }
       }
 
-      // L'utente è autorizzato
-      console.log(`ProtectedRoute: Utente autorizzato per ${pathname}`)
+      // All checks passed: User is authorized for this route
+      console.log(`ProtectedRoute: User '${user.id}' is authorized for ${pathname}.`)
       setIsAuthorized(true)
-      authCheckCompletedRef.current = true
     }
 
-    checkAuthorization()
+    checkAuthorizationLogic()
+  }, [user, isLoading, isAdmin, adminOnly, requiredPermission, pathname, router, checkSession, supabaseInitializing])
 
-    // Pulizia quando il componente viene smontato
-    return () => {
-      redirectingRef.current = false
-    }
-  }, [user, isLoading, isAdmin, router, adminOnly, pathname, requiredPermission, checkSession])
+  // Add or ensure this effect is present to reset redirectingRef on path changes
+  useEffect(() => {
+    console.log("ProtectedRoute: Pathname changed, resetting redirectingRef.", pathname)
+    redirectingRef.current = false
+  }, [pathname])
 
   // Aggiungi questo useEffect dopo quello esistente
   useEffect(() => {
     // Timeout di sicurezza per evitare attese infinite
     const timeoutId = setTimeout(() => {
-      if (isLoading && !authCheckCompletedRef.current) {
+      if ((isLoading || supabaseInitializing) && !authCheckCompletedRef.current) {
         console.log("ProtectedRoute: Timeout raggiunto, forzo il controllo dell'autorizzazione")
         if (!user && !redirectingRef.current) {
           console.log("ProtectedRoute: Timeout - utente non trovato, reindirizzamento al login")
           redirectingRef.current = true
-          router.push("/login")
+          router.push("/")
         }
       }
     }, 10000) // 10 secondi di timeout
@@ -159,7 +165,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
     return () => {
       clearTimeout(timeoutId)
     }
-  }, [isLoading, user, router])
+  }, [isLoading, supabaseInitializing, user, router])
 
   // Verifica periodica della sessione
   useEffect(() => {
@@ -177,7 +183,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
           if (!isValid && !redirectingRef.current) {
             console.log("Sessione non valida, reindirizzamento al login...")
             redirectingRef.current = true
-            router.push("/login")
+            router.push("/")
           }
         } catch (error) {
           console.error("Errore nella verifica della sessione:", error)
@@ -193,7 +199,7 @@ export function ProtectedRoute({ children, adminOnly = false, requiredPermission
     }
   }, [isAuthorized, checkSession, router])
 
-  if (isLoading) {
+  if (isLoading || supabaseInitializing) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

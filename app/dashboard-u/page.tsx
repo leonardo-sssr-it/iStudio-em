@@ -22,8 +22,8 @@ function DashboardUContent() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <Card>
+    <div className="container mx-auto py-6 space-y-6 content-inherit">
+      <Card className="dashboard-card">
         <CardHeader>
           <CardTitle className="text-2xl flex items-center">
             <LayoutDashboard className="h-6 w-6 mr-2" />
@@ -33,7 +33,7 @@ function DashboardUContent() {
             Benvenuto, {user?.nome || user?.username || "Utente"}. Gestisci le tue attività, progetti e scadenze.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="dashboard-content">
           <div className="space-y-6">
             <AgendaWidget />
             <GanttChartWidget />

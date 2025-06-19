@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useCustomTheme } from "@/contexts/theme-context"
+import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,27 +11,70 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Palette, Moon, Sun, Layout, LayoutGrid, LayoutDashboard } from "lucide-react"
+import { Palette, Moon, Sun, Layout, LayoutGrid, LayoutDashboard, RotateCcw } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export function ThemeSelector() {
-  const { themes, currentTheme, applyTheme, toggleDarkMode, isDarkMode, layout, setLayout } = useCustomTheme()
+  const { themes, currentTheme, applyTheme, resetToDefault, toggleDarkMode, isDarkMode, layout, setLayout, mounted } =
+    useSafeCustomTheme()
   const [isOpen, setIsOpen] = useState(false)
+
+  const handleThemeChange = (themeId: number) => {
+    // Rimuovi questi console.log che causano rumore nella console
+    // console.log("=== CAMBIO TEMA ===")
+    // console.log("Cambiando tema a ID:", themeId)
+    const success = applyTheme(themeId)
+    // console.log("Tema applicato con successo:", success)
+    setIsOpen(false)
+  }
+
+  const handleResetToDefault = () => {
+    // Rimuovi questi console.log che causano rumore nella console
+    // console.log("=== RESET AL TEMA PREDEFINITO ===")
+    const success = resetToDefault()
+    // console.log("Reset completato:", success)
+    setIsOpen(false)
+  }
+
+  const handleDarkModeToggle = () => {
+    // Rimuovi questi console.log che causano rumore nella console
+    // console.log("=== CLICK TOGGLE DARK MODE ===")
+    // console.log("Toggle dark mode, stato attuale:", isDarkMode)
+    toggleDarkMode()
+  }
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center space-x-2">
+        <div className="h-9 w-9" />
+        <div className="h-9 w-9" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center space-x-2">
       {/* Layout Selector */}
-      <Tabs defaultValue={layout} className="hidden md:flex" onValueChange={(value) => setLayout(value as any)}>
-        <TabsList>
-          <TabsTrigger value="default" className="flex items-center gap-1">
+      <Tabs value={layout} className="hidden md:flex" onValueChange={(value) => setLayout(value as any)}>
+        <TabsList className="bg-transparent border">
+          <TabsTrigger
+            value="default"
+            className="flex items-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
             <Layout className="h-4 w-4" />
             <span className="hidden lg:inline">Standard</span>
           </TabsTrigger>
-          <TabsTrigger value="fullWidth" className="flex items-center gap-1">
+          <TabsTrigger
+            value="fullWidth"
+            className="flex items-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
             <LayoutGrid className="h-4 w-4" />
             <span className="hidden lg:inline">Full Width</span>
           </TabsTrigger>
-          <TabsTrigger value="sidebar" className="flex items-center gap-1">
+          <TabsTrigger
+            value="sidebar"
+            className="flex items-center gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden lg:inline">Sidebar</span>
           </TabsTrigger>
@@ -39,43 +82,73 @@ export function ThemeSelector() {
       </Tabs>
 
       {/* Dark Mode Toggle */}
-      <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="h-9 w-9">
-        {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleDarkModeToggle}
+        className="h-9 w-9 hover:bg-accent/50 focus:bg-accent/50 transition-colors duration-200"
+        title={isDarkMode ? "Passa alla modalità chiara" : "Passa alla modalità scura"}
+      >
+        {isDarkMode ? <Sun className="h-4 w-4 text-yellow-500" /> : <Moon className="h-4 w-4 text-blue-600" />}
       </Button>
 
       {/* Theme Selector */}
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-9 w-9">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 hover:bg-accent/50 focus:bg-accent/50 transition-colors duration-200"
+            title="Seleziona tema"
+          >
             <Palette className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Temi Disponibili</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto border bg-popover">
+          <DropdownMenuLabel className="font-semibold text-popover-foreground">
+            Temi Disponibili
+            {currentTheme && (
+              <div className="text-xs text-muted-foreground font-normal mt-1">Attuale: {currentTheme.nome_tema}</div>
+            )}
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {themes.map((theme) => (
-            <DropdownMenuItem
-              key={theme.id}
-              onClick={() => {
-                applyTheme(theme.id)
-                setIsOpen(false)
-              }}
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <div
-                className="w-4 h-4 rounded-full"
-                style={{
-                  backgroundColor: theme.primary_color
-                    ? theme.primary_color.startsWith("#")
-                      ? theme.primary_color
-                      : `hsl(${theme.primary_color})`
-                    : "#000000",
-                }}
-              />
-              <span>{theme.nome}</span>
-              {currentTheme?.id === theme.id && <span className="ml-auto">✓</span>}
+          {themes.length > 0 ? (
+            themes.map((theme) => (
+              <DropdownMenuItem
+                key={theme.id}
+                onClick={() => handleThemeChange(theme.id)}
+                className="flex items-center gap-3 cursor-pointer py-3 px-3 hover:bg-accent/50 focus:bg-accent/50"
+              >
+                {theme.isDefault ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                    <RotateCcw className="h-3 w-3 text-white" />
+                  </div>
+                ) : (
+                  <div
+                    className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
+                    style={{
+                      backgroundColor: theme.colore_titolo?.startsWith("#")
+                        ? theme.colore_titolo
+                        : theme.colore_titolo?.includes("%")
+                          ? `hsl(${theme.colore_titolo})`
+                          : "#6366f1",
+                    }}
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate text-sm text-popover-foreground">
+                    {theme.nome_tema}
+                    {theme.isDefault && <span className="ml-2 text-xs text-muted-foreground">(Sistema)</span>}
+                  </div>
+                </div>
+                {currentTheme?.id === theme.id && <span className="text-primary font-bold text-lg">✓</span>}
+              </DropdownMenuItem>
+            ))
+          ) : (
+            <DropdownMenuItem disabled className="text-muted-foreground py-3">
+              Nessun tema disponibile
             </DropdownMenuItem>
-          ))}
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

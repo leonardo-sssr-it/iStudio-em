@@ -16,6 +16,7 @@ import Link from "next/link"
 import { useSupabase } from "@/lib/supabase-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatDateIT } from "@/lib/date-utils"
 
 // Funzione di validazione per i campi del profilo
 function validateProfileField(field: string, value: string): { valid: boolean; message?: string } {
@@ -69,23 +70,6 @@ function validateProfileField(field: string, value: string): { valid: boolean; m
       break
   }
   return { valid: true }
-}
-
-// Funzione per formattare le date in formato italiano
-function formatDateIT(dateString: string | null | undefined): string {
-  if (!dateString) return "Non disponibile"
-  try {
-    return new Date(dateString).toLocaleString("it-IT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  } catch (error) {
-    console.error("Errore nella formattazione della data:", error)
-    return "Data non valida"
-  }
 }
 
 export default function ProfilePage() {

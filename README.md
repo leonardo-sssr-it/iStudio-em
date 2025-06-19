@@ -124,6 +124,10 @@ docker build -t istudio-v0.4 .
 docker run -p 3000:3000 istudio-v0.4
 \`\`\`
 
+## 🌐 Live Demo
+
+**[https://istudio.vercel.app](https://istudio.vercel.app)** *(Domain to be configured)*
+
 ## 🤝 Contribuire
 
 1. Fork del progetto
@@ -146,13 +150,12 @@ Per supporto e domande:
 ---
 
 **iStudio v0.4** - Gestione dati semplificata e potente 🚀
-\`\`\`
 
-# Fork of iStudio v0.4 - liste e 
+# iStudio
 
 *Automatically synced with your [v0.dev](https://v0.dev) deployments*
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/antonellos-projects-9da0dd8b/v0-fork-of-i-studio-v0-4-liste-e)
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://istudio.vercel.app)
 [![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/crcKSkQHGzt)
 
 ## Overview
@@ -164,7 +167,7 @@ Any changes you make to your deployed app will be automatically pushed to this r
 
 Your project is live at:
 
-**[https://vercel.com/antonellos-projects-9da0dd8b/v0-fork-of-i-studio-v0-4-liste-e](https://vercel.com/antonellos-projects-9da0dd8b/v0-fork-of-i-studio-v0-4-liste-e)**
+**[https://istudio.vercel.app](https://istudio.vercel.app)** *(Domain to be configured)*
 
 ## Build your app
 
@@ -179,4 +182,25 @@ Continue building your app on:
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
 
-## 2. Miglioramento del Date-Picker con timezone e navigazione
+## 🔧 Domain Configuration
+
+To change your domain from the current Vercel-generated URL to a custom domain:
+
+### Option 1: Custom Domain (Recommended)
+1. Purchase a domain (e.g., `istudio.com`, `yourdomain.com`)
+2. Go to your Vercel dashboard
+3. Select your project
+4. Navigate to Settings → Domains
+5. Add your custom domain
+6. Follow Vercel's DNS configuration instructions
+
+### Option 2: Rename Vercel Project
+1. Go to your Vercel dashboard
+2. Select your project "v0-fork-of-i-studio-v0-4-liste-e"
+3. Go to Settings → General
+4. Change the project name to "istudio"
+5. Your new URL will be: `istudio.vercel.app`
+
+### Option 3: Use Vercel Subdomain
+1. In your Vercel project settings
+2. Add a custom Vercel subdomain like `istudio.vercel.app`

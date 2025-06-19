@@ -10,12 +10,12 @@ import {
   endOfMonth,
   eachDayOfInterval,
   isSameDay,
-  isToday,
   isWithinInterval,
   addWeeks,
   addMonths,
   subWeeks,
   subMonths,
+  isToday,
 } from "date-fns"
 import { it } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,6 @@ import {
   Clock,
   Info,
   Search,
-  Plus,
   Filter,
   Download,
   AlertCircle,
@@ -47,8 +46,9 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useAuth } from "@/lib/auth-provider"
+import { useAuth } from "@/lib/auth-provider" // Ensure this path is correct
 import { useDebugConfig } from "@/hooks/use-debug-config"
+import { cn } from "@/lib/utils"
 
 // Funzioni di utilità per il debug
 const formatDateForDebug = (date: Date | undefined): string => {
@@ -874,11 +874,17 @@ const MonthlyView = ({
   )
 }
 
-export function AgendaWidget() {
-  const { user, isAdmin } = useAuth()
+export interface AgendaWidgetProps {
+  initialDate?: Date
+  mode?: "desktop" | "mobile"
+}
+
+export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProps) {
+  const { user, isAdmin, isLoading: authIsLoading } = useAuth() // user can be null
   const { isDebugEnabled, isLoading: isDebugConfigLoading } = useDebugConfig()
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
+
+  const [currentDate, setCurrentDate] = useState(initialDate || new Date())
+  const [view, setView] = useState<"daily" | "weekly" | "monthly">(mode === "mobile" ? "daily" : "daily")
   const [filters, setFilters] = useState({
     attivita: true,
     progetti: true,
@@ -894,150 +900,93 @@ export function AgendaWidget() {
   const [logs, setLogs] = useState<string[]>([])
   const [debugItems, setDebugItems] = useState<any[]>([])
 
-  // Determina se il debug è abilitato (solo per admin e se configurazione.debug è true)
   const isDebugAllowed = isAdmin && isDebugEnabled && !isDebugConfigLoading
 
-  // Calcola le date di inizio e fine in base alla vista corrente
   const { startDate, endDate } = useMemo(() => {
+    // Crea date stabili usando solo i valori numerici
+    const currentDateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`
+
     let start: Date, end: Date
 
     switch (view) {
       case "daily":
-        // Imposta l'inizio della giornata (00:00:00.000)
-        start = new Date(currentDate)
-        start.setHours(0, 0, 0, 0)
-
-        // Imposta la fine della giornata (23:59:59.999)
-        end = new Date(currentDate)
-        end.setHours(23, 59, 59, 999)
+        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
+        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
         break
       case "weekly":
-        // Imposta l'inizio della settimana all'inizio della giornata
-        start = startOfWeek(currentDate, { weekStartsOn: 1 })
-        start.setHours(0, 0, 0, 0)
-
-        // Imposta la fine della settimana alla fine della giornata
-        end = endOfWeek(currentDate, { weekStartsOn: 1 })
-        end.setHours(23, 59, 59, 999)
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
+        start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 1)
+        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
+        end = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999)
         break
       case "monthly":
-        // Imposta l'inizio del mese all'inizio della giornata
-        start = startOfMonth(currentDate)
-        start.setHours(0, 0, 0, 0)
-
-        // Imposta la fine del mese alla fine della giornata
-        end = endOfMonth(currentDate)
-        end.setHours(23, 59, 59, 999)
+        const monthStart = startOfMonth(currentDate)
+        start = new Date(monthStart.getFullYear(), monthStart.getMonth(), monthStart.getDate(), 0, 0, 0, 1)
+        const monthEnd = endOfMonth(currentDate)
+        end = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59, 999)
         break
       default:
-        start = new Date(currentDate)
-        start.setHours(0, 0, 0, 0)
-        end = new Date(currentDate)
-        end.setHours(23, 59, 59, 999)
+        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
+        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
     }
-
-    // Assicuriamoci che le date siano oggetti Date validi
-    if (!(start instanceof Date) || isNaN(start.getTime())) {
-      if (isDebugAllowed) {
-        console.error("startDate non è un oggetto Date valido", start)
-      }
-      start = new Date()
-      start.setHours(0, 0, 0, 0)
-    }
-
-    if (!(end instanceof Date) || isNaN(end.getTime())) {
-      if (isDebugAllowed) {
-        console.error("endDate non è un oggetto Date valido", end)
-      }
-      end = new Date()
-      end.setHours(23, 59, 59, 999)
-    }
-
-    // Debug: Log delle date
-    conditionalLog(
-      "AgendaWidget - Date calcolate:",
-      {
-        view,
-        currentDate: currentDate.toISOString(),
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-      },
-      isDebugAllowed,
-    )
 
     return { startDate: start, endDate: end }
-  }, [currentDate, view, isDebugAllowed])
+  }, [currentDate.getTime(), view]) // Usa getTime() per dipendenza stabile
 
   const addLog = useCallback(
     (message: string) => {
-      if (isDebugAllowed) {
-        setLogs((prev) => [...prev, `${new Date().toISOString()}: ${message}`])
-      }
+      if (isDebugAllowed) setLogs((prev) => [...prev, `${new Date().toISOString()}: ${message}`])
     },
     [isDebugAllowed],
   )
 
   const { items, isLoading, error, tableStats } = useAgendaItems(startDate, endDate)
 
-  // Debug: Verifica la validità delle date degli elementi
   useEffect(() => {
     if (items && items.length > 0 && isDebugAllowed) {
-      // Verifica elementi con date non valide
-      const invalidItems = checkInvalidDates(items)
-      if (invalidItems.length > 0) {
-        console.warn("AgendaWidget - Elementi con date non valide:", invalidItems)
-        addLog(`Trovati ${invalidItems.length} elementi con date non valide`)
-      }
+      // Aggiungi un debounce per evitare loop
+      const timeoutId = setTimeout(() => {
+        const invalidItems = checkInvalidDates(items)
+        if (invalidItems.length > 0) {
+          console.warn("AgendaWidget - Elementi con date non valide:", invalidItems)
+          addLog(`Trovati ${invalidItems.length} elementi con date non valide`)
+        }
+        const debugData = items.map((item) => ({
+          id: item.id,
+          titolo: item.titolo,
+          tipo: item.tipo,
+          generale: item.generale,
+          data_inizio: formatDateForDebug(item.data_inizio),
+          data_fine: formatDateForDebug(item.data_fine),
+          data_scadenza: formatDateForDebug(item.data_scadenza),
+          tabella_origine: item.tabella_origine,
+          matchesCurrentDate: item.data_inizio instanceof Date && isSameDay(item.data_inizio, currentDate),
+        }))
+        setDebugItems(debugData)
+        conditionalLog("AgendaWidget - Dettagli elementi:", debugData, isDebugAllowed)
+        addLog(
+          `Caricati ${items.length} elementi, di cui ${debugData.filter((i) => i.matchesCurrentDate).length} corrispondono alla data corrente`,
+        )
+      }, 100)
 
-      // Prepara dati di debug
-      const debugData = items.map((item) => ({
-        id: item.id,
-        titolo: item.titolo,
-        tipo: item.tipo,
-        generale: item.generale,
-        data_inizio: formatDateForDebug(item.data_inizio),
-        data_fine: formatDateForDebug(item.data_fine),
-        data_scadenza: formatDateForDebug(item.data_scadenza),
-        tabella_origine: item.tabella_origine,
-        matchesCurrentDate:
-          item.data_inizio instanceof Date &&
-          currentDate.getFullYear() === item.data_inizio.getFullYear() &&
-          currentDate.getMonth() === item.data_inizio.getMonth() &&
-          currentDate.getDate() === item.data_inizio.getDate(),
-      }))
-
-      setDebugItems(debugData)
-
-      // Log dettagliato
-      conditionalLog("AgendaWidget - Dettagli elementi:", debugData, isDebugAllowed)
-      addLog(
-        `Caricati ${items.length} elementi, di cui ${debugData.filter((i) => i.matchesCurrentDate).length} corrispondono alla data corrente`,
-      )
+      return () => clearTimeout(timeoutId)
     }
-  }, [items, currentDate, isDebugAllowed, addLog])
+  }, [items, isDebugAllowed, addLog]) // Rimuovere currentDate dalle dipendenze!
 
   useEffect(() => {
     if (isDebugAllowed) {
       addLog(`Selected date: ${currentDate.toISOString()}`)
       addLog(`View: ${view}`)
-
       if (items) {
         addLog(`Items count: ${items.length}`)
-        if (items.length > 0) {
+        if (items.length > 0)
           addLog(
-            `First item: ${JSON.stringify({
-              id: items[0].id,
-              titolo: items[0].titolo,
-              tipo: items[0].tipo,
-              data_inizio: formatDateForDebug(items[0].data_inizio),
-            })}`,
+            `First item: ${JSON.stringify({ id: items[0].id, titolo: items[0].titolo, tipo: items[0].tipo, data_inizio: formatDateForDebug(items[0].data_inizio) })}`,
           )
-        }
       }
     }
   }, [currentDate, view, items, isDebugAllowed, addLog])
 
-  // Estrai la lista dei clienti
   useMemo(() => {
     if (items.length > 0) {
       const clienti = [...new Set(items.map((item) => item.cliente).filter(Boolean))] as string[]
@@ -1045,10 +994,12 @@ export function AgendaWidget() {
     }
   }, [items])
 
-  // Filtra gli elementi in base ai filtri selezionati e al termine di ricerca
   const filteredItems = useMemo(() => {
+    // Guard against user being null during auth loading or if not authenticated
+    if (authIsLoading || !user) {
+      return [] // Return empty array if user is not available yet
+    }
     return items.filter((item) => {
-      // Filtra per tipo
       let passesTypeFilter = false
       switch (item.tipo) {
         case "attivita":
@@ -1061,14 +1012,12 @@ export function AgendaWidget() {
           passesTypeFilter = filters.appuntamenti
           break
         case "scadenza":
-          // Per le scadenze, controlliamo se è generale o personale
           if (item.generale) {
-            // Se l'utente è l'utente 1, non dovremmo avere scadenze generali qui
-            // ma per sicurezza aggiungiamo un controllo extra
-            if (user && user.id === 1) {
-              if (isDebugAllowed) {
+            // user is guaranteed to be non-null here due to the guard above
+            if (user.id === 1) {
+              // Check user.id directly
+              if (isDebugAllowed)
                 console.log("Filtro: utente 1 non dovrebbe vedere scadenze generali qui (già filtrate)")
-              }
               passesTypeFilter = false
             } else {
               passesTypeFilter = filters.scadenze_generali
@@ -1083,21 +1032,15 @@ export function AgendaWidget() {
         default:
           passesTypeFilter = true
       }
-
-      // Filtra per termine di ricerca
       const passesSearchFilter =
         searchTerm === "" ||
         (item.titolo && item.titolo.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (item.descrizione && item.descrizione.toLowerCase().includes(searchTerm.toLowerCase()))
-
-      // Filtra per cliente
       const passesClienteFilter = !clienteFilter || item.cliente === clienteFilter
-
       return passesTypeFilter && passesSearchFilter && passesClienteFilter
     })
-  }, [items, filters, searchTerm, clienteFilter, user, isDebugAllowed])
+  }, [items, filters, searchTerm, clienteFilter, user, authIsLoading, isDebugAllowed]) // Added authIsLoading and user
 
-  // Funzioni per navigare tra le date
   const navigatePrevious = () => {
     switch (view) {
       case "daily":
@@ -1111,7 +1054,6 @@ export function AgendaWidget() {
         break
     }
   }
-
   const navigateNext = () => {
     switch (view) {
       case "daily":
@@ -1125,30 +1067,21 @@ export function AgendaWidget() {
         break
     }
   }
-
   const navigateToday = () => {
     setCurrentDate(new Date())
   }
-
-  // Funzione per esportare l'agenda
   const exportAgenda = () => {
     alert("Funzionalità di esportazione in fase di sviluppo")
   }
 
-  // Aggiungiamo un log per verificare il periodo selezionato quando cambia
   useEffect(() => {
     conditionalLog(
       "Periodo selezionato:",
-      {
-        view,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-      },
+      { view, startDate: startDate.toISOString(), endDate: endDate.toISOString() },
       isDebugAllowed,
     )
   }, [view, startDate, endDate, isDebugAllowed])
 
-  // Aggiungiamo un log per verificare gli elementi filtrati
   useEffect(() => {
     conditionalLog(
       "Elementi filtrati:",
@@ -1167,29 +1100,24 @@ export function AgendaWidget() {
     )
   }, [filteredItems, isDebugAllowed])
 
-  // Aggiungiamo un cleanup per i log
   useEffect(() => {
-    // Cleanup function
     return () => {
-      // Clear any timers or subscriptions if needed
-      if (isDebugAllowed) {
-        console.log("AgendaWidget unmounted - cleaning up")
-      }
+      if (isDebugAllowed) console.log("AgendaWidget unmounted - cleaning up")
     }
   }, [isDebugAllowed])
 
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-xl">Agenda</CardTitle>
-
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
+          <CardTitle className="text-xl whitespace-nowrap">Agenda</CardTitle>
+          <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
             <Button variant="outline" size="sm" onClick={navigatePrevious}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={navigateToday}>
-              Oggi
+              {" "}
+              Oggi{" "}
             </Button>
             <Button variant="outline" size="sm" onClick={navigateNext}>
               <ChevronRight className="h-4 w-4" />
@@ -1201,50 +1129,58 @@ export function AgendaWidget() {
                 onClick={() => setShowDebug(!showDebug)}
                 className={showDebug ? "bg-blue-100" : ""}
               >
-                <Bug className="h-4 w-4 mr-1" />
-                Debug
+                <Bug className="h-4 w-4 mr-1 sm:mr-1" />
+                <span className={mode === "mobile" ? "hidden sm:inline" : ""}>Debug</span>
               </Button>
             )}
           </div>
         </div>
       </CardHeader>
-
       <CardContent>
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Tabs defaultValue="daily" value={view} onValueChange={(v) => setView(v as any)}>
-              <TabsList>
-                <TabsTrigger value="daily" className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Giornaliera
+          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2">
+            <Tabs
+              defaultValue={mode === "mobile" ? "daily" : "daily"}
+              value={view}
+              onValueChange={(v) => setView(v as any)}
+            >
+              <TabsList
+                className={cn(
+                  mode === "mobile"
+                    ? "grid w-full grid-cols-2"
+                    : "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+                  // For desktop, we use the default shadcn/ui classes for TabsList or simply 'inline-flex' if you want minimal styling.
+                  // The default classes provide the standard look and feel.
+                )}
+              >
+                <TabsTrigger value="daily" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Giorno
                 </TabsTrigger>
-                <TabsTrigger value="weekly" className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Settimanale
+                <TabsTrigger value="weekly" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Settimana
                 </TabsTrigger>
-                <TabsTrigger value="monthly" className="flex items-center gap-1">
-                  <CalendarIcon className="h-4 w-4" />
-                  Mensile
-                </TabsTrigger>
+                {mode === "desktop" && (
+                  <TabsTrigger value="monthly" className="flex items-center gap-1 text-xs sm:text-sm">
+                    <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Mese
+                  </TabsTrigger>
+                )}
               </TabsList>
             </Tabs>
-
-            <div className="flex items-center gap-2">
-              <div className="relative w-48">
+            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
+              <div className="relative w-full sm:w-48">
                 <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                 <Input
                   placeholder="Cerca..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="pl-8 text-sm"
+                  aria-label="Cerca nell'agenda"
                 />
               </div>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <Filter className="h-4 w-4" />
-                    Filtri
+                  <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs sm:text-sm">
+                    <Filter className="h-3 w-3 sm:h-4 sm:w-4" /> Filtri
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -1261,7 +1197,6 @@ export function AgendaWidget() {
                           Attività
                         </Label>
                       </div>
-
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="filter-progetti"
@@ -1272,7 +1207,6 @@ export function AgendaWidget() {
                           Progetti
                         </Label>
                       </div>
-
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="filter-appuntamenti"
@@ -1283,7 +1217,6 @@ export function AgendaWidget() {
                           Appuntamenti
                         </Label>
                       </div>
-
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="filter-scadenze"
@@ -1295,7 +1228,6 @@ export function AgendaWidget() {
                           Scadenze personali
                         </Label>
                       </div>
-
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="filter-scadenze-generali"
@@ -1309,7 +1241,6 @@ export function AgendaWidget() {
                           Scadenze generali
                         </Label>
                       </div>
-
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id="filter-todo"
@@ -1321,7 +1252,6 @@ export function AgendaWidget() {
                         </Label>
                       </div>
                     </div>
-
                     {clientiList.length > 0 && (
                       <>
                         <div className="font-medium mt-4 mb-2">Cliente</div>
@@ -1336,7 +1266,6 @@ export function AgendaWidget() {
                               Tutti i clienti
                             </Label>
                           </div>
-
                           {clientiList.map((cliente) => (
                             <div key={cliente} className="flex items-center space-x-2">
                               <Checkbox
@@ -1355,22 +1284,21 @@ export function AgendaWidget() {
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
-
-              <Button variant="outline" size="sm" onClick={exportAgenda} className="flex items-center gap-1">
-                <Download className="h-4 w-4" />
-                Esporta
-              </Button>
-
-              <Button variant="default" size="sm" className="flex items-center gap-1">
-                <Plus className="h-4 w-4" />
-                Nuovo
-              </Button>
-
+              {mode === "desktop" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportAgenda}
+                  className="flex items-center gap-1 text-xs sm:text-sm"
+                >
+                  <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
+                </Button>
+              )}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <HelpCircle className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                      <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                       <span className="sr-only">Legenda</span>
                     </Button>
                   </TooltipTrigger>
@@ -1382,10 +1310,7 @@ export function AgendaWidget() {
               </TooltipProvider>
             </div>
           </div>
-
-          {/* Legenda dei colori */}
           <ColorLegend />
-
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -1395,7 +1320,6 @@ export function AgendaWidget() {
               </AlertDescription>
             </Alert>
           )}
-
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-8 w-64" />
@@ -1415,7 +1339,6 @@ export function AgendaWidget() {
                   isDebugEnabled={isDebugAllowed}
                 />
               )}
-
               {view === "weekly" && (
                 <WeeklyView
                   items={filteredItems}
@@ -1424,8 +1347,7 @@ export function AgendaWidget() {
                   isDebugEnabled={isDebugAllowed}
                 />
               )}
-
-              {view === "monthly" && (
+              {mode === "desktop" && view === "monthly" && (
                 <MonthlyView
                   items={filteredItems}
                   currentDate={currentDate}
@@ -1433,13 +1355,11 @@ export function AgendaWidget() {
                   isDebugEnabled={isDebugAllowed}
                 />
               )}
-
               <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
                 <div className="flex items-center">
-                  <Info className="h-3 w-3 mr-1" />
-                  Elementi visualizzati: {filteredItems.length} di {items.length} totali
+                  <Info className="h-3 w-3 mr-1" /> Elementi visualizzati: {filteredItems.length} di {items.length}{" "}
+                  totali
                 </div>
-
                 <div className="flex gap-2">
                   {Object.entries(tableStats).map(([tipo, count]) => (
                     <Badge key={tipo} variant="outline" className="text-xs">
@@ -1461,7 +1381,6 @@ export function AgendaWidget() {
         {isDebugAllowed && showDebug && (
           <div className="mt-4 p-2 border rounded bg-gray-50">
             <h4 className="font-bold mb-2">Debug Info</h4>
-
             <div className="mb-4">
               <h5 className="font-semibold text-sm">Date di Sistema</h5>
               <div className="text-xs">
@@ -1482,7 +1401,6 @@ export function AgendaWidget() {
                 </div>
               </div>
             </div>
-
             <div className="mb-4">
               <h5 className="font-semibold text-sm">Statistiche Elementi</h5>
               <div className="text-xs">
@@ -1505,7 +1423,6 @@ export function AgendaWidget() {
                 </ul>
               </div>
             </div>
-
             <div className="mb-4">
               <h5 className="font-semibold text-sm">Elementi per la Data Corrente</h5>
               <div className="text-xs">
@@ -1548,7 +1465,6 @@ export function AgendaWidget() {
                 )}
               </div>
             </div>
-
             <div className="max-h-60 overflow-y-auto">
               <h5 className="font-semibold text-sm">Log</h5>
               {logs.map((log, index) => (

@@ -4,15 +4,12 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-provider"
 import { Button } from "@/components/ui/button"
-import { Menu, X, LayoutDashboard, User, LogOut, Calendar } from "lucide-react"
+import { Menu, X, LayoutDashboard, User, LogOut, Calendar, Settings } from "lucide-react"
 import { ThemeSelector } from "@/components/theme-selector"
-// Rimosso useCustomTheme perché il padding è gestito dal wrapper
-// import { useCustomTheme } from "@/contexts/theme-context"
 
 export function Header() {
   const { user, isAdmin, logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  // const { layout } = useCustomTheme() // Rimosso
   const [mounted, setMounted] = useState(false)
   const [currentDate, setCurrentDate] = useState("")
 
@@ -41,25 +38,19 @@ export function Header() {
     ...(user
       ? [
           {
-            href: isAdmin ? "/admin" : "/dashboard",
-            label: isAdmin ? "Admin Dashboard" : "Dashboard",
+            href: "/dashboard-utente",
+            label: "Dashboard Utente",
             icon: LayoutDashboard,
           },
         ]
       : []),
   ]
 
-  // Rimosso containerClass, il padding è gestito dal LayoutWrapper
-  // const containerClass = ...
-
   if (!mounted) return null
 
   return (
     <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Il div con containerClass è stato rimosso. Il padding è gestito dal LayoutWrapper */}
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        {" "}
-        {/* Aggiunto container standard */}
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
@@ -71,13 +62,22 @@ export function Header() {
 
           {/* Center - Date */}
           <div className="hidden md:flex items-center space-x-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
+            
             <span className="font-medium">{currentDate}</span>
           </div>
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
             <ThemeSelector />
+            {/* Link Admin per utenti autorizzati */}
+            {isAdmin && (
+              <Link href="/admin">
+                <Button variant="outline" size="sm" className="hidden md:flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span>Admin</span>
+                </Button>
+              </Link>
+            )}
             {user && (
               <div className="hidden md:flex items-center space-x-2">
                 <Link href="/profile" className="text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -116,6 +116,17 @@ export function Header() {
                   <span>{item.label}</span>
                 </Link>
               ))}
+              {/* Link Admin nel menu mobile */}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="flex items-center space-x-2 px-2 py-2 text-sm font-medium rounded-md hover:bg-accent"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Admin</span>
+                </Link>
+              )}
               {user && (
                 <>
                   <Link

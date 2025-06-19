@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
@@ -27,6 +29,7 @@ import {
   FileText,
   Grid3X3,
   List,
+  StickyNote,
 } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -41,6 +44,7 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: Briefcase },
   { id: "clienti", label: "Clienti", icon: Users },
   { id: "pagine", label: "Pagine", icon: FileText },
+  { id: "note", label: "Note", icon: StickyNote },
 ]
 
 // Definizione dei campi per ogni tabella (CORRETTA in base alla struttura reale del DB)
@@ -201,6 +205,24 @@ const TABLE_FIELDS = {
       privato: "boolean",
     },
   },
+  note: {
+    listFields: ["id", "titolo", "data_creazione", "modifica", "priorita"],
+    readOnlyFields: ["id", "data_creazione", "modifica", "id_utente"],
+    defaultSort: "data_creazione",
+    types: {
+      id: "number",
+      titolo: "string",
+      contenuto: "text",
+      data_creazione: "datetime",
+      modifica: "datetime",
+      tags: "array",
+      priorita: "string",
+      notifica: "datetime",
+      notebook_id: "string",
+      id_utente: "string",
+      synced: "boolean",
+    },
+  },
 }
 
 // Funzione per formattare le date in italiano
@@ -251,11 +273,12 @@ export default function DataExplorerPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [filteredData, setFilteredData] = useState<any[]>([])
   const [view, setView] = useState<"list" | "grid">("list")
+  const [activeTab, setActiveTab] = useState<"columns" | "filters">("columns")
 
   // Leggi il parametro 'table' dalla query string all'inizializzazione
   useEffect(() => {
     const tableParam = searchParams.get("table")
-    if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam)) {
+    if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam) && !selectedTable) {
       setSelectedTable(tableParam)
     }
   }, [searchParams])
@@ -274,7 +297,6 @@ export default function DataExplorerPage() {
     }
   }, [searchTerm, data, sortField, sortDirection])
 
-  // Carica i dati dalla tabella selezionata
   const loadTableData = async () => {
     if (!supabase || !selectedTable || !user?.id) return
 
@@ -284,22 +306,33 @@ export default function DataExplorerPage() {
       const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
       const defaultSort = tableConfig?.defaultSort || "id"
 
+      // Determina il tipo di id_utente per questa tabella
+      const userIdType = tableConfig?.types?.id_utente
+      const userId = userIdType === "string" ? String(user.id) : user.id
+
+      console.log(`[DataExplorer] Caricamento dati da ${selectedTable} per utente ${userId} (tipo: ${userIdType})`)
+
       // Esegui la query
       const { data, error } = await supabase
         .from(selectedTable)
         .select("*")
-        .eq("id_utente", user.id)
+        .eq("id_utente", userId)
         .order(defaultSort, { ascending: true })
 
       if (error) {
         throw error
       }
 
+      console.log(`[DataExplorer] Caricati ${data?.length || 0} elementi da ${selectedTable}`)
       setData(data || [])
       setSortField(defaultSort)
       setSortDirection("asc")
     } catch (error: any) {
       console.error(`Errore nel caricamento dei dati da ${selectedTable}:`, error)
+
+      // Non resettare selectedTable in caso di errore, mantieni la selezione
+      setData([]) // Imposta array vuoto invece di undefined
+
       toast({
         title: "Errore",
         description: `Impossibile caricare i dati: ${error.message}`,
@@ -379,12 +412,61 @@ export default function DataExplorerPage() {
     }
   }
 
+  // Funzione per completare rapidamente un elemento
+  const handleMarkCompleted = async (itemId: number, e: React.MouseEvent) => {
+    e.stopPropagation() // Previene il click sulla riga
+
+    if (!supabase || !selectedTable || !user?.id) return
+
+    try {
+      const { error } = await supabase
+        .from(selectedTable)
+        .update({
+          stato: "completato",
+          modifica: new Date().toISOString(),
+        })
+        .eq("id", itemId)
+        .eq("id_utente", user.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Completato",
+        description: "Elemento marcato come completato",
+      })
+
+      // Ricarica i dati per aggiornare la vista
+      loadTableData()
+    } catch (error: any) {
+      toast({
+        title: "Errore",
+        description: `Impossibile aggiornare lo stato: ${error.message}`,
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Funzione per verificare se mostrare il pulsante completato
+  const shouldShowCompleteButton = (item: any) => {
+    if (!selectedTable) return false
+
+    const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
+    const types = tableConfig?.types || {}
+
+    // Verifica se la tabella ha il campo stato
+    if (!types.stato) return false
+
+    // Verifica se lo stato attuale è diverso da "completato"
+    return item.stato && item.stato !== "completato"
+  }
+
   // Renderizza l'intestazione della tabella
   const renderTableHeader = () => {
     if (!selectedTable) return null
 
     const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
     const fields = tableConfig?.listFields || []
+    const hasStateField = tableConfig?.types?.stato
 
     return (
       <TableHeader>
@@ -401,6 +483,11 @@ export default function DataExplorerPage() {
               </div>
             </TableHead>
           ))}
+          {hasStateField && (
+            <TableHead className="text-center w-24">
+              <span className="text-xs sm:text-sm font-medium">Azioni</span>
+            </TableHead>
+          )}
         </TableRow>
       </TableHeader>
     )
@@ -431,7 +518,10 @@ export default function DataExplorerPage() {
         <TableBody>
           <TableRow>
             <TableCell
-              colSpan={TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0}
+              colSpan={
+                (TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0) +
+                (TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.types?.stato ? 1 : 0)
+              }
               className="text-center h-32"
             >
               <div className="flex flex-col items-center justify-center space-y-4">
@@ -463,6 +553,20 @@ export default function DataExplorerPage() {
                 {renderCellValue(item[field], types[field as keyof typeof types])}
               </TableCell>
             ))}
+            {tableConfig?.types?.stato && (
+              <TableCell className="p-2 text-center">
+                {shouldShowCompleteButton(item) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                    onClick={(e) => handleMarkCompleted(item.id, e)}
+                  >
+                    ✓ Completato
+                  </Button>
+                )}
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>
@@ -542,12 +646,24 @@ export default function DataExplorerPage() {
         {filteredData.map((item) => (
           <Card
             key={item.id}
-            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group"
+            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group relative"
             onClick={() => handleRowClick(item.id)}
           >
             <CardContent className="p-4">
+              {/* Pulsante completato in alto a destra */}
+              {shouldShowCompleteButton(item) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="absolute top-2 right-2 h-6 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => handleMarkCompleted(item.id, e)}
+                >
+                  ✓
+                </Button>
+              )}
+
               <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-sm line-clamp-2 flex-1">
+                <h3 className="font-semibold text-sm line-clamp-2 flex-1 pr-8">
                   {item.titolo || item.nome || item.descrizione || `ID: ${item.id}`}
                 </h3>
               </div>
@@ -587,6 +703,13 @@ export default function DataExplorerPage() {
     return <Icon className="h-5 w-5" />
   }
 
+  // Gestisce la selezione di una tabella
+  const handleTableSelect = useCallback((tableName: string) => {
+    console.log(`[DataExplorer] Selezione tabella: ${tableName}`)
+    setSelectedTable(tableName)
+    setActiveTab("columns")
+  }, [])
+
   return (
     <div className="w-full max-w-none space-y-6">
       <Card className="border-border/50">
@@ -609,7 +732,13 @@ export default function DataExplorerPage() {
           <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-4">
             {/* Selezione tabella */}
             <div className="w-full lg:w-1/3">
-              <Select value={selectedTable} onValueChange={setSelectedTable}>
+              <Select
+                value={selectedTable}
+                onValueChange={(value) => {
+                  console.log(`[DataExplorer] Select onChange: ${value}`)
+                  setSelectedTable(value)
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleziona una tabella" />
                 </SelectTrigger>
@@ -702,7 +831,7 @@ export default function DataExplorerPage() {
                     key={table.id}
                     variant="outline"
                     className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors"
-                    onClick={() => setSelectedTable(table.id)}
+                    onClick={() => handleTableSelect(table.id)}
                   >
                     <table.icon className="h-6 w-6" />
                     <span className="text-xs font-medium">{table.label}</span>
