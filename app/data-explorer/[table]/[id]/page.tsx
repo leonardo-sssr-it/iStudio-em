@@ -32,16 +32,36 @@ import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
 import { isValid, parseISO } from "date-fns"
+import {
+  Search,
+  SortAsc,
+  SortDesc,
+  Plus,
+  RefreshCw,
+  Calendar,
+  CheckSquare,
+  Clock,
+  ListTodo,
+  Briefcase,
+  Users,
+  FolderKanban,
+  FilePlus,
+  FileText,
+  Grid3X3,
+  List,
+  StickyNote,
+} from "lucide-react"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
-  { id: "appuntamenti", label: "Appuntamenti", icon: "📅" },
-  { id: "attivita", label: "Attività", icon: "📋" },
-  { id: "scadenze", label: "Scadenze", icon: "⏰" },
-  { id: "todolist", label: "To-Do List", icon: "✓" },
-  { id: "progetti", label: "Progetti", icon: "📊" },
-  { id: "clienti", label: "Clienti", icon: "👥" },
-  { id: "pagine", label: "Pagine", icon: "📄" },
+  { id: "appuntamenti", label: "Appuntamenti", icon: Calendar },
+  { id: "attivita", label: "Attività", icon: CheckSquare },
+  { id: "scadenze", label: "Scadenze", icon: Clock },
+  { id: "todolist", label: "To-Do List", icon: ListTodo },
+  { id: "progetti", label: "Progetti", icon: Briefcase },
+  { id: "clienti", label: "Clienti", icon: Users },
+  { id: "pagine", label: "Pagine", icon: FileText },
+  { id: "note", label: "Note", icon: StickyNote },
 ]
 
 // Definizione dei campi per ogni tabella
@@ -321,6 +341,31 @@ const TABLE_FIELDS = {
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
+  note: {
+    listFields: ["id", "titolo", "data_creazione", "priorita", "synced"],
+    readOnlyFields: ["id", "data_creazione", "modifica", "id_utente"],
+    requiredFields: ["titolo", "contenuto"],
+    defaultSort: "data_creazione",
+    types: {
+      id: "number",
+      titolo: "string",
+      contenuto: "text",
+      data_creazione: "datetime",
+      modifica: "datetime",
+      tags: "json",
+      priorita: "priority_select",
+      notifica: "datetime",
+      notebook_id: "string",
+      id_utente: "string",
+      synced: "boolean",
+    },
+    selectOptions: {},
+    groups: {
+      "Informazioni principali": ["titolo", "contenuto", "priorita"],
+      Dettagli: ["tags", "notifica", "notebook_id", "synced"],
+      "Informazioni di sistema": ["id", "data_creazione", "modifica", "id_utente"],
+    },
+  },
 }
 
 // Funzione per pulire i dati prima del salvataggio
@@ -587,6 +632,11 @@ export default function ItemDetailPage() {
           newItem.stato = "bozza"
           newItem.attivo = true
           newItem.privato = false
+        } else if (tableName === "note") {
+          newItem.titolo = ""
+          newItem.contenuto = ""
+          newItem.priorita = 1
+          newItem.synced = false
         }
         setItem(newItem)
         setEditedItem(newItem)
