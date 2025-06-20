@@ -20,6 +20,26 @@ import { cn } from "@/lib/utils"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { parseISO, formatISO } from "date-fns"
+import {
+  Search,
+  SortAsc,
+  SortDesc,
+  Plus,
+  RefreshCw,
+  Calendar,
+  CheckSquare,
+  Clock,
+  ListTodo,
+  Briefcase,
+  Users,
+  FolderKanban,
+  FilePlus,
+  FileText,
+  Grid3X3,
+  List,
+  StickyNote,
+} from "lucide-react"
+
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
