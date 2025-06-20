@@ -42,6 +42,7 @@ const AVAILABLE_TABLES = [
   { id: "progetti", label: "Progetti", icon: "📊" },
   { id: "clienti", label: "Clienti", icon: "👥" },
   { id: "pagine", label: "Pagine", icon: "📄" },
+  { id: "note", label: "Note", icon: "📝" },
 ]
 
 // Definizione dei campi per ogni tabella
@@ -321,6 +322,31 @@ const TABLE_FIELDS = {
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
+  note: {
+    listFields: ["id", "titolo", "data_creazione", "priorita", "synced"],
+    readOnlyFields: ["id", "data_creazione", "modifica", "id_utente"],
+    requiredFields: ["titolo", "contenuto"],
+    defaultSort: "data_creazione",
+    types: {
+      id: "number",
+      titolo: "string",
+      contenuto: "text",
+      data_creazione: "datetime",
+      modifica: "datetime",
+      tags: "json",
+      priorita: "priority_select",
+      notifica: "datetime",
+      notebook_id: "string",
+      id_utente: "string",
+      synced: "boolean",
+    },
+    selectOptions: {},
+    groups: {
+      "Informazioni principali": ["titolo", "contenuto", "priorita"],
+      Dettagli: ["tags", "notifica", "notebook_id", "synced"],
+      "Informazioni di sistema": ["id", "data_creazione", "modifica", "id_utente"],
+    },
+  },
 }
 
 // Funzione per pulire i dati prima del salvataggio
@@ -587,6 +613,11 @@ export default function ItemDetailPage() {
           newItem.stato = "bozza"
           newItem.attivo = true
           newItem.privato = false
+        } else if (tableName === "note") {
+          newItem.titolo = ""
+          newItem.contenuto = ""
+          newItem.priorita = 1
+          newItem.synced = false
         }
         setItem(newItem)
         setEditedItem(newItem)
