@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
@@ -111,6 +111,7 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
+      priorita: "priority_select",
       note: "text",
       luogo: "string",
       tags: "tags",
@@ -147,7 +148,7 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "number",
+      priorita: "priority_select",
       note: "text",
       attivo: "boolean",
       id_utente: "number",
@@ -181,7 +182,7 @@ const TABLE_FIELDS = {
       descrizione: "text",
       scadenza: "datetime",
       stato: "select",
-      priorita: "number",
+      priorita: "priority_select",
       note: "text",
       id_utente: "number",
       data_creazione: "datetime",
@@ -212,7 +213,7 @@ const TABLE_FIELDS = {
       titolo: "string",
       descrizione: "text",
       completato: "boolean",
-      priorita: "number",
+      priorita: "priority_select",
       scadenza: "datetime",
       note: "text",
       id_utente: "number",
@@ -352,7 +353,7 @@ const TABLE_FIELDS = {
     requiredFields: ["titolo", "contenuto"],
     autoFields: ["id", "data_creazione", "modifica", "id_utente"],
     defaultValues: {
-      priorita: 2, // Cambiato da "media" a 2
+      priorita: 2, // Valore di default numerico
       synced: false,
     },
     fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
@@ -363,24 +364,15 @@ const TABLE_FIELDS = {
       data_creazione: "datetime",
       modifica: "datetime",
       tags: "array",
-      priorita: "select",
+      priorita: "priority_select", // Usa priority_select per caricare da configurazione
       notifica: "datetime",
       notebook_id: "string",
       id_utente: "string",
       synced: "boolean",
     },
-    selectOptions: {
-      priorita: [
-        { value: 1, label: "Bassa" }, // Cambiato da "bassa" a 1
-        { value: 2, label: "Media" }, // Cambiato da "media" a 2
-        { value: 3, label: "Alta" }, // Cambiato da "alta" a 3
-        { value: 4, label: "Urgente" }, // Cambiato da "urgente" a 4
-      ],
-    },
     validation: {
       titolo: { minLength: 3, maxLength: 100 },
       contenuto: { minLength: 1, maxLength: 10000 },
-      priorita: { min: 1, max: 4 }, // Aggiunta validazione numerica
     },
   },
 }
@@ -417,6 +409,7 @@ export default function NewItemPage() {
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
 
   // Estrai il nome della tabella
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -433,6 +426,41 @@ export default function NewItemPage() {
   const fieldTypes = tableConfig?.types || {}
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
+
+  // Funzione per caricare le opzioni di priorità da Supabase (stessa logica del data-explorer)
+  const loadPriorityOptions = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const { data, error } = await supabase.from("configurazione").select("priorita").single()
+      if (error) throw error
+      let priorityArray = null
+      if (data?.priorita) {
+        if (Array.isArray(data.priorita)) priorityArray = data.priorita
+        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
+        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
+      }
+      if (!priorityArray || priorityArray.length === 0) {
+        setPriorityOptions([])
+        return
+      }
+      const mappedPriorities = priorityArray.map((item: any) => ({
+        value: item.livello || item.value,
+        nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
+        descrizione: item.descrizione || item.description || "",
+      }))
+      setPriorityOptions(mappedPriorities)
+    } catch (error: any) {
+      console.error("Errore nel caricamento delle priorità:", error)
+      setPriorityOptions([])
+    }
+  }, [supabase])
+
+  // Carica le opzioni di priorità all'avvio
+  useEffect(() => {
+    if (supabase) {
+      loadPriorityOptions()
+    }
+  }, [supabase, loadPriorityOptions])
 
   // Inizializza i dati del form
   useEffect(() => {
@@ -737,6 +765,36 @@ export default function NewItemPage() {
           />,
         )
 
+      case "priority_select":
+        return fieldWrapper(
+          <div>
+            {priorityOptions.length > 0 ? (
+              <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, Number(val))}>
+                <SelectTrigger className={cn(error && "border-red-500")}>
+                  <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2" onClick={loadPriorityOptions}>
+                  Riprova caricamento
+                </Button>
+              </div>
+            )}
+          </div>,
+        )
+
       case "select":
         const options = selectOptions[field] || []
         return fieldWrapper(
@@ -819,36 +877,6 @@ export default function NewItemPage() {
   const getTableTitle = () => {
     const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
     return table ? table.label : "Nuovo elemento"
-  }
-
-  // Renderizza i campi di data, mettendo data_inizio e data_fine sulla stessa linea
-  const renderDateFields = (fields: string[]) => {
-    const dateFields = fields.filter((field) => fieldTypes[field] === "datetime")
-
-    if (dateFields.length === 0) return null
-
-    // Se c'è un solo campo data nel gruppo, rendilo normalmente
-    if (dateFields.length === 1 && fields.length === 1) {
-      return <div className="space-y-4">{renderField(dateFields[0], fieldTypes[dateFields[0]])}</div>
-    }
-
-    // Se ci sono 2 campi data (es. data_inizio e data_fine), mettili sulla stessa linea
-    // e gli altri campi del gruppo sotto.
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {dateFields.map((field) => (
-            <div key={field}>{renderField(field, fieldTypes[field])}</div>
-          ))}
-        </div>
-        {/* Renderizza altri campi non-data del gruppo, se presenti */}
-        {fields
-          .filter((field) => fieldTypes[field] !== "datetime")
-          .map((field) => (
-            <div key={field}>{renderField(field, fieldTypes[field])}</div>
-          ))}
-      </div>
-    )
   }
 
   // Se la tabella non è valida, mostra errore
