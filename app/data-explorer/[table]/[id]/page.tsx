@@ -35,14 +35,14 @@ import { isValid, parseISO } from "date-fns"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
-  { id: "appuntamenti", label: "Appuntamenti", icon: "📅" },
-  { id: "attivita", label: "Attività", icon: "📋" },
-  { id: "scadenze", label: "Scadenze", icon: "⏰" },
-  { id: "todolist", label: "To-Do List", icon: "✓" },
-  { id: "progetti", label: "Progetti", icon: "📊" },
-  { id: "clienti", label: "Clienti", icon: "👥" },
-  { id: "pagine", label: "Pagine", icon: "📄" },
-  { id: "note", label: "Note", icon: "📝" },
+  { id: "appuntamenti", label: "Appuntamenti", icon: Calendar },
+  { id: "attivita", label: "Attività", icon: CheckSquare },
+  { id: "scadenze", label: "Scadenze", icon: Clock },
+  { id: "todolist", label: "To-Do List", icon: ListTodo },
+  { id: "progetti", label: "Progetti", icon: Briefcase },
+  { id: "clienti", label: "Clienti", icon: Users },
+  { id: "pagine", label: "Pagine", icon: FileText },
+  { id: "note", label: "Note", icon: StickyNote },
 ]
 
 // Definizione dei campi per ogni tabella
