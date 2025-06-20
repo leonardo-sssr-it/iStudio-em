@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("agenda")
   const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date())
+  const [agendaView, setAgendaView] = useState<"day" | "week" | "month">("day")
 
   useEffect(() => {
     // Update time every second
@@ -110,12 +111,14 @@ export default function DashboardPage() {
 
                 <TabsContent value="agenda" className="space-y-4 min-w-full">
                   <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    <div className="lg:col-span-3">
-                      <AgendaWidget />
+                    <div className={agendaView === "day" ? "lg:col-span-3" : "lg:col-span-4"}>
+                      <AgendaWidget onViewChange={setAgendaView} />
                     </div>
-                    <div className="lg:col-span-1">
-                      <QuickNotesWidget />
-                    </div>
+                    {agendaView === "day" && (
+                      <div className="lg:col-span-1">
+                        <QuickNotesWidget />
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
 
