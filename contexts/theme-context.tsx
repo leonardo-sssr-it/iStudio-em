@@ -1,8 +1,10 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useState, useMemo } from "react"
 import type { Theme } from "@/hooks/use-themes"
+import { useTheme as useNextTheme } from "next-themes"
+import { useThemes } from "@/hooks/use-themes"
 
 type LayoutType = "default" | "fullWidth" | "sidebar"
 
@@ -243,10 +245,40 @@ const defaultThemeContext: ThemeContextType = {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState("default")
-  const themes = ["default", "blue", "green", "purple"]
+  const { themes, currentTheme, applyTheme, resetToDefault, isLoading } = useThemes()
+  const { theme, setTheme, systemTheme } = useNextTheme()
+  const [layout, setLayout] = useState<LayoutType>(() => {
+    if (typeof window !== "undefined") {
+      const savedLayout = localStorage.getItem("preferredLayout")
+      return (savedLayout as LayoutType) || "default"
+    }
+    return "default"
+  })
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  return <ThemeContext.Provider value={{ theme, setTheme, themes }}>{children}</ThemeContext.Provider>
+  // Implementation continues with proper theme management...
+
+  const contextValue = useMemo(
+    () => ({
+      currentTheme,
+      themes,
+      applyTheme,
+      resetToDefault,
+      isLoading,
+      layout,
+      setLayout,
+      toggleDarkMode: () => {
+        const newTheme = isDarkMode ? "light" : "dark"
+        setTheme(newTheme)
+      },
+      isDarkMode,
+      mounted,
+    }),
+    [currentTheme, themes, applyTheme, resetToDefault, isLoading, layout, isDarkMode, mounted],
+  )
+
+  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {
@@ -265,5 +297,13 @@ export function useSafeCustomTheme() {
     return defaultThemeContext
   }
 
+  return context
+}
+
+export function useCustomTheme() {
+  const context = useContext(ThemeContext)
+  if (context === undefined) {
+    throw new Error("useCustomTheme must be used within a ThemeProvider")
+  }
   return context
 }
