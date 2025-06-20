@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react"
-import { useTheme as useNextTheme } from "next-themes"
-import { useThemes, type Theme } from "@/hooks/use-themes"
+import { createContext, useContext, useState } from "react"
+import type { Theme } from "@/hooks/use-themes"
 
 type LayoutType = "default" | "fullWidth" | "sidebar"
 
@@ -244,98 +243,16 @@ const defaultThemeContext: ThemeContextType = {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { themes, currentTheme, applyTheme, resetToDefault, isLoading } = useThemes()
-  const { theme, setTheme, systemTheme } = useNextTheme()
-  const [layout, setLayout] = useState<LayoutType>(() => {
-    if (typeof window !== "undefined") {
-      const savedLayout = localStorage.getItem("preferredLayout")
-      return (savedLayout as LayoutType) || "default"
-    }
-    return "default"
-  })
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState("default")
+  const themes = ["default", "blue", "green", "purple"]
 
-  // Aspetta che il componente sia montato
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Salva il layout nel localStorage quando cambia
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("preferredLayout", layout)
-    }
-  }, [layout])
-
-  // Sincronizziamo il tema di sistema con il nostro stato
-  useEffect(() => {
-    if (mounted) {
-      const resolvedTheme = theme === "system" ? systemTheme : theme
-      setIsDarkMode(resolvedTheme === "dark")
-
-      // Rimuovi questo console.log che causa rumore nella console
-      // console.log("Tema risolto:", resolvedTheme, "isDark:", resolvedTheme === "dark")
-    }
-  }, [theme, systemTheme, mounted])
-
-  // Applichiamo il tema personalizzato quando cambia
-  useEffect(() => {
-    if (mounted && currentTheme && typeof window !== "undefined") {
-      const resolvedTheme = theme === "system" ? systemTheme : theme
-      // Rimuovi questo console.log che causa rumore nella console
-      // console.log("Applicando tema personalizzato:", currentTheme.nome_tema, "isDark:", resolvedTheme === "dark")
-
-      // Aggiungi una verifica per evitare reset inutili del tema predefinito
-      const lastAppliedTheme = window.localStorage.getItem("lastAppliedThemeId")
-      const currentThemeId = currentTheme.id.toString()
-
-      if (lastAppliedTheme !== currentThemeId) {
-        applyCustomTheme(currentTheme, resolvedTheme === "dark")
-        window.localStorage.setItem("lastAppliedThemeId", currentThemeId)
-      }
-    }
-  }, [currentTheme, theme, systemTheme, mounted])
-
-  // Funzione per cambiare il tema chiaro/scuro
-  const toggleDarkMode = useCallback(() => {
-    if (!mounted) return
-
-    console.log("=== TOGGLE DARK MODE ===")
-    console.log("Tema attuale:", theme)
-    console.log("isDarkMode attuale:", isDarkMode)
-
-    const newTheme = isDarkMode ? "light" : "dark"
-    console.log("Nuovo tema:", newTheme)
-
-    setTheme(newTheme)
-    console.log("=== FINE TOGGLE DARK MODE ===")
-  }, [theme, setTheme, isDarkMode, mounted])
-
-  // Creiamo il valore del contesto con useMemo per evitare render inutili
-  const contextValue = useMemo(
-    () => ({
-      currentTheme,
-      themes,
-      applyTheme,
-      resetToDefault,
-      isLoading,
-      layout,
-      setLayout,
-      toggleDarkMode,
-      isDarkMode,
-      mounted,
-    }),
-    [currentTheme, themes, applyTheme, resetToDefault, isLoading, layout, toggleDarkMode, isDarkMode, mounted],
-  )
-
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={{ theme, setTheme, themes }}>{children}</ThemeContext.Provider>
 }
 
-export function useCustomTheme() {
+export function useTheme() {
   const context = useContext(ThemeContext)
   if (context === undefined) {
-    throw new Error("useCustomTheme must be used within a ThemeProvider")
+    throw new Error("useTheme must be used within a ThemeProvider")
   }
   return context
 }

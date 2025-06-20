@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useSupabase } from "./supabase-provider"
 import { toast } from "@/components/ui/use-toast"
 import * as bcrypt from "bcryptjs"
+import { createClient } from "@/lib/supabase/client"
 
 // Define types directly in this file to avoid circular imports
 export interface AuthUser {
@@ -20,6 +21,12 @@ export interface AuthUser {
   updated_at?: string
 }
 
+// interface AuthContextType {
+//   user: User | null
+//   loading: boolean
+//   signOut: () => Promise<void>
+// }
+
 export interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
@@ -30,6 +37,8 @@ export interface AuthContextType {
   checkSession: () => Promise<boolean>
   hashPassword: (password: string) => Promise<string>
   verifyPassword: (password: string, hashedPassword: string) => Promise<boolean>
+  signOut: () => Promise<void>
+  loading: boolean
 }
 
 // Create the context with a default value
@@ -43,6 +52,8 @@ const AuthContext = createContext<AuthContextType>({
   checkSession: async () => false,
   hashPassword: async () => "",
   verifyPassword: async () => false,
+  signOut: async () => {},
+  loading: true,
 })
 
 const AUTH_COOKIE_NAME = "auth_session"
@@ -59,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(false)
   const isCheckingSessionRef = useRef(false)
   const redirectingRef = useRef(false)
+  const [loading, setLoading] = useState(true)
+  const supabaseClient = createClient()
 
   const hashPassword = useCallback(async (password: string): Promise<string> => {
     try {
@@ -408,6 +421,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [supabase, supabaseConnected, supabaseInitializing, checkSession, sessionChecked])
 
+  const signOut = async () => {
+    await supabaseClient.auth.signOut()
+  }
+
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabaseClient.auth.getUser()
+      setUser(user as AuthUser)
+      setLoading(false)
+    }
+
+    getUser()
+
+    const {
+      data: { subscription },
+    } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+      setUser((session?.user as AuthUser) ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabaseClient.auth])
+
   const contextValue: AuthContextType = {
     user,
     isLoading: isLoading || supabaseInitializing,
@@ -418,6 +456,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession,
     hashPassword,
     verifyPassword,
+    signOut,
+    loading,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
@@ -438,6 +478,8 @@ export function useAuth() {
       checkSession: async () => false,
       hashPassword: async () => "",
       verifyPassword: async () => false,
+      signOut: async () => {},
+      loading: true,
     }
   }
   return context
