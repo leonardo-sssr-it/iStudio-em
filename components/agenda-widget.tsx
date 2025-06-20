@@ -942,6 +942,8 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
 
   const { items, isLoading, error, tableStats } = useAgendaItems(startDate, endDate)
 
+  // Rimuovi questo useEffect che causa il loop
+  /*
   useEffect(() => {
     if (items && items.length > 0 && isDebugAllowed) {
       // Aggiungi un debounce per evitare loop
@@ -971,8 +973,28 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
 
       return () => clearTimeout(timeoutId)
     }
-  }, [items, isDebugAllowed, addLog]) // Rimuovere currentDate dalle dipendenze!
+  }, [items, isDebugAllowed, addLog])
+  */
 
+  // Sostituisci con una versione più stabile
+  useEffect(() => {
+    if (items && items.length > 0 && isDebugAllowed) {
+      const debugData = items.map((item) => ({
+        id: item.id,
+        titolo: item.titolo,
+        tipo: item.tipo,
+        generale: item.generale,
+        data_inizio: formatDateForDebug(item.data_inizio),
+        data_fine: formatDateForDebug(item.data_fine),
+        data_scadenza: formatDateForDebug(item.data_scadenza),
+        tabella_origine: item.tabella_origine,
+      }))
+      setDebugItems(debugData)
+    }
+  }, [items.length, isDebugAllowed]) // Usa items.length invece di items per evitare loop
+
+  // Commenta o rimuovi questi useEffect
+  /*
   useEffect(() => {
     if (isDebugAllowed) {
       addLog(`Selected date: ${currentDate.toISOString()}`)
@@ -986,6 +1008,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
       }
     }
   }, [currentDate, view, items, isDebugAllowed, addLog])
+  */
 
   useMemo(() => {
     if (items.length > 0) {
