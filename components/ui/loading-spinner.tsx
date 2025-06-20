@@ -9,9 +9,13 @@ interface LoadingSpinnerProps {
 export function LoadingSpinner({ className, size = "md" }: LoadingSpinnerProps) {
   const sizeClasses = {
     sm: "h-4 w-4",
-    md: "h-6 w-6",
-    lg: "h-8 w-8",
+    md: "h-5 w-5",
+    lg: "h-6 w-6",
   }
 
-  return <Loader2 className={cn("animate-spin", sizeClasses[size], className)} />
+  return (
+    <div className={cn("flex items-center justify-center", className)}>
+      <Loader2 className={cn(sizeClasses[size], "animate-spin text-muted-foreground")} />
+    </div>
+  )
 }

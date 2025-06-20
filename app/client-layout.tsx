@@ -14,8 +14,6 @@ import { Toaster } from "@/components/ui/toaster"
 import { useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useIsMobile } from "@/hooks/use-is-mobile"
-import { useAuth } from "@/lib/auth-provider"
-import { LoadingSpinner } from "@/components/ui/loading-spinner"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -50,16 +48,6 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
   return (
     <html lang="it" suppressHydrationWarning>
       <body className={inter.className}>
