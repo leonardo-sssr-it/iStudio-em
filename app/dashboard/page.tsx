@@ -12,14 +12,12 @@ import { UserTablesTab } from "@/components/user-tables-tab"
 import { GanttChartWidget } from "@/components/gantt-chart-widget"
 import { AgendaWidget } from "@/components/agenda-widget"
 import { KanbanWidget } from "@/components/kanban-widget"
-import { QuickNotesWidget } from "@/components/quick-notes-widget"
 
 export default function DashboardPage() {
   const { user, logout } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("agenda")
   const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date())
-  const [agendaView, setAgendaView] = useState<"day" | "week" | "month">("day")
 
   useEffect(() => {
     // Update time every second
@@ -110,16 +108,7 @@ export default function DashboardPage() {
                 </TabsContent>
 
                 <TabsContent value="agenda" className="space-y-4 min-w-full">
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    <div className={agendaView === "day" ? "lg:col-span-3" : "lg:col-span-4"}>
-                      <AgendaWidget onViewChange={setAgendaView} />
-                    </div>
-                    {agendaView === "day" && (
-                      <div className="lg:col-span-1">
-                        <QuickNotesWidget />
-                      </div>
-                    )}
-                  </div>
+                  <AgendaWidget />
                 </TabsContent>
 
                 <TabsContent value="kanban" className="space-y-4 min-w-full">

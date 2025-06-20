@@ -352,7 +352,7 @@ const TABLE_FIELDS = {
     requiredFields: ["titolo", "contenuto"],
     autoFields: ["id", "data_creazione", "modifica", "id_utente"],
     defaultValues: {
-      priorita: "media",
+      priorita: 2, // Cambiato da "media" a 2
       synced: false,
     },
     fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
@@ -371,15 +371,16 @@ const TABLE_FIELDS = {
     },
     selectOptions: {
       priorita: [
-        { value: "bassa", label: "Bassa" },
-        { value: "media", label: "Media" },
-        { value: "alta", label: "Alta" },
-        { value: "urgente", label: "Urgente" },
+        { value: 1, label: "Bassa" }, // Cambiato da "bassa" a 1
+        { value: 2, label: "Media" }, // Cambiato da "media" a 2
+        { value: 3, label: "Alta" }, // Cambiato da "alta" a 3
+        { value: 4, label: "Urgente" }, // Cambiato da "urgente" a 4
       ],
     },
     validation: {
       titolo: { minLength: 3, maxLength: 100 },
       contenuto: { minLength: 1, maxLength: 10000 },
+      priorita: { min: 1, max: 4 }, // Aggiunta validazione numerica
     },
   },
 }
@@ -452,7 +453,7 @@ export default function NewItemPage() {
       if (tableName === "note") {
         initialData.titolo = ""
         initialData.contenuto = ""
-        initialData.priorita = "media"
+        initialData.priorita = 2
         initialData.synced = false
       }
 

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase-helpers"
+import { NO_CACHE_HEADERS } from "@/lib/no-cache"
 import type { Database } from "@/types/supabase"
 
 export type Nota = Database["public"]["Tables"]["note"]["Row"]
@@ -85,7 +86,7 @@ export class NoteService {
       }
 
       // Esegui la query con no-cache
-      const { data, error, count } = await query
+      const { data, error, count } = await query.headers(NO_CACHE_HEADERS)
 
       if (error) throw error
 
@@ -106,7 +107,13 @@ export class NoteService {
     try {
       const supabase = createClient()
 
-      const { data, error } = await supabase.from("note").select("*").eq("id", id).eq("id_utente", userId).single()
+      const { data, error } = await supabase
+        .from("note")
+        .select("*")
+        .eq("id", id)
+        .eq("id_utente", userId)
+        .single()
+        .headers(NO_CACHE_HEADERS)
 
       if (error) throw error
 
@@ -219,6 +226,7 @@ export class NoteService {
         .select("priorita")
         .eq("id_utente", userId)
         .not("priorita", "is", null)
+        .headers(NO_CACHE_HEADERS)
 
       if (error) throw error
 

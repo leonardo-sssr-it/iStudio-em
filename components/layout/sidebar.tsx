@@ -98,13 +98,12 @@ function SidebarContent({
   return (
     <div className="space-y-4 py-4 h-full flex flex-col">
       <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">iStudio</h2>
+        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
+          iStudio
+          <span className="text-xs text-muted-foreground ml-1">v0.4</span>
+        </h2>
         <div className="space-y-1">
-          <Button
-            asChild
-            variant={pathname === "/dashboard" ? "secondary" : "ghost"}
-            className="w-full justify-start items-center text-sm flex items-center gap-2"
-          >
+          <Button asChild variant={pathname === "/dashboard" ? "secondary" : "ghost"} className="w-full justify-start">
             <Link href="/dashboard">
               <LayoutDashboard className="mr-2 h-4 w-4" />
               Dashboard
@@ -113,7 +112,7 @@ function SidebarContent({
           <Button
             asChild
             variant={pathname === "/dashboard-u" ? "secondary" : "ghost"}
-            className="w-full justify-start items-center text-sm flex items-center gap-2"
+            className="w-full justify-start"
           >
             <Link href="/dashboard-u">
               <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -123,7 +122,7 @@ function SidebarContent({
           <Button
             asChild
             variant={pathname === "/dashboard-utente" ? "secondary" : "ghost"}
-            className="w-full justify-start items-center text-sm flex items-center gap-2"
+            className="w-full justify-start"
           >
             <Link href="/dashboard-utente">
               <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -133,7 +132,7 @@ function SidebarContent({
           <Button
             asChild
             variant={pathname === "/dashboard-mobile" ? "secondary" : "ghost"}
-            className="w-full justify-start items-center text-sm flex items-center gap-2"
+            className="w-full justify-start"
           >
             <Link href="/dashboard-mobile">
               <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -149,7 +148,7 @@ function SidebarContent({
             <Button
               asChild
               variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/pagine">
                 <FileText className="mr-2 h-4 w-4" />
@@ -159,7 +158,7 @@ function SidebarContent({
             <Button
               asChild
               variant={pathname?.includes("/note") ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/note">
                 <StickyNote className="mr-2 h-4 w-4" />
@@ -173,7 +172,7 @@ function SidebarContent({
                   ? "secondary"
                   : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=appuntamenti">
                 <Calendar className="mr-2 h-4 w-4" />
@@ -187,7 +186,7 @@ function SidebarContent({
                   ? "secondary"
                   : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=attivita">
                 <ClipboardList className="mr-2 h-4 w-4" />
@@ -201,7 +200,7 @@ function SidebarContent({
                   ? "secondary"
                   : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=scadenze">
                 <Clock className="mr-2 h-4 w-4" />
@@ -215,7 +214,7 @@ function SidebarContent({
                   ? "secondary"
                   : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=todolist">
                 <CheckSquare className="mr-2 h-4 w-4" />
@@ -229,7 +228,7 @@ function SidebarContent({
                   ? "secondary"
                   : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=progetti">
                 <BarChart3 className="mr-2 h-4 w-4" />
@@ -241,7 +240,7 @@ function SidebarContent({
               variant={
                 pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=clienti">
                 <Users className="mr-2 h-4 w-4" />
@@ -253,7 +252,7 @@ function SidebarContent({
               variant={
                 pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine" ? "secondary" : "ghost"
               }
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer?table=pagine">
                 <FileText className="mr-2 h-4 w-4" />
@@ -269,11 +268,7 @@ function SidebarContent({
         <div className="px-4 py-2">
           <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Amministrazione</h2>
           <div className="space-y-1">
-            <Button
-              asChild
-              variant={pathname === "/admin" ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
-            >
+            <Button asChild variant={pathname === "/admin" ? "secondary" : "ghost"} className="w-full justify-start">
               <Link href="/admin">
                 <Settings className="mr-2 h-4 w-4" />
                 Admin Panel
@@ -282,7 +277,7 @@ function SidebarContent({
             <Button
               asChild
               variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/admin/users">
                 <Users className="mr-2 h-4 w-4" />
@@ -292,7 +287,7 @@ function SidebarContent({
             <Button
               asChild
               variant={pathname?.includes("/data-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/data-explorer">
                 <Database className="mr-2 h-4 w-4" />
@@ -302,7 +297,7 @@ function SidebarContent({
             <Button
               asChild
               variant={pathname?.includes("/table-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/table-explorer">
                 <Layers className="mr-2 h-4 w-4" />
@@ -312,7 +307,7 @@ function SidebarContent({
             <Button
               asChild
               variant={pathname?.includes("/debug-scadenze") ? "secondary" : "ghost"}
-              className="w-full justify-start items-center text-sm flex items-center gap-2"
+              className="w-full justify-start"
             >
               <Link href="/debug-scadenze">
                 <AlertTriangle className="mr-2 h-4 w-4" />
@@ -326,11 +321,7 @@ function SidebarContent({
       {/* Sezione Profilo */}
       <div className="px-4 py-2 mt-auto">
         <div className="space-y-1">
-          <Button
-            asChild
-            variant={pathname === "/profile" ? "secondary" : "ghost"}
-            className="w-full justify-start items-center text-sm flex items-center gap-2"
-          >
+          <Button asChild variant={pathname === "/profile" ? "secondary" : "ghost"} className="w-full justify-start">
             <Link href="/profile">
               <Users className="mr-2 h-4 w-4" />
               Profilo
