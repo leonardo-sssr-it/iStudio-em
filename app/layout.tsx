@@ -8,6 +8,7 @@ import { AuthProvider } from "@/lib/auth-provider"
 import { SupabaseProvider } from "@/lib/supabase-provider"
 import { Toaster } from "@/components/ui/toaster"
 import ClientLayout from "./client-layout"
+import ErrorBoundary from "@/components/error-boundary"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -28,16 +29,18 @@ export default function RootLayout({
   return (
     <html lang="it" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false}>
-          <SupabaseProvider>
-            <AuthProvider>
-              <ThemeProvider>
-                <ClientLayout>{children}</ClientLayout>
-                <Toaster />
-              </ThemeProvider>
-            </AuthProvider>
-          </SupabaseProvider>
-        </NextThemeProvider>
+        <ErrorBoundary>
+          <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false}>
+            <SupabaseProvider>
+              <AuthProvider>
+                <ThemeProvider>
+                  <ClientLayout>{children}</ClientLayout>
+                  <Toaster />
+                </ThemeProvider>
+              </AuthProvider>
+            </SupabaseProvider>
+          </NextThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )
