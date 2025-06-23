@@ -20,31 +20,20 @@ import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { parseISO, formatISO } from "date-fns"
 import {
-  ArrowLeft, 
-  X, 
-  AlertCircle, 
-  CheckCircle2, 
-  FileText, 
+  ArrowLeft,
+  X,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
   Settings,
-  Search,
-  SortAsc,
-  SortDesc,
-  Plus,
-  RefreshCw,
   Calendar,
   CheckSquare,
   Clock,
   ListTodo,
   Briefcase,
   Users,
-  FolderKanban,
-  FilePlus,
-  FileText,
-  Grid3X3,
-  List,
   StickyNote,
 } from "lucide-react"
-
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -901,7 +890,8 @@ export default function NewItemPage() {
   // Ottieni il titolo della tabella
   const getTableTitle = () => {
     const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
-    return table ? table.label : "Nuovo elemento"
+    \
+    returnurn table ? table.label : "Nuovo elemento"
   }
 
   // Se la tabella non è valida, mostra errore
@@ -1024,3 +1014,4 @@ export default function NewItemPage() {
     </div>
   )
 }
+</merged_code>
