@@ -71,7 +71,7 @@ const TABLE_FIELDS = {
       id_cli: "number",
       tags: "json",
       notifica: "array",
-      completato: "boolean",
+      completato: "boolean", // Solo se questa tabella ha il campo
     },
   },
   attivita: {
@@ -96,7 +96,7 @@ const TABLE_FIELDS = {
       tags: "json",
       priorita: "string",
       notifica: "datetime",
-      completato: "boolean",
+      completato: "boolean", // Solo se questa tabella ha il campo
     },
   },
   scadenze: {
@@ -117,7 +117,7 @@ const TABLE_FIELDS = {
       stato: "string",
       privato: "boolean",
       notifica: "datetime",
-      completato: "boolean",
+      completato: "boolean", // Solo se questa tabella ha il campo
     },
   },
   todolist: {
@@ -134,7 +134,7 @@ const TABLE_FIELDS = {
       priorita: "string",
       notifica: "time",
       titolo: "string",
-      completato: "boolean",
+      completato: "boolean", // Solo se questa tabella ha il campo
     },
   },
   progetti: {
@@ -163,7 +163,7 @@ const TABLE_FIELDS = {
       notifica: "datetime",
       priorita: "string",
       allegati: "json",
-      completato: "boolean",
+      // progetti non ha il campo completato
     },
   },
   clienti: {
@@ -190,6 +190,7 @@ const TABLE_FIELDS = {
       note: "text",
       attivo: "boolean",
       qr: "string",
+      // clienti non ha il campo completato
     },
   },
   pagine: {
@@ -209,6 +210,7 @@ const TABLE_FIELDS = {
       immagine: "string",
       pubblicato: "datetime",
       privato: "boolean",
+      // pagine non ha il campo completato
     },
   },
   note: {
@@ -227,7 +229,7 @@ const TABLE_FIELDS = {
       notebook_id: "string",
       id_utente: "string",
       synced: "boolean",
-      completato: "boolean",
+      completato: "boolean", // Solo se questa tabella ha il campo
     },
   },
 }
@@ -828,8 +830,8 @@ export default function DataExplorerPage() {
               </Select>
             </div>
 
-            {/* Filtro completato (se la tabella ha il campo) */}
-            {hasCompletedField() && (
+            {/* Filtro completato (solo se la tabella ha il campo) */}
+            {selectedTable && hasCompletedField() && (
               <div className="w-full lg:w-1/4">
                 <Select value={completedFilter} onValueChange={(value) => setCompletedFilter(value as any)}>
                   <SelectTrigger className="w-full">
@@ -860,7 +862,7 @@ export default function DataExplorerPage() {
             )}
 
             {/* Controlli azioni */}
-            <div className="w-full lg:flex-1 flex flex-col sm:flex-row gap-2">
+            <div className={`w-full flex flex-col sm:flex-row gap-2 ${hasCompletedField() ? "lg:flex-1" : "lg:w-3/4"}`}>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
