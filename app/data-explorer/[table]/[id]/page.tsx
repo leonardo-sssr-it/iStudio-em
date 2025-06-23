@@ -89,7 +89,6 @@ const TABLE_FIELDS = {
     },
     selectOptions: {
       stato: [
-        { value: "da_pianificare", label: "Da pianificare" },
         { value: "pianificato", label: "Pianificato" },
         { value: "in_corso", label: "In corso" },
         { value: "completato", label: "Completato" },
