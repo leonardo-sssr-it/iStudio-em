@@ -71,7 +71,7 @@ const TABLE_FIELDS = {
       id_cli: "number",
       tags: "json",
       notifica: "array",
-      completato: "boolean", // Solo se questa tabella ha il campo
+      // progetti non ha il campo completato
     },
   },
   attivita: {
