@@ -15,12 +15,17 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, X, AlertCircle, CheckCircle2, FileText, Calendar, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { parseISO, formatISO } from "date-fns"
 import {
+  ArrowLeft, 
+  X, 
+  AlertCircle, 
+  CheckCircle2, 
+  FileText, 
+  Settings,
   Search,
   SortAsc,
   SortDesc,
