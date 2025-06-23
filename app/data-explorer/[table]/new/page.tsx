@@ -1013,4 +1013,3 @@ export default function NewItemPage() {
     </div>
   )
 }
-</file_content>
