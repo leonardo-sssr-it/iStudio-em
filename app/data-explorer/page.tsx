@@ -30,6 +30,7 @@ import {
   Grid3X3,
   List,
   StickyNote,
+  Filter,
 } from "lucide-react"
 import { formatValue } from "@/lib/utils-db"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -70,6 +71,7 @@ const TABLE_FIELDS = {
       id_cli: "number",
       tags: "json",
       notifica: "array",
+      completato: "boolean",
     },
   },
   attivita: {
@@ -94,6 +96,7 @@ const TABLE_FIELDS = {
       tags: "json",
       priorita: "string",
       notifica: "datetime",
+      completato: "boolean",
     },
   },
   scadenze: {
@@ -114,6 +117,7 @@ const TABLE_FIELDS = {
       stato: "string",
       privato: "boolean",
       notifica: "datetime",
+      completato: "boolean",
     },
   },
   todolist: {
@@ -130,6 +134,7 @@ const TABLE_FIELDS = {
       priorita: "string",
       notifica: "time",
       titolo: "string",
+      completato: "boolean",
     },
   },
   progetti: {
@@ -158,6 +163,7 @@ const TABLE_FIELDS = {
       notifica: "datetime",
       priorita: "string",
       allegati: "json",
+      completato: "boolean",
     },
   },
   clienti: {
@@ -221,6 +227,7 @@ const TABLE_FIELDS = {
       notebook_id: "string",
       id_utente: "string",
       synced: "boolean",
+      completato: "boolean",
     },
   },
 }
@@ -274,6 +281,7 @@ export default function DataExplorerPage() {
   const [filteredData, setFilteredData] = useState<any[]>([])
   const [view, setView] = useState<"list" | "grid">("list")
   const [activeTab, setActiveTab] = useState<"columns" | "filters">("columns")
+  const [completedFilter, setCompletedFilter] = useState<"non-completati" | "completati" | "tutti">("non-completati")
 
   // Leggi il parametro 'table' dalla query string all'inizializzazione
   useEffect(() => {
@@ -290,12 +298,26 @@ export default function DataExplorerPage() {
     }
   }, [selectedTable, user?.id])
 
-  // Filtra i dati quando cambia il termine di ricerca
+  // Filtra i dati quando cambia il termine di ricerca o il filtro completato
   useEffect(() => {
     if (data.length > 0) {
       filterData()
     }
-  }, [searchTerm, data, sortField, sortDirection])
+  }, [searchTerm, data, sortField, sortDirection, completedFilter])
+
+  // Reset del filtro completato quando cambia tabella
+  useEffect(() => {
+    if (selectedTable) {
+      setCompletedFilter("non-completati")
+    }
+  }, [selectedTable])
+
+  // Verifica se la tabella ha il campo "completato"
+  const hasCompletedField = () => {
+    if (!selectedTable) return false
+    const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
+    return tableConfig?.types?.completato === "boolean"
+  }
 
   const loadTableData = async () => {
     if (!supabase || !selectedTable || !user?.id) return
@@ -346,6 +368,21 @@ export default function DataExplorerPage() {
   // Filtra e ordina i dati
   const filterData = () => {
     let filtered = [...data]
+
+    // Applica il filtro per il campo "completato" se esiste
+    if (hasCompletedField()) {
+      switch (completedFilter) {
+        case "non-completati":
+          filtered = filtered.filter((item) => !item.completato)
+          break
+        case "completati":
+          filtered = filtered.filter((item) => item.completato === true)
+          break
+        case "tutti":
+          // Non applicare filtro
+          break
+      }
+    }
 
     // Applica la ricerca
     if (searchTerm) {
@@ -419,14 +456,22 @@ export default function DataExplorerPage() {
     if (!supabase || !selectedTable || !user?.id) return
 
     try {
-      const { error } = await supabase
-        .from(selectedTable)
-        .update({
-          stato: "completato",
-          modifica: new Date().toISOString(),
-        })
-        .eq("id", itemId)
-        .eq("id_utente", user.id)
+      const updateData: any = {
+        modifica: new Date().toISOString(),
+      }
+
+      // Se la tabella ha il campo "completato", aggiornalo
+      if (hasCompletedField()) {
+        updateData.completato = true
+      }
+
+      // Se la tabella ha il campo "stato", aggiornalo
+      const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
+      if (tableConfig?.types?.stato) {
+        updateData.stato = "completato"
+      }
+
+      const { error } = await supabase.from(selectedTable).update(updateData).eq("id", itemId).eq("id_utente", user.id)
 
       if (error) throw error
 
@@ -450,13 +495,16 @@ export default function DataExplorerPage() {
   const shouldShowCompleteButton = (item: any) => {
     if (!selectedTable) return false
 
+    // Se ha il campo "completato", verifica che non sia già completato
+    if (hasCompletedField()) {
+      return !item.completato
+    }
+
+    // Altrimenti verifica il campo "stato" come prima
     const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
     const types = tableConfig?.types || {}
 
-    // Verifica se la tabella ha il campo stato
     if (!types.stato) return false
-
-    // Verifica se lo stato attuale è diverso da "completato"
     return item.stato && item.stato !== "completato"
   }
 
@@ -467,6 +515,7 @@ export default function DataExplorerPage() {
     const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
     const fields = tableConfig?.listFields || []
     const hasStateField = tableConfig?.types?.stato
+    const showCompleteButton = hasCompletedField() || hasStateField
 
     return (
       <TableHeader>
@@ -483,7 +532,7 @@ export default function DataExplorerPage() {
               </div>
             </TableHead>
           ))}
-          {hasStateField && (
+          {showCompleteButton && (
             <TableHead className="text-center w-24">
               <span className="text-xs sm:text-sm font-medium">Azioni</span>
             </TableHead>
@@ -514,18 +563,26 @@ export default function DataExplorerPage() {
     }
 
     if (filteredData.length === 0) {
+      const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
+      const hasStateField = tableConfig?.types?.stato
+      const showCompleteButton = hasCompletedField() || hasStateField
+
       return (
         <TableBody>
           <TableRow>
             <TableCell
               colSpan={
                 (TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.listFields.length || 0) +
-                (TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]?.types?.stato ? 1 : 0)
+                (showCompleteButton ? 1 : 0)
               }
               className="text-center h-32"
             >
               <div className="flex flex-col items-center justify-center space-y-4">
-                <p className="text-gray-500">{searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}</p>
+                <p className="text-gray-500">
+                  {searchTerm || (hasCompletedField() && completedFilter !== "tutti")
+                    ? "Nessun risultato trovato"
+                    : "Nessun dato disponibile"}
+                </p>
                 <Button variant="outline" onClick={handleCreateNew} size="sm">
                   <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
                 </Button>
@@ -539,13 +596,17 @@ export default function DataExplorerPage() {
     const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
     const fields = tableConfig?.listFields || []
     const types = tableConfig?.types || {}
+    const hasStateField = tableConfig?.types?.stato
+    const showCompleteButton = hasCompletedField() || hasStateField
 
     return (
       <TableBody>
         {filteredData.map((item) => (
           <TableRow
             key={item.id}
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+              hasCompletedField() && item.completato ? "opacity-60" : ""
+            }`}
             onClick={() => handleRowClick(item.id)}
           >
             {fields.map((field) => (
@@ -553,7 +614,7 @@ export default function DataExplorerPage() {
                 {renderCellValue(item[field], types[field as keyof typeof types])}
               </TableCell>
             ))}
-            {tableConfig?.types?.stato && (
+            {showCompleteButton && (
               <TableCell className="p-2 text-center">
                 {shouldShowCompleteButton(item) && (
                   <Button
@@ -564,6 +625,9 @@ export default function DataExplorerPage() {
                   >
                     ✓ Completato
                   </Button>
+                )}
+                {hasCompletedField() && item.completato && (
+                  <span className="text-xs text-green-600 font-medium">✓ Completato</span>
                 )}
               </TableCell>
             )}
@@ -628,7 +692,9 @@ export default function DataExplorerPage() {
       return (
         <div className="flex flex-col justify-center items-center h-64 space-y-4">
           <p className="text-gray-500 text-center">
-            {searchTerm ? "Nessun risultato trovato" : "Nessun dato disponibile"}
+            {searchTerm || (hasCompletedField() && completedFilter !== "tutti")
+              ? "Nessun risultato trovato"
+              : "Nessun dato disponibile"}
           </p>
           <Button variant="outline" onClick={handleCreateNew}>
             <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
@@ -646,7 +712,9 @@ export default function DataExplorerPage() {
         {filteredData.map((item) => (
           <Card
             key={item.id}
-            className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group relative"
+            className={`cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group relative ${
+              hasCompletedField() && item.completato ? "opacity-60" : ""
+            }`}
             onClick={() => handleRowClick(item.id)}
           >
             <CardContent className="p-4">
@@ -660,6 +728,11 @@ export default function DataExplorerPage() {
                 >
                   ✓
                 </Button>
+              )}
+
+              {/* Indicatore completato */}
+              {hasCompletedField() && item.completato && (
+                <div className="absolute top-2 right-2 text-green-600 text-xs font-medium">✓ Completato</div>
               )}
 
               <div className="flex items-start justify-between mb-3">
@@ -731,7 +804,7 @@ export default function DataExplorerPage() {
           {/* Controlli superiori */}
           <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-4">
             {/* Selezione tabella */}
-            <div className="w-full lg:w-1/3">
+            <div className="w-full lg:w-1/4">
               <Select
                 value={selectedTable}
                 onValueChange={(value) => {
@@ -755,8 +828,39 @@ export default function DataExplorerPage() {
               </Select>
             </div>
 
+            {/* Filtro completato (se la tabella ha il campo) */}
+            {hasCompletedField() && (
+              <div className="w-full lg:w-1/4">
+                <Select value={completedFilter} onValueChange={(value) => setCompletedFilter(value as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="non-completati">
+                      <div className="flex items-center space-x-2">
+                        <Filter className="h-4 w-4" />
+                        <span>Non completati</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="completati">
+                      <div className="flex items-center space-x-2">
+                        <CheckSquare className="h-4 w-4" />
+                        <span>Completati</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="tutti">
+                      <div className="flex items-center space-x-2">
+                        <List className="h-4 w-4" />
+                        <span>Tutti</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Controlli azioni */}
-            <div className="w-full lg:w-2/3 flex flex-col sm:flex-row gap-2">
+            <div className="w-full lg:flex-1 flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -847,7 +951,12 @@ export default function DataExplorerPage() {
               <span>
                 Visualizzazione di {filteredData.length} elementi su {data.length} totali
               </span>
-              {searchTerm && <span>Filtrato per: "{searchTerm}"</span>}
+              <div className="flex space-x-4">
+                {searchTerm && <span>Filtrato per: "{searchTerm}"</span>}
+                {hasCompletedField() && completedFilter !== "tutti" && (
+                  <span>Filtro: {completedFilter === "completati" ? "Solo completati" : "Solo non completati"}</span>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
