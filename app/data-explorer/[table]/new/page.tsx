@@ -890,8 +890,7 @@ export default function NewItemPage() {
   // Ottieni il titolo della tabella
   const getTableTitle = () => {
     const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
-    \
-    returnurn table ? table.label : "Nuovo elemento"
+    return table ? table.label : "Nuovo elemento"
   }
 
   // Se la tabella non è valida, mostra errore
@@ -1014,4 +1013,4 @@ export default function NewItemPage() {
     </div>
   )
 }
-</merged_code>
+</file_content>
