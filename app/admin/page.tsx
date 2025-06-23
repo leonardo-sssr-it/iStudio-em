@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
-import { User, Database, List, Filter, Loader2, Save, AlertCircle } from "lucide-react"
+import { User, Database, List, Filter, Loader2, Save } from "lucide-react"
 import Link from "next/link"
 import { memo, useRef, useEffect, useState } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
+import { JsonEditor } from "@/components/ui/json-editor"
 
 // Componente card memoizzato per evitare re-render inutili
 const AdminCard = memo(
@@ -112,8 +112,10 @@ const AdminDashboardContent = memo(() => {
   const [configFields, setConfigFields] = useState<Array<{ name: string; type: string; nullable: boolean }>>([])
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
-  const [configErrors, setConfigErrors] = useState<Record<string, string>>({})
-  const [jsonValidation, setJsonValidation] = useState<Record<string, { isValid: boolean; error?: string }>>({})
+  const [/*configErrors*/ /*setConfigErrors*/ ,] = useState<Record<string, string>>({})
+  const [/*jsonValidation*/ /*setJsonValidation*/ ,] = useState<Record<string, { isValid: boolean; error?: string }>>(
+    {},
+  )
 
   // Animazione sequenziale delle card
   useEffect(() => {
@@ -223,28 +225,6 @@ const AdminDashboardContent = memo(() => {
   const handleFieldChange = (fieldName: string, value: any, fieldType: string) => {
     console.log(`Cambiamento campo ${fieldName}:`, value, `(tipo: ${fieldType})`)
 
-    // Validazione JSON
-    if (fieldType === "json") {
-      const validation = validateJSON(value)
-      setJsonValidation((prev) => ({
-        ...prev,
-        [fieldName]: validation,
-      }))
-
-      if (!validation.isValid) {
-        setConfigErrors((prev) => ({
-          ...prev,
-          [fieldName]: validation.error || "JSON non valido",
-        }))
-      } else {
-        setConfigErrors((prev) => {
-          const newErrors = { ...prev }
-          delete newErrors[fieldName]
-          return newErrors
-        })
-      }
-    }
-
     setConfigData((prev) => ({
       ...prev,
       [fieldName]: value,
@@ -255,32 +235,12 @@ const AdminDashboardContent = memo(() => {
   const saveConfiguration = async () => {
     if (!supabase) return
 
-    // Verifica errori di validazione
-    if (Object.keys(configErrors).length > 0) {
-      toast({
-        title: "Errore di validazione",
-        description: "Correggi gli errori nei campi prima di salvare",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsSavingConfig(true)
     try {
       console.log("Salvataggio configurazione:", configData)
 
-      // Prepara i dati per il salvataggio
+      // I dati sono già nel formato corretto grazie al JsonEditor
       const dataToSave = { ...configData }
-
-      // Converte i campi JSON da stringa a oggetto
-      configFields.forEach((field) => {
-        if (field.type === "json" && typeof dataToSave[field.name] === "string") {
-          const validation = jsonValidation[field.name]
-          if (validation?.isValid && validation.parsed !== undefined) {
-            dataToSave[field.name] = validation.parsed
-          }
-        }
-      })
 
       // Verifica se esiste già una configurazione
       const { data: existingConfig } = await supabase.from("configurazione").select("id").limit(1).maybeSingle()
@@ -318,7 +278,7 @@ const AdminDashboardContent = memo(() => {
   // Renderizza un campo di input basato sul tipo
   const renderField = (field: { name: string; type: string; nullable: boolean }) => {
     const value = configData[field.name] || ""
-    const hasError = configErrors[field.name]
+    const hasError = /*configErrors*/ false
 
     switch (field.type) {
       case "boolean":
@@ -341,24 +301,14 @@ const AdminDashboardContent = memo(() => {
 
       case "json":
         return (
-          <div className="space-y-2">
-            <Label htmlFor={field.name} className="text-sm font-medium">
-              {field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-            </Label>
-            <Textarea
-              id={field.name}
-              value={typeof value === "object" ? JSON.stringify(value, null, 2) : value}
-              onChange={(e) => handleFieldChange(field.name, e.target.value, field.type)}
-              placeholder={`Inserisci JSON valido per ${field.name}`}
-              className={`min-h-[100px] font-mono text-sm ${hasError ? "border-destructive" : ""}`}
-            />
-            {hasError && (
-              <div className="flex items-center text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 mr-1" />
-                {hasError}
-              </div>
-            )}
-          </div>
+          <JsonEditor
+            key={field.name}
+            label={field.name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+            value={configData[field.name]}
+            onChange={(value) => handleFieldChange(field.name, value, field.type)}
+            placeholder={`Inserisci JSON valido per ${field.name}`}
+            rows={8}
+          />
         )
 
       case "number":
@@ -473,7 +423,10 @@ const AdminDashboardContent = memo(() => {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t">
-                  <Button onClick={saveConfiguration} disabled={isSavingConfig || Object.keys(configErrors).length > 0}>
+                  <Button
+                    onClick={saveConfiguration}
+                    disabled={isSavingConfig /*|| Object.keys(configErrors).length > 0*/}
+                  >
                     {isSavingConfig ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
