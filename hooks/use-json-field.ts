@@ -2,13 +2,13 @@
 
 import { useState, useCallback, useMemo } from "react"
 
+// Tipi per la validazione JSON
 export interface JsonValidationResult {
   isValid: boolean
   error?: string
-  errorLine?: number
-  errorColumn?: number
-  formatted?: string
-  parsed?: any
+  line?: number
+  column?: number
+  type?: string
 }
 
 export interface JsonFieldState {
@@ -18,80 +18,56 @@ export interface JsonFieldState {
   isFormatted: boolean
 }
 
-// Funzione di validazione standalone (non hook)
-function validateJsonString(jsonString: string): JsonValidationResult {
-  // Valore vuoto è considerato valido (null)
-  if (!jsonString || jsonString.trim() === "") {
-    return {
-      isValid: true,
-      parsed: null,
-      formatted: "",
-    }
-  }
-
-  try {
-    // Prova a parsare il JSON
-    const parsed = JSON.parse(jsonString)
-
-    // Genera la versione formattata
-    const formatted = JSON.stringify(parsed, null, 2)
-
-    return {
-      isValid: true,
-      parsed,
-      formatted,
-    }
-  } catch (error) {
-    // Estrae informazioni dettagliate sull'errore
-    const errorInfo = extractJsonError(error as SyntaxError, jsonString)
-
-    return {
-      isValid: false,
-      error: errorInfo.message,
-      errorLine: errorInfo.line,
-      errorColumn: errorInfo.column,
-    }
-  }
+export interface JsonFieldActions {
+  setValue: (value: string) => void
+  format: () => void
+  minify: () => void
+  reset: () => void
+  validate: () => JsonValidationResult
 }
 
-// Estrae informazioni dettagliate dall'errore JSON
-function extractJsonError(error: SyntaxError, jsonString: string) {
+export interface UseJsonFieldReturn {
+  state: JsonFieldState
+  actions: JsonFieldActions
+}
+
+// Funzione per estrarre informazioni dettagliate sull'errore JSON
+function extractJsonError(error: SyntaxError): { line?: number; column?: number; message: string } {
   const message = error.message
+
+  // Cerca pattern comuni per linea e colonna
+  const lineMatch = message.match(/line (\d+)/i) || message.match(/at line (\d+)/i)
+  const columnMatch = message.match(/column (\d+)/i) || message.match(/at column (\d+)/i)
+  const positionMatch = message.match(/position (\d+)/i)
+
   let line: number | undefined
   let column: number | undefined
-  let friendlyMessage = message
 
-  // Cerca pattern comuni negli errori JSON
-  if (message.includes("position")) {
-    const positionMatch = message.match(/position (\d+)/)
-    if (positionMatch) {
-      const position = Number.parseInt(positionMatch[1])
-      const lineInfo = getLineAndColumn(jsonString, position)
-      line = lineInfo.line
-      column = lineInfo.column
-    }
+  if (lineMatch) {
+    line = Number.parseInt(lineMatch[1], 10)
   }
 
-  // Messaggi di errore più user-friendly
-  if (message.includes("Unexpected token")) {
-    const tokenMatch = message.match(/Unexpected token (.+?) in JSON/)
-    if (tokenMatch) {
-      const token = tokenMatch[1]
-      friendlyMessage = `Carattere inaspettato: ${token}. Controlla virgole, parentesi e apici.`
-    }
-  } else if (message.includes("Unexpected end")) {
-    friendlyMessage = "JSON incompleto. Controlla che tutte le parentesi e apici siano chiusi."
-  } else if (message.includes("Expected property name")) {
-    friendlyMessage = "Nome proprietà mancante. Le chiavi degli oggetti devono essere tra apici doppi."
-  } else if (message.includes("Unexpected string")) {
-    friendlyMessage = "Stringa inaspettata. Controlla virgole e struttura dell'oggetto."
+  if (columnMatch) {
+    column = Number.parseInt(columnMatch[1], 10)
   }
 
-  return { message: friendlyMessage, line, column }
+  // Se abbiamo solo la posizione, proviamo a calcolare linea e colonna
+  if (positionMatch && !line && !column) {
+    const position = Number.parseInt(positionMatch[1], 10)
+    // Questo è approssimativo senza il testo originale
+    line = Math.floor(position / 50) + 1 // Stima basata su 50 caratteri per linea
+    column = position % 50
+  }
+
+  return {
+    line,
+    column,
+    message: getUserFriendlyErrorMessage(message),
+  }
 }
 
-// Calcola linea e colonna da una posizione
-function getLineAndColumn(text: string, position: number) {
+// Funzione per ottenere linea e colonna da una posizione nel testo
+function getLineAndColumn(text: string, position: number): { line: number; column: number } {
   const lines = text.substring(0, position).split("\n")
   return {
     line: lines.length,
@@ -99,20 +75,128 @@ function getLineAndColumn(text: string, position: number) {
   }
 }
 
-export function useJsonField(initialValue: any = null) {
-  // Converte il valore iniziale in stringa JSON formattata
+// Funzione per convertire errori tecnici in messaggi user-friendly
+function getUserFriendlyErrorMessage(technicalMessage: string): string {
+  const lowerMessage = technicalMessage.toLowerCase()
+
+  if (lowerMessage.includes("unexpected token")) {
+    if (lowerMessage.includes("'")) {
+      return "Carattere inaspettato: controlla le virgolette e gli apici"
+    }
+    if (lowerMessage.includes(",")) {
+      return "Virgola inaspettata: potrebbe esserci una virgola di troppo"
+    }
+    if (lowerMessage.includes("}")) {
+      return "Parentesi graffa chiusa inaspettata: controlla la struttura dell'oggetto"
+    }
+    if (lowerMessage.includes("]")) {
+      return "Parentesi quadra chiusa inaspettata: controlla la struttura dell'array"
+    }
+    return "Carattere non valido: controlla la sintassi JSON"
+  }
+
+  if (lowerMessage.includes("unexpected end")) {
+    return "JSON incompleto: mancano caratteri alla fine"
+  }
+
+  if (lowerMessage.includes("expected")) {
+    return "Elemento mancante: controlla che tutti gli elementi siano presenti"
+  }
+
+  if (lowerMessage.includes("duplicate")) {
+    return "Chiave duplicata: ogni chiave deve essere unica nell'oggetto"
+  }
+
+  if (lowerMessage.includes("trailing comma")) {
+    return "Virgola finale non permessa: rimuovi l'ultima virgola"
+  }
+
+  return technicalMessage
+}
+
+// Validatore JSON avanzato simile a Supabase
+function validateJsonString(jsonString: string): JsonValidationResult {
+  // Gestisci casi speciali
+  if (!jsonString || jsonString.trim() === "") {
+    return {
+      isValid: true,
+      type: "empty",
+    }
+  }
+
+  const trimmed = jsonString.trim()
+
+  // Controlla se è null esplicito
+  if (trimmed === "null") {
+    return {
+      isValid: true,
+      type: "null",
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed)
+
+    // Determina il tipo del JSON
+    let type = "unknown"
+    if (parsed === null) {
+      type = "null"
+    } else if (Array.isArray(parsed)) {
+      type = "array"
+    } else if (typeof parsed === "object") {
+      type = "object"
+    } else if (typeof parsed === "string") {
+      type = "string"
+    } else if (typeof parsed === "number") {
+      type = "number"
+    } else if (typeof parsed === "boolean") {
+      type = "boolean"
+    }
+
+    return {
+      isValid: true,
+      type,
+    }
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      const errorInfo = extractJsonError(error)
+
+      return {
+        isValid: false,
+        error: errorInfo.message,
+        line: errorInfo.line,
+        column: errorInfo.column,
+      }
+    }
+
+    return {
+      isValid: false,
+      error: "Errore sconosciuto nella validazione JSON",
+    }
+  }
+}
+
+export function useJsonField(initialValue: any = null): UseJsonFieldReturn {
+  // Converti il valore iniziale in stringa JSON
   const initialJsonString = useMemo(() => {
     if (initialValue === null || initialValue === undefined) {
       return ""
     }
-    try {
-      return typeof initialValue === "string" ? initialValue : JSON.stringify(initialValue, null, 2)
-    } catch {
-      return ""
+
+    if (typeof initialValue === "string") {
+      // Se è già una stringa, verifica se è JSON valido
+      try {
+        JSON.parse(initialValue)
+        return initialValue
+      } catch {
+        // Se non è JSON valido, trattalo come stringa normale
+        return JSON.stringify(initialValue, null, 2)
+      }
     }
+
+    return JSON.stringify(initialValue, null, 2)
   }, [initialValue])
 
-  // Inizializza lo stato usando la funzione standalone
   const [state, setState] = useState<JsonFieldState>(() => ({
     value: initialJsonString,
     validation: validateJsonString(initialJsonString),
@@ -120,82 +204,82 @@ export function useJsonField(initialValue: any = null) {
     isFormatted: true,
   }))
 
-  // Validatore JSON come callback (per consistency con l'API)
+  // Validatore JSON avanzato simile a Supabase
   const validateJson = useCallback((jsonString: string): JsonValidationResult => {
     return validateJsonString(jsonString)
   }, [])
 
-  // Aggiorna il valore e valida
-  const setValue = useCallback((newValue: string) => {
-    const validation = validateJsonString(newValue)
-    setState((prev) => ({
-      ...prev,
-      value: newValue,
-      validation,
-      isDirty: true,
-      isFormatted: false,
-    }))
-  }, [])
-
-  // Formatta il JSON automaticamente
-  const formatJson = useCallback(() => {
-    if (state.validation.isValid && state.validation.formatted) {
+  const setValue = useCallback(
+    (newValue: string) => {
+      const validation = validateJson(newValue)
       setState((prev) => ({
         ...prev,
-        value: state.validation.formatted!,
+        value: newValue,
+        validation,
+        isDirty: newValue !== initialJsonString,
+        isFormatted: false,
+      }))
+    },
+    [validateJson, initialJsonString],
+  )
+
+  const format = useCallback(() => {
+    if (!state.validation.isValid) return
+
+    try {
+      const parsed = JSON.parse(state.value || "null")
+      const formatted = JSON.stringify(parsed, null, 2)
+      setState((prev) => ({
+        ...prev,
+        value: formatted,
         isFormatted: true,
       }))
+    } catch (error) {
+      // Se c'è un errore, non fare nulla
+      console.warn("Impossibile formattare JSON:", error)
     }
-  }, [state.validation])
+  }, [state.value, state.validation.isValid])
 
-  // Minifica il JSON
-  const minifyJson = useCallback(() => {
-    if (state.validation.isValid && state.validation.parsed !== undefined) {
-      const minified = JSON.stringify(state.validation.parsed)
+  const minify = useCallback(() => {
+    if (!state.validation.isValid) return
+
+    try {
+      const parsed = JSON.parse(state.value || "null")
+      const minified = JSON.stringify(parsed)
       setState((prev) => ({
         ...prev,
         value: minified,
         isFormatted: false,
       }))
+    } catch (error) {
+      // Se c'è un errore, non fare nulla
+      console.warn("Impossibile minificare JSON:", error)
     }
-  }, [state.validation])
+  }, [state.value, state.validation.isValid])
 
-  // Reset al valore iniziale
   const reset = useCallback(() => {
     setState({
       value: initialJsonString,
-      validation: validateJsonString(initialJsonString),
+      validation: validateJson(initialJsonString),
       isDirty: false,
       isFormatted: true,
     })
-  }, [initialJsonString])
+  }, [initialJsonString, validateJson])
 
-  // Valida un JSON specifico senza cambiare lo stato
-  const validateOnly = useCallback((jsonString: string) => {
-    return validateJsonString(jsonString)
-  }, [])
+  const validate = useCallback(() => {
+    return validateJson(state.value)
+  }, [validateJson, state.value])
+
+  const actions: JsonFieldActions = {
+    setValue,
+    format,
+    minify,
+    reset,
+    validate,
+  }
 
   return {
-    // Stato
-    value: state.value,
-    validation: state.validation,
-    isDirty: state.isDirty,
-    isFormatted: state.isFormatted,
-
-    // Azioni
-    setValue,
-    formatJson,
-    minifyJson,
-    reset,
-    validateOnly,
-
-    // Computed values
-    isValid: state.validation.isValid,
-    error: state.validation.error,
-    errorLine: state.validation.errorLine,
-    errorColumn: state.validation.errorColumn,
-    parsedValue: state.validation.parsed,
-    canFormat: state.validation.isValid && !state.isFormatted,
-    canMinify: state.validation.isValid && state.isFormatted,
+    state,
+    actions,
   }
 }
