@@ -3,294 +3,238 @@
 import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { ChevronLeft, ChevronRight, Plus, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react'
-import { cn } from "@/lib/utils"
-
-// CONFIGURAZIONE WIDGET - Modifica questi valori per personalizzare il comportamento
-const NOTES_PER_PAGE = 5 // Numero di note da mostrare per pagina
-const NAVIGATION_THRESHOLD = 5 // Soglia minima per mostrare i tasti di navigazione
-const WIDGET_FONT_SIZE = "text-[10px]" // Dimensione carattere per tutto il widget
 
 interface Note {
   id: number
   titolo: string
-  contenuto: string
+  contenuto: string | null
 }
 
 export function NotesFooterWidget() {
-  const { supabase } = useSupabase()
   const { user } = useAuth()
   const router = useRouter()
-
-  // Stati del widget
   const [notes, setNotes] = useState<Note[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
-  const [totalNotes, setTotalNotes] = useState(0)
-  const [expandedNote, setExpandedNote] = useState<number | null>(null) // Solo una nota espansa alla volta
+  const [expandedNote, setExpandedNote] = useState<number | null>(null)
 
-  // Calcola se mostrare i controlli di navigazione
-  const totalPages = Math.ceil(totalNotes / NOTES_PER_PAGE)
-  const hasNextPage = currentPage < totalPages - 1
-  const hasPrevPage = currentPage > 0
+  // CONFIGURAZIONE WIDGET - Modifica questi valori
+  const NOTES_PER_PAGE = 5 // Numero di note per pagina
+  const NAVIGATION_THRESHOLD = 5 // Soglia per mostrare navigazione
 
-  // Carica le note dal database in modo asincrono
+  const totalPages = Math.ceil(notes.length / NOTES_PER_PAGE)
+  const showNavigation = notes.length > NAVIGATION_THRESHOLD
+
+  // Carica le note dell'utente
   const loadNotes = useCallback(async () => {
-    if (!supabase || !user?.id) return
+    if (!user?.id) return
 
+    setLoading(true)
     try {
       console.log("Caricamento note per utente:", user.id)
+      const supabase = createClient()
 
-      // Query per il conteggio totale - VERIFICA FILTRO id_utente
-      const { count, error: countError } = await supabase
-        .from("note")
-        .select("*", { count: "exact", head: true })
-        .eq("id_utente", user.id)
-
-      if (countError) {
-        console.error("Errore conteggio note:", countError)
-        throw countError
-      }
-
-      console.log("Totale note trovate:", count)
-      setTotalNotes(count || 0)
-
-      // Query per le note della pagina corrente - ORDINE CRESCENTE (prima nel DB = prima nella lista)
       const { data, error } = await supabase
         .from("note")
         .select("id, titolo, contenuto")
         .eq("id_utente", user.id)
-        .order("id", { ascending: true }) // Ordine crescente per ID (prima nel DB = prima nella lista)
-        .range(currentPage * NOTES_PER_PAGE, (currentPage + 1) * NOTES_PER_PAGE - 1)
+        .order("id", { ascending: true }) // Ordine crescente - prima nel DB = prima nella lista
 
       if (error) {
-        console.error("Errore caricamento note:", error)
-        throw error
+        console.error("Errore nel caricamento delle note:", error)
+        return
       }
 
-      console.log("Note caricate:", data)
+      console.log("Note caricate:", data?.length || 0)
       setNotes(data || [])
     } catch (error) {
       console.error("Errore nel caricamento delle note:", error)
-      setNotes([])
-      setTotalNotes(0)
     } finally {
       setLoading(false)
     }
-  }, [supabase, user?.id, currentPage])
+  }, [user?.id])
 
-  // Carica le note quando il componente si monta o cambia pagina
   useEffect(() => {
-    if (supabase && user?.id) {
-      loadNotes()
-    }
+    loadNotes()
   }, [loadNotes])
 
-  // Gestisce la navigazione tra le pagine
-  const handlePrevPage = useCallback(() => {
-    if (hasPrevPage) {
-      setCurrentPage((prev) => prev - 1)
-      setExpandedNote(null) // Chiudi la nota espansa quando cambi pagina
-    }
-  }, [hasPrevPage])
-
-  const handleNextPage = useCallback(() => {
-    if (hasNextPage) {
-      setCurrentPage((prev) => prev + 1)
-      setExpandedNote(null) // Chiudi la nota espansa quando cambi pagina
-    }
-  }, [hasNextPage])
-
-  // Crea una nuova nota e torna al top
+  // Gestisce la creazione di una nuova nota
   const handleCreateNote = useCallback(() => {
-    // Scorri al top della pagina
-    window.scrollTo({ top: 0, behavior: "smooth" })
     router.push("/data-explorer/note/new")
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }, [router])
 
-  // Apre una nota in visualizzazione/modifica e torna al top
+  // Gestisce la visualizzazione di una nota
   const handleViewNote = useCallback(
     (noteId: number) => {
-      // Scorri al top della pagina
-      window.scrollTo({ top: 0, behavior: "smooth" })
       router.push(`/data-explorer/note/${noteId}`)
+      window.scrollTo({ top: 0, behavior: "smooth" })
     },
     [router],
   )
 
-  // Gestisce l'espansione/collasso del contenuto delle note - solo una alla volta
-  const toggleNoteContentExpansion = useCallback((noteId: number, e: React.MouseEvent) => {
-    e.stopPropagation() // Previene altri eventi
-    setExpandedNote((prev) => {
-      // Se la nota è già espansa, chiudila; altrimenti aprila e chiudi le altre
-      return prev === noteId ? null : noteId
-    })
-  }, [])
-
-  // Gestisce il doppio click sul contenuto per aprire la nota
+  // Gestisce il doppio click sul contenuto
   const handleContentDoubleClick = useCallback(
     (noteId: number, e: React.MouseEvent) => {
-      e.stopPropagation() // Previene altri eventi
+      e.stopPropagation()
       handleViewNote(noteId)
     },
     [handleViewNote],
   )
 
-  // Formatta il contenuto markdown (versione semplificata)
-  const formatMarkdown = useCallback((content: string) => {
-    if (!content) return ""
-
-    return content
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // Bold
-      .replace(/\*(.*?)\*/g, "<em>$1</em>") // Italic
-      .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 rounded text-[9px]">$1</code>') // Code
-      .replace(/\n/g, "<br>") // Line breaks
+  // Gestisce l'espansione/contrazione del contenuto
+  const toggleExpanded = useCallback((noteId: number) => {
+    setExpandedNote((prev) => (prev === noteId ? null : noteId))
   }, [])
 
-  // Non mostrare il widget se l'utente non è autenticato
-  if (!user) {
-    console.log("Widget note: utente non autenticato")
-    return null
+  // Navigazione tra le pagine
+  const goToPreviousPage = useCallback(() => {
+    setCurrentPage((prev) => Math.max(0, prev - 1))
+    setExpandedNote(null) // Chiude tutte le note espanse quando cambi pagina
+  }, [])
+
+  const goToNextPage = useCallback(() => {
+    setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1))
+    setExpandedNote(null) // Chiude tutte le note espanse quando cambi pagina
+  }, [totalPages])
+
+  // Calcola le note da mostrare nella pagina corrente
+  const currentNotes = notes.slice(currentPage * NOTES_PER_PAGE, (currentPage + 1) * NOTES_PER_PAGE)
+
+  // Formatta il contenuto markdown base
+  const formatContent = (content: string) => {
+    return content
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`(.*?)`/g, '<code class="text-[9px] bg-gray-100 px-1 rounded">$1</code>')
   }
 
-  console.log("Rendering widget note per utente:", user.id)
+  if (!user) return null
 
   return (
-    <div className="space-y-3">
+    <div className="text-[10px] space-y-2">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold">Note</h4>
-        <div className="flex items-center space-x-1">
-          {/* Navigazione sinistra - visibile solo se necessaria */}
-          {totalNotes > NAVIGATION_THRESHOLD && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handlePrevPage}
-              disabled={!hasPrevPage || loading}
-              className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
-            >
-              <ChevronLeft className="h-3 w-3" />
-            </Button>
+        <h3 className="font-medium text-gray-900">Note</h3>
+
+        <div className="flex items-center gap-1">
+          {/* Navigazione - appare solo se ci sono più di NAVIGATION_THRESHOLD note */}
+          {showNavigation && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-3 w-3 p-0"
+                onClick={goToPreviousPage}
+                disabled={currentPage === 0}
+                title="Pagina precedente"
+              >
+                <ChevronLeft className="h-2 w-2" />
+              </Button>
+
+              <span className="text-[8px] text-gray-500 mx-1">
+                {currentPage + 1}/{totalPages}
+              </span>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-3 w-3 p-0"
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages - 1}
+                title="Pagina successiva"
+              >
+                <ChevronRight className="h-2 w-2" />
+              </Button>
+            </>
           )}
 
-          {/* Pulsante nuova nota */}
+          {/* Pulsante per creare nuova nota */}
           <Button
             variant="ghost"
             size="sm"
+            className="h-3 w-3 p-0 ml-1"
             onClick={handleCreateNote}
-            className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
-            title="Nuova nota"
+            title="Crea nuova nota"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-2 w-2" />
           </Button>
-
-          {/* Navigazione destra - visibile solo se necessaria */}
-          {totalNotes > NAVIGATION_THRESHOLD && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={!hasNextPage || loading}
-              className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
-            >
-              <ChevronRight className="h-3 w-3" />
-            </Button>
-          )}
         </div>
       </div>
 
       {/* Lista delle note */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         {loading ? (
-          <div className="text-center text-muted-foreground">
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mx-auto mb-1"></div>
-            <span className={WIDGET_FONT_SIZE}>Caricamento...</span>
-          </div>
-        ) : notes.length === 0 ? (
-          <div className="text-center text-muted-foreground">
-            <p className={WIDGET_FONT_SIZE}>Nessuna nota</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCreateNote}
-              className={cn("mt-1 h-5 bg-transparent", WIDGET_FONT_SIZE)}
-            >
-              <Plus className="h-2 w-2 mr-1" />
-              Crea nota
-            </Button>
-          </div>
+          <div className="text-[8px] text-gray-500">Caricamento...</div>
+        ) : currentNotes.length === 0 ? (
+          <div className="text-[8px] text-gray-500">Nessuna nota trovata</div>
         ) : (
-          <ul className="space-y-1">
-            {notes.map((note) => {
-              const isExpanded = expandedNote === note.id
-              const hasContent = note.contenuto && note.contenuto.trim().length > 0
+          currentNotes.map((note) => (
+            <div
+              key={note.id}
+              className={`border rounded p-2 transition-all duration-200 ${
+                expandedNote === note.id
+                  ? "border-l-4 border-l-primary bg-muted/30"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {/* Titolo della nota */}
+              <div
+                className="font-medium text-gray-900 cursor-pointer hover:text-primary"
+                onClick={() => handleViewNote(note.id)}
+                title={note.titolo}
+              >
+                {note.titolo.length > 40 ? `${note.titolo.substring(0, 40)}...` : note.titolo}
+              </div>
 
-              return (
-                <li key={note.id} className="space-y-1">
-                  {/* Titolo della nota - NON cliccabile, solo testo */}
-                  <div className="flex items-start justify-between">
-                    <div
-                      className={cn(
-                        "text-left text-muted-foreground flex-1 line-clamp-1",
-                        WIDGET_FONT_SIZE,
-                      )}
-                      title={note.titolo || "Nota senza titolo"}
+              {/* Contenuto espandibile */}
+              {note.contenuto && (
+                <div className="mt-1">
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-3 w-3 p-0"
+                      onClick={() => toggleExpanded(note.id)}
+                      title={expandedNote === note.id ? "Contrai contenuto" : "Espandi contenuto"}
                     >
-                      {note.titolo || "Nota senza titolo"}
-                    </div>
-
-                    {/* Pulsante per espandere/contrarre il contenuto - solo se c'è contenuto */}
-                    {hasContent && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => toggleNoteContentExpansion(note.id, e)}
-                        className="h-3 w-3 p-0 ml-1 flex-shrink-0 text-muted-foreground hover:text-primary"
-                        title={isExpanded ? "Riduci contenuto" : "Espandi contenuto"}
-                      >
-                        {isExpanded ? <ChevronUp className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />}
-                      </Button>
-                    )}
+                      {expandedNote === note.id ? (
+                        <ChevronUp className="h-2 w-2" />
+                      ) : (
+                        <ChevronDown className="h-2 w-2" />
+                      )}
+                    </Button>
                   </div>
 
-                  {/* Contenuto della nota - doppio click per aprire in data-explorer */}
-                  {hasContent && isExpanded && (
-                    <div className="ml-2 pl-2 border-l-2 border-l-primary/30">
-                      <ScrollArea className="max-h-32 w-full">
-                        <div
-                          className={cn(
-                            "text-muted-foreground prose prose-sm max-w-none cursor-pointer pr-2 select-text",
-                            WIDGET_FONT_SIZE,
-                          )}
-                          onDoubleClick={(e) => handleContentDoubleClick(note.id, e)}
-                          title="Doppio click per aprire la nota in data-explorer"
-                          dangerouslySetInnerHTML={{
-                            __html: formatMarkdown(note.contenuto),
-                          }}
-                        />
-                      </ScrollArea>
-                    </div>
+                  {expandedNote === note.id && (
+                    <ScrollArea
+                      className="w-full max-h-32 mt-1"
+                      onDoubleClick={(e) => handleContentDoubleClick(note.id, e)}
+                    >
+                      <div
+                        className="text-gray-600 pr-2 cursor-pointer select-text"
+                        dangerouslySetInnerHTML={{
+                          __html: formatContent(note.contenuto),
+                        }}
+                        title="Doppio click per aprire la nota in data-explorer"
+                      />
+                    </ScrollArea>
                   )}
-                </li>
-              )
-            })}
-          </ul>
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
 
-      {/* Footer con informazioni - solo se ci sono note */}
-      {!loading && notes.length > 0 && totalNotes > NAVIGATION_THRESHOLD && (
-        <div className="text-center text-muted-foreground">
-          <span className="text-[8px]">
-            Pagina {currentPage + 1} di {totalPages} ({totalNotes} note)
-          </span>
-        </div>
-      )}
+      {/* Footer info */}
+      {notes.length > 0 && <div className="text-[8px] text-gray-400 text-center">{notes.length} note totali</div>}
     </div>
   )
 }

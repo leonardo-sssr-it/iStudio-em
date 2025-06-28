@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [originalConfig, setOriginalConfig] = useState<AppConfig>({})
   const [hasChanges, setHasChanges] = useState(false)
 
-  // Carica la configurazione dalla tabella "configurazione" (RIPRISTINATO)
+  // Carica la configurazione dalla tabella "configurazione"
   useEffect(() => {
     async function loadConfig() {
       if (!supabase || !user?.id) return
@@ -96,7 +96,7 @@ export default function AdminPage() {
     setHasChanges(JSON.stringify(config) !== JSON.stringify(originalConfig))
   }, [config, originalConfig])
 
-  // Salva la configurazione nella tabella "configurazione" (RIPRISTINATO)
+  // Salva la configurazione nella tabella "configurazione"
   const handleSave = async () => {
     if (!supabase || !user?.id) return
 
