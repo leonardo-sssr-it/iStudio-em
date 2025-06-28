@@ -28,6 +28,7 @@ interface AppConfig {
   tema_default?: string
   lingua_default?: string
   fuso_orario?: string
+  versione?: string
   [key: string]: any
 }
 
@@ -41,20 +42,28 @@ export default function AdminPage() {
   const [originalConfig, setOriginalConfig] = useState<AppConfig>({})
   const [hasChanges, setHasChanges] = useState(false)
 
-  // Carica la configurazione
+  // Carica la configurazione dalla tabella "configurazione"
   useEffect(() => {
     async function loadConfig() {
       if (!supabase || !user?.id) return
 
       setLoading(true)
       try {
-        const { data, error } = await supabase.from("app_config").select("*").single()
+        console.log("Caricamento configurazione...")
+        const { data, error } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
 
         if (error && error.code !== "PGRST116") {
           throw error
         }
 
-        const configData = data || {}
+        const configData = data || {
+          versione: "1.0.0",
+          tema_default: "light",
+          lingua_default: "it",
+          fuso_orario: "Europe/Rome",
+        }
+
+        console.log("Configurazione caricata:", configData)
         setConfig(configData)
         setOriginalConfig(configData)
       } catch (err: any) {
@@ -64,6 +73,16 @@ export default function AdminPage() {
           description: `Impossibile caricare la configurazione: ${err.message}`,
           variant: "destructive",
         })
+
+        // Imposta una configurazione di default in caso di errore
+        const defaultConfig = {
+          versione: "1.0.0",
+          tema_default: "light",
+          lingua_default: "it",
+          fuso_orario: "Europe/Rome",
+        }
+        setConfig(defaultConfig)
+        setOriginalConfig(defaultConfig)
       } finally {
         setLoading(false)
       }
@@ -77,13 +96,15 @@ export default function AdminPage() {
     setHasChanges(JSON.stringify(config) !== JSON.stringify(originalConfig))
   }, [config, originalConfig])
 
-  // Salva la configurazione
+  // Salva la configurazione nella tabella "configurazione"
   const handleSave = async () => {
     if (!supabase || !user?.id) return
 
     setSaving(true)
     try {
-      const { error } = await supabase.from("app_config").upsert(config)
+      console.log("Salvataggio configurazione:", config)
+
+      const { error } = await supabase.from("configurazione").upsert(config)
 
       if (error) throw error
 
@@ -212,6 +233,16 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="versione">Versione</Label>
+                  <Input
+                    id="versione"
+                    value={config.versione || ""}
+                    onChange={(e) => updateConfig("versione", e.target.value)}
+                    placeholder="1.0.0"
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="tema_default">Tema Predefinito</Label>
                   <Input
