@@ -42,14 +42,14 @@ export default function AdminPage() {
   const [originalConfig, setOriginalConfig] = useState<AppConfig>({})
   const [hasChanges, setHasChanges] = useState(false)
 
-  // Carica la configurazione dalla tabella "configurazione"
+  // Carica la configurazione dalla tabella "configurazione" (RIPRISTINATO)
   useEffect(() => {
     async function loadConfig() {
       if (!supabase || !user?.id) return
 
       setLoading(true)
       try {
-        console.log("Caricamento configurazione...")
+        console.log("Caricamento configurazione dalla tabella 'configurazione'...")
         const { data, error } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
 
         if (error && error.code !== "PGRST116") {
@@ -96,13 +96,13 @@ export default function AdminPage() {
     setHasChanges(JSON.stringify(config) !== JSON.stringify(originalConfig))
   }, [config, originalConfig])
 
-  // Salva la configurazione nella tabella "configurazione"
+  // Salva la configurazione nella tabella "configurazione" (RIPRISTINATO)
   const handleSave = async () => {
     if (!supabase || !user?.id) return
 
     setSaving(true)
     try {
-      console.log("Salvataggio configurazione:", config)
+      console.log("Salvataggio configurazione nella tabella 'configurazione':", config)
 
       const { error } = await supabase.from("configurazione").upsert(config)
 

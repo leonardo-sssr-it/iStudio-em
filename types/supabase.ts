@@ -126,6 +126,47 @@ export type Database = {
           synced?: boolean | null
         }
       }
+      configurazione: {
+        Row: {
+          id?: string
+          versione?: string
+          tema_default?: string
+          lingua_default?: string
+          fuso_orario?: string
+          priorita?: Json
+          stati?: Json
+          categorie?: Json
+          tags_predefiniti?: Json
+          impostazioni_notifiche?: Json
+          [key: string]: any
+        }
+        Insert: {
+          id?: string
+          versione?: string
+          tema_default?: string
+          lingua_default?: string
+          fuso_orario?: string
+          priorita?: Json
+          stati?: Json
+          categorie?: Json
+          tags_predefiniti?: Json
+          impostazioni_notifiche?: Json
+          [key: string]: any
+        }
+        Update: {
+          id?: string
+          versione?: string
+          tema_default?: string
+          lingua_default?: string
+          fuso_orario?: string
+          priorita?: Json
+          stati?: Json
+          categorie?: Json
+          tags_predefiniti?: Json
+          impostazioni_notifiche?: Json
+          [key: string]: any
+        }
+      }
     }
     Views: {
       [_ in never]: never
