@@ -21,7 +21,6 @@ interface Note {
   id: number
   titolo: string
   contenuto: string
-  data_creazione: string
 }
 
 export function NotesFooterWidget() {
@@ -48,25 +47,41 @@ export function NotesFooterWidget() {
 
     setLoading(true)
     try {
-      // Query per il conteggio totale
-      const { count } = await supabase.from("note").select("*", { count: "exact", head: true }).eq("id_utente", user.id)
+      console.log("Caricamento note per utente:", user.id)
 
+      // Query per il conteggio totale - VERIFICA FILTRO id_utente
+      const { count, error: countError } = await supabase
+        .from("note")
+        .select("*", { count: "exact", head: true })
+        .eq("id_utente", user.id)
+
+      if (countError) {
+        console.error("Errore conteggio note:", countError)
+        throw countError
+      }
+
+      console.log("Totale note trovate:", count)
       setTotalNotes(count || 0)
 
-      // Query per le note della pagina corrente
+      // Query per le note della pagina corrente - VERIFICA FILTRO id_utente
       const { data, error } = await supabase
         .from("note")
-        .select("id, titolo, contenuto, data_creazione")
+        .select("id, titolo, contenuto")
         .eq("id_utente", user.id)
-        .order("data_creazione", { ascending: false })
+        .order("id", { ascending: false })
         .range(currentPage * NOTES_PER_PAGE, (currentPage + 1) * NOTES_PER_PAGE - 1)
 
-      if (error) throw error
+      if (error) {
+        console.error("Errore caricamento note:", error)
+        throw error
+      }
 
+      console.log("Note caricate:", data)
       setNotes(data || [])
     } catch (error) {
       console.error("Errore nel caricamento delle note:", error)
       setNotes([])
+      setTotalNotes(0)
     } finally {
       setLoading(false)
     }
@@ -80,32 +95,35 @@ export function NotesFooterWidget() {
   }, [loadNotes])
 
   // Gestisce la navigazione tra le pagine
-  const handlePrevPage = () => {
+  const handlePrevPage = useCallback(() => {
     if (hasPrevPage) {
       setCurrentPage((prev) => prev - 1)
       setExpandedNotes(new Set()) // Chiudi tutte le note espanse
     }
-  }
+  }, [hasPrevPage])
 
-  const handleNextPage = () => {
+  const handleNextPage = useCallback(() => {
     if (hasNextPage) {
       setCurrentPage((prev) => prev + 1)
       setExpandedNotes(new Set()) // Chiudi tutte le note espanse
     }
-  }
+  }, [hasNextPage])
 
   // Crea una nuova nota
-  const handleCreateNote = () => {
+  const handleCreateNote = useCallback(() => {
     router.push("/data-explorer/note/new")
-  }
+  }, [router])
 
   // Apre una nota in modifica
-  const handleEditNote = (noteId: number) => {
-    router.push(`/data-explorer/note/${noteId}?edit=true`)
-  }
+  const handleEditNote = useCallback(
+    (noteId: number) => {
+      router.push(`/data-explorer/note/${noteId}?edit=true`)
+    },
+    [router],
+  )
 
   // Gestisce l'espansione/collasso del contenuto delle note
-  const toggleNoteContentExpansion = (noteId: number, e: React.MouseEvent) => {
+  const toggleNoteContentExpansion = useCallback((noteId: number, e: React.MouseEvent) => {
     e.stopPropagation() // Previene l'apertura della nota in modifica
     setExpandedNotes((prev) => {
       const newSet = new Set(prev)
@@ -116,10 +134,10 @@ export function NotesFooterWidget() {
       }
       return newSet
     })
-  }
+  }, [])
 
   // Formatta il contenuto markdown (versione semplificata)
-  const formatMarkdown = (content: string) => {
+  const formatMarkdown = useCallback((content: string) => {
     if (!content) return ""
 
     return content
@@ -127,19 +145,27 @@ export function NotesFooterWidget() {
       .replace(/\*(.*?)\*/g, "<em>$1</em>") // Italic
       .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 rounded text-[9px]">$1</code>') // Code
       .replace(/\n/g, "<br>") // Line breaks
-  }
+  }, [])
 
   // Tronca il contenuto se non espanso
-  const getTruncatedContent = (content: string, noteId: number, maxLength = 80) => {
-    const isExpanded = expandedNotes.has(noteId)
-    if (isExpanded || content.length <= maxLength) {
-      return content
-    }
-    return content.substring(0, maxLength) + "..."
-  }
+  const getTruncatedContent = useCallback(
+    (content: string, noteId: number, maxLength = 80) => {
+      const isExpanded = expandedNotes.has(noteId)
+      if (isExpanded || content.length <= maxLength) {
+        return content
+      }
+      return content.substring(0, maxLength) + "..."
+    },
+    [expandedNotes],
+  )
 
   // Non mostrare il widget se l'utente non è autenticato
-  if (!user) return null
+  if (!user) {
+    console.log("Widget note: utente non autenticato")
+    return null
+  }
+
+  console.log("Rendering widget note per utente:", user.id)
 
   return (
     <div className="w-full max-w-sm mx-auto">
@@ -252,15 +278,6 @@ export function NotesFooterWidget() {
                           <h4 className={cn("font-medium text-foreground line-clamp-1 flex-1", WIDGET_FONT_SIZE)}>
                             {note.titolo || "Nota senza titolo"}
                           </h4>
-                          {/* Data di creazione accanto al titolo */}
-                          <div className={cn("text-muted-foreground ml-2 flex-shrink-0", "text-[8px]")}>
-                            {new Date(note.data_creazione).toLocaleDateString("it-IT", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
                         </div>
 
                         {/* Contenuto della nota - collassabile */}

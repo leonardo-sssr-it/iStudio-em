@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Github, Twitter, Linkedin, Mail, ExternalLink } from "lucide-react"
 import { useAppConfig } from "@/hooks/use-app-config"
 import { useAuth } from "@/lib/auth-provider"
-import { NotesFooterWidget } from "@/components/widgets/notes-footer-widget"
+import { NotesFooterWidget } from "@/components/notes-footer-widget"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
