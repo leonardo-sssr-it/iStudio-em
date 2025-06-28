@@ -60,12 +60,12 @@ export function NotesFooterWidget() {
       console.log("Totale note trovate:", count)
       setTotalNotes(count || 0)
 
-      // Query per le note della pagina corrente - ORDINE DECRESCENTE (più recenti prima)
+      // Query per le note della pagina corrente - ORDINE CRESCENTE (prima nel DB = prima nella lista)
       const { data, error } = await supabase
         .from("note")
         .select("id, titolo, contenuto")
         .eq("id_utente", user.id)
-        .order("id", { ascending: false }) // Ordine decrescente per ID (più recenti prima)
+        .order("id", { ascending: true }) // Ordine crescente per ID (prima nel DB = prima nella lista)
         .range(currentPage * NOTES_PER_PAGE, (currentPage + 1) * NOTES_PER_PAGE - 1)
 
       if (error) {
@@ -250,13 +250,13 @@ export function NotesFooterWidget() {
                     )}
                   </div>
 
-                  {/* Contenuto della nota - collassato di default, solo una espansa alla volta */}
+                  {/* Contenuto della nota - con scrollbar se necessario, senza troncamento */}
                   {hasContent && isExpanded && (
                     <div className="ml-2 pl-2 border-l-2 border-l-primary/30">
-                      <ScrollArea className="max-h-16">
+                      <ScrollArea className="max-h-32 w-full">
                         <div
                           className={cn(
-                            "text-muted-foreground prose prose-sm max-w-none cursor-pointer",
+                            "text-muted-foreground prose prose-sm max-w-none cursor-pointer pr-2",
                             WIDGET_FONT_SIZE,
                           )}
                           onClick={() => handleEditNote(note.id)}
