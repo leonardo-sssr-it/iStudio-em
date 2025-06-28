@@ -94,7 +94,7 @@ export function Footer() {
 
         {/* Copyright */}
         <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 iStudio. Tutti i diritti riservati.</p>
+          <p>&copy; 2025 iStudio. Tutti i diritti riservati.</p>
         </div>
       </div>
     </footer>
