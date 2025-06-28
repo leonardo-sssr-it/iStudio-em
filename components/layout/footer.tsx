@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Github, Twitter, Linkedin, Mail, ExternalLink } from "lucide-react"
+import { ExternalLink } from "lucide-react"
 import { useAppConfig } from "@/hooks/use-app-config"
 import { useAuth } from "@/lib/auth-provider"
 import { NotesFooterWidget } from "@/components/notes-footer-widget"
@@ -45,6 +45,7 @@ export function Footer() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Sezione iStudio */}
             <div className="space-y-3">
               <h3 className="font-semibold text-lg">iStudio</h3>
               <p className="text-sm text-muted-foreground">Sistema di gestione integrato per la tua azienda.</p>
@@ -57,6 +58,8 @@ export function Footer() {
                 )}
               </div>
             </div>
+
+            {/* Sezione Link Rapidi */}
             <div className="space-y-3">
               <h4 className="font-semibold">Link Rapidi</h4>
               <ul className="space-y-2 text-sm">
@@ -82,6 +85,8 @@ export function Footer() {
                 </li>
               </ul>
             </div>
+
+            {/* Sezione Supporto */}
             <div className="space-y-3">
               <h4 className="font-semibold">Supporto</h4>
               <ul className="space-y-2 text-sm">
@@ -102,33 +107,14 @@ export function Footer() {
                 </li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h4 className="font-semibold">Seguici</h4>
-              <div className="flex space-x-4">
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  <Github className="h-5 w-5" />
-                </Link>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  <Twitter className="h-5 w-5" />
-                </Link>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  <Linkedin className="h-5 w-5" />
-                </Link>
-                <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  <Mail className="h-5 w-5" />
-                </Link>
-              </div>
-            </div>
-          </div>
 
-          {/* Widget Note integrato nel footer - solo per utenti autenticati */}
-          {user && (
-            <div className="mt-8 pt-8 border-t">
-              <div className="flex justify-center">
+            {/* Widget Note - solo per utenti autenticati */}
+            {user && (
+              <div className="space-y-3">
                 <NotesFooterWidget />
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="mt-8 pt-8 border-t">
             <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">

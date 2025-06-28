@@ -6,10 +6,9 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Plus, StickyNote, ChevronUp, ChevronDown } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // CONFIGURAZIONE WIDGET - Modifica questi valori per personalizzare il comportamento
@@ -29,9 +28,8 @@ export function NotesFooterWidget() {
   const router = useRouter()
 
   // Stati del widget
-  const [isCollapsed, setIsCollapsed] = useState(true)
   const [notes, setNotes] = useState<Note[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalNotes, setTotalNotes] = useState(0)
   const [expandedNotes, setExpandedNotes] = useState<Set<number>>(new Set())
@@ -41,11 +39,10 @@ export function NotesFooterWidget() {
   const hasNextPage = currentPage < totalPages - 1
   const hasPrevPage = currentPage > 0
 
-  // Carica le note dal database
+  // Carica le note dal database in modo asincrono
   const loadNotes = useCallback(async () => {
     if (!supabase || !user?.id) return
 
-    setLoading(true)
     try {
       console.log("Caricamento note per utente:", user.id)
 
@@ -147,18 +144,6 @@ export function NotesFooterWidget() {
       .replace(/\n/g, "<br>") // Line breaks
   }, [])
 
-  // Tronca il contenuto se non espanso
-  const getTruncatedContent = useCallback(
-    (content: string, noteId: number, maxLength = 80) => {
-      const isExpanded = expandedNotes.has(noteId)
-      if (isExpanded || content.length <= maxLength) {
-        return content
-      }
-      return content.substring(0, maxLength) + "..."
-    },
-    [expandedNotes],
-  )
-
   // Non mostrare il widget se l'utente non è autenticato
   if (!user) {
     console.log("Widget note: utente non autenticato")
@@ -168,172 +153,132 @@ export function NotesFooterWidget() {
   console.log("Rendering widget note per utente:", user.id)
 
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <Card className={cn("shadow-lg border-2", WIDGET_FONT_SIZE)}>
-        {/* Header del widget */}
-        <CardHeader className="p-2 bg-primary text-primary-foreground">
-          <div className="flex items-center justify-between">
-            {/* Navigazione sinistra - visibile solo se necessaria */}
-            {totalNotes > NAVIGATION_THRESHOLD && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handlePrevPage}
-                disabled={!hasPrevPage || loading}
-                className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <ChevronLeft className="h-3 w-3" />
-              </Button>
-            )}
-
-            {/* Sezione centrale con icona e titolo */}
-            <div className="flex items-center space-x-2 flex-1 justify-center">
-              <StickyNote className="h-4 w-4" />
-              <span className="font-medium">Note</span>
-              {totalNotes > NAVIGATION_THRESHOLD && (
-                <span className="text-xs opacity-75">
-                  {currentPage + 1}/{totalPages}
-                </span>
-              )}
-            </div>
-
-            {/* Pulsante nuova nota */}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="font-semibold">Note</h4>
+        <div className="flex items-center space-x-1">
+          {/* Navigazione sinistra - visibile solo se necessaria */}
+          {totalNotes > NAVIGATION_THRESHOLD && (
             <Button
               variant="ghost"
+              size="sm"
+              onClick={handlePrevPage}
+              disabled={!hasPrevPage || loading}
+              className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
+            >
+              <ChevronLeft className="h-3 w-3" />
+            </Button>
+          )}
+
+          {/* Pulsante nuova nota */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCreateNote}
+            className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
+            title="Nuova nota"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+
+          {/* Navigazione destra - visibile solo se necessaria */}
+          {totalNotes > NAVIGATION_THRESHOLD && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={!hasNextPage || loading}
+              className="h-4 w-4 p-0 text-muted-foreground hover:text-primary"
+            >
+              <ChevronRight className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Lista delle note */}
+      <div className="space-y-2">
+        {loading ? (
+          <div className="text-center text-muted-foreground">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mx-auto mb-1"></div>
+            <span className={WIDGET_FONT_SIZE}>Caricamento...</span>
+          </div>
+        ) : notes.length === 0 ? (
+          <div className="text-center text-muted-foreground">
+            <p className={WIDGET_FONT_SIZE}>Nessuna nota</p>
+            <Button
+              variant="outline"
               size="sm"
               onClick={handleCreateNote}
-              className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-              title="Nuova nota"
+              className={cn("mt-1 h-5 bg-transparent", WIDGET_FONT_SIZE)}
             >
-              <Plus className="h-3 w-3" />
-            </Button>
-
-            {/* Navigazione destra - visibile solo se necessaria */}
-            {totalNotes > NAVIGATION_THRESHOLD && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={!hasNextPage || loading}
-                className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <ChevronRight className="h-3 w-3" />
-              </Button>
-            )}
-
-            {/* Pulsante collassa/espandi */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20 ml-2"
-            >
-              {isCollapsed ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              <Plus className="h-2 w-2 mr-1" />
+              Crea nota
             </Button>
           </div>
-        </CardHeader>
+        ) : (
+          <ul className="space-y-1">
+            {notes.map((note) => {
+              const isExpanded = expandedNotes.has(note.id)
+              const hasContent = note.contenuto && note.contenuto.trim().length > 0
 
-        {/* Contenuto del widget - collassabile */}
-        {!isCollapsed && (
-          <CardContent className="p-0">
-            <ScrollArea className="h-64">
-              {loading ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mx-auto mb-2"></div>
-                  <span className={WIDGET_FONT_SIZE}>Caricamento note...</span>
-                </div>
-              ) : notes.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  <StickyNote className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className={WIDGET_FONT_SIZE}>Nessuna nota trovata</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCreateNote}
-                    className={cn("mt-2 h-6 bg-transparent", WIDGET_FONT_SIZE)}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Crea la prima nota
-                  </Button>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {notes.map((note) => {
-                    const isExpanded = expandedNotes.has(note.id)
-                    const truncatedContent = getTruncatedContent(note.contenuto, note.id)
-                    const hasContent = note.contenuto && note.contenuto.trim().length > 0
+              return (
+                <li key={note.id} className="space-y-1">
+                  {/* Titolo della nota - sempre visibile */}
+                  <div className="flex items-start justify-between">
+                    <button
+                      onClick={() => handleEditNote(note.id)}
+                      className={cn(
+                        "text-left text-muted-foreground hover:text-primary transition-colors flex-1 line-clamp-1",
+                        WIDGET_FONT_SIZE,
+                      )}
+                      title={note.titolo || "Nota senza titolo"}
+                    >
+                      {note.titolo || "Nota senza titolo"}
+                    </button>
 
-                    return (
-                      <div
-                        key={note.id}
-                        className={cn(
-                          "p-3 hover:bg-muted/50 cursor-pointer transition-all duration-200",
-                          // Bordino dinamico per note espanse
-                          isExpanded && "border-l-4 border-l-primary bg-muted/30",
-                        )}
-                        onClick={() => handleEditNote(note.id)}
+                    {/* Pulsante per espandere/contrarre il contenuto - solo se c'è contenuto */}
+                    {hasContent && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => toggleNoteContentExpansion(note.id, e)}
+                        className="h-3 w-3 p-0 ml-1 flex-shrink-0 text-muted-foreground hover:text-primary"
+                        title={isExpanded ? "Riduci contenuto" : "Espandi contenuto"}
                       >
-                        {/* Titolo della nota */}
-                        <div className="flex items-start justify-between mb-1">
-                          <h4 className={cn("font-medium text-foreground line-clamp-1 flex-1", WIDGET_FONT_SIZE)}>
-                            {note.titolo || "Nota senza titolo"}
-                          </h4>
-                        </div>
+                        {isExpanded ? <ChevronUp className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />}
+                      </Button>
+                    )}
+                  </div>
 
-                        {/* Contenuto della nota - collassabile */}
-                        {hasContent && (
-                          <div className="mt-2">
-                            <div className="flex items-start justify-between">
-                              <div
-                                className={cn("text-muted-foreground flex-1 cursor-pointer", WIDGET_FONT_SIZE)}
-                                onClick={(e) => toggleNoteContentExpansion(note.id, e)}
-                              >
-                                <div
-                                  className={cn(
-                                    "prose prose-sm max-w-none",
-                                    isExpanded ? "max-h-24 overflow-y-auto" : "line-clamp-2",
-                                    WIDGET_FONT_SIZE,
-                                  )}
-                                  dangerouslySetInnerHTML={{
-                                    __html: formatMarkdown(truncatedContent),
-                                  }}
-                                />
-                              </div>
-
-                              {/* Pulsante per espandere/contrarre il contenuto */}
-                              {note.contenuto.length > 80 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => toggleNoteContentExpansion(note.id, e)}
-                                  className="h-4 w-4 p-0 ml-2 flex-shrink-0 hover:bg-primary/10"
-                                  title={isExpanded ? "Riduci contenuto" : "Espandi contenuto"}
-                                >
-                                  {isExpanded ? <ChevronUp className="h-2 w-2" /> : <ChevronDown className="h-2 w-2" />}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-
-            {/* Footer con informazioni aggiuntive */}
-            {!loading && notes.length > 0 && (
-              <div className="p-2 bg-muted/30 border-t text-center text-muted-foreground">
-                <span className="text-[8px]">
-                  {totalNotes} note totali
-                  {totalNotes > NAVIGATION_THRESHOLD && ` • Pagina ${currentPage + 1} di ${totalPages}`}
-                </span>
-              </div>
-            )}
-          </CardContent>
+                  {/* Contenuto della nota - collassato di default */}
+                  {hasContent && isExpanded && (
+                    <div className="ml-2 pl-2 border-l-2 border-l-primary/30">
+                      <ScrollArea className="max-h-16">
+                        <div
+                          className={cn("text-muted-foreground prose prose-sm max-w-none", WIDGET_FONT_SIZE)}
+                          dangerouslySetInnerHTML={{
+                            __html: formatMarkdown(note.contenuto),
+                          }}
+                        />
+                      </ScrollArea>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         )}
-      </Card>
+      </div>
+
+      {/* Footer con informazioni - solo se ci sono note */}
+      {!loading && notes.length > 0 && totalNotes > NAVIGATION_THRESHOLD && (
+        <div className="text-center text-muted-foreground">
+          <span className="text-[8px]">
+            Pagina {currentPage + 1} di {totalPages} ({totalNotes} note)
+          </span>
+        </div>
+      )}
     </div>
   )
 }
