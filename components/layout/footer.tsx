@@ -1,167 +1,100 @@
-"use client"
-
-import Link from "next/link"
-import { ExternalLink } from "lucide-react"
-import { useAppConfig } from "@/hooks/use-app-config"
-import { useAuth } from "@/lib/auth-provider"
 import { NotesFooterWidget } from "@/components/notes-footer-widget"
 
 export function Footer() {
-  const currentYear = new Date().getFullYear()
-  const { config, isLoading } = useAppConfig()
-  const { user } = useAuth()
-
-  // Funzione per determinare se un URL è esterno
-  const isExternalUrl = (url: string) => {
-    return url.startsWith("http://") || url.startsWith("https://")
-  }
-
-  // Configurazione dei link legali
-  const legalLinks = [
-    {
-      key: "URLprivacy",
-      label: "Privacy Policy",
-      url: config?.URLprivacy,
-    },
-    {
-      key: "URLtermini",
-      label: "Termini di Servizio",
-      url: config?.URLtermini,
-    },
-    {
-      key: "URLcookies",
-      label: "Informativa Cookie",
-      url: config?.URLcookies,
-    },
-    {
-      key: "URLlicenza",
-      label: "Licenza",
-      url: config?.URLlicenza,
-    },
-  ].filter((link) => link.url && link.url.trim() !== "") // Mostra solo i link configurati
-
   return (
-    <footer className="w-full border-t bg-background">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* Sezione iStudio */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-lg">iStudio</h3>
-              <p className="text-sm text-muted-foreground">Sistema di gestione integrato per la tua azienda.</p>
-              {/* Versione dal database */}
-              <div className="text-xs text-muted-foreground">
-                {isLoading ? (
-                  <span className="animate-pulse">Caricamento versione...</span>
-                ) : (
-                  <span>Versione {config?.versione || "N/A"}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Sezione Link Rapidi */}
-            <div className="space-y-3">
-              <h4 className="font-semibold">Link Rapidi</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="/" className="text-muted-foreground hover:text-primary transition-colors">
-                    Home
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/dashboard" className="text-muted-foreground hover:text-primary transition-colors">
-                    Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/profile" className="text-muted-foreground hover:text-primary transition-colors">
-                    Profilo
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/pagine" className="text-muted-foreground hover:text-primary transition-colors">
-                    Pagine
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Sezione Supporto */}
-            <div className="space-y-3">
-              <h4 className="font-semibold">Supporto</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                    Documentazione
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                    FAQ
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                    Contatti
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Widget Note - solo per utenti autenticati */}
-            {user && (
-              <div className="space-y-3">
-                <NotesFooterWidget />
-              </div>
-            )}
+    <footer className="bg-background border-t">
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* iStudio */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">iStudio</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <a href="/about" className="hover:text-primary transition-colors">
+                  Chi siamo
+                </a>
+              </li>
+              <li>
+                <a href="/features" className="hover:text-primary transition-colors">
+                  Funzionalità
+                </a>
+              </li>
+              <li>
+                <a href="/pricing" className="hover:text-primary transition-colors">
+                  Prezzi
+                </a>
+              </li>
+              <li>
+                <a href="/blog" className="hover:text-primary transition-colors">
+                  Blog
+                </a>
+              </li>
+            </ul>
           </div>
 
-          <div className="mt-8 pt-8 border-t">
-            <div className="flex flex-col md:flex-row justify-between items-center space-y-2 md:space-y-0">
-              <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4">
-                <p className="text-sm text-muted-foreground">
-                  © {currentYear} iStudio{" "}
-                  {isLoading ? (
-                    <span className="animate-pulse">Caricamento versione...</span>
-                  ) : (
-                    <span>Versione {config?.versione || "N/A"}</span>
-                  )}
-                  . Tutti i diritti riservati.
-                </p>
-                {/* Link al sito Leonardo */}
-                <Link
-                  href="https://leonardo.sssr.it"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-                >
-                  Sviluppato da Leonardo SSSR
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
-
-              {/* Link legali dinamici */}
-              {legalLinks.length > 0 && (
-                <div className="flex flex-wrap justify-center md:justify-end gap-x-4 gap-y-1 text-sm">
-                  {legalLinks.map((link, index) => {
-                    const isExternal = isExternalUrl(link.url!)
-                    return (
-                      <Link
-                        key={link.key}
-                        href={link.url!}
-                        target={isExternal ? "_blank" : undefined}
-                        rel={isExternal ? "noopener noreferrer" : undefined}
-                        className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-                      >
-                        {link.label}
-                        {isExternal && <ExternalLink className="h-3 w-3" />}
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+          {/* Link Rapidi */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Link Rapidi</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <a href="/dashboard" className="hover:text-primary transition-colors">
+                  Dashboard
+                </a>
+              </li>
+              <li>
+                <a href="/data-explorer" className="hover:text-primary transition-colors">
+                  Data Explorer
+                </a>
+              </li>
+              <li>
+                <a href="/note" className="hover:text-primary transition-colors">
+                  Note
+                </a>
+              </li>
+              <li>
+                <a href="/profile" className="hover:text-primary transition-colors">
+                  Profilo
+                </a>
+              </li>
+            </ul>
           </div>
+
+          {/* Supporto */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Supporto</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <a href="/help" className="hover:text-primary transition-colors">
+                  Centro Assistenza
+                </a>
+              </li>
+              <li>
+                <a href="/contact" className="hover:text-primary transition-colors">
+                  Contattaci
+                </a>
+              </li>
+              <li>
+                <a href="/privacy" className="hover:text-primary transition-colors">
+                  Privacy Policy
+                </a>
+              </li>
+              <li>
+                <a href="/terms" className="hover:text-primary transition-colors">
+                  Termini di Servizio
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          {/* Widget Note */}
+          <div>
+            <NotesFooterWidget />
+          </div>
+        </div>
+
+        {/* Copyright */}
+        <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
+          <p>&copy; 2024 iStudio. Tutti i diritti riservati.</p>
         </div>
       </div>
     </footer>

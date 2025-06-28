@@ -8,7 +8,7 @@ import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from "@/lib/utils"
 
 // CONFIGURAZIONE WIDGET - Modifica questi valori per personalizzare il comportamento
@@ -113,24 +113,33 @@ export function NotesFooterWidget() {
     router.push("/data-explorer/note/new")
   }, [router])
 
-  // Apre una nota in modifica e torna al top
-  const handleEditNote = useCallback(
+  // Apre una nota in visualizzazione/modifica e torna al top
+  const handleViewNote = useCallback(
     (noteId: number) => {
       // Scorri al top della pagina
       window.scrollTo({ top: 0, behavior: "smooth" })
-      router.push(`/data-explorer/note/${noteId}?edit=true`)
+      router.push(`/data-explorer/note/${noteId}`)
     },
     [router],
   )
 
   // Gestisce l'espansione/collasso del contenuto delle note - solo una alla volta
   const toggleNoteContentExpansion = useCallback((noteId: number, e: React.MouseEvent) => {
-    e.stopPropagation() // Previene l'apertura della nota in modifica
+    e.stopPropagation() // Previene altri eventi
     setExpandedNote((prev) => {
       // Se la nota è già espansa, chiudila; altrimenti aprila e chiudi le altre
       return prev === noteId ? null : noteId
     })
   }, [])
+
+  // Gestisce il doppio click sul contenuto per aprire la nota
+  const handleContentDoubleClick = useCallback(
+    (noteId: number, e: React.MouseEvent) => {
+      e.stopPropagation() // Previene altri eventi
+      handleViewNote(noteId)
+    },
+    [handleViewNote],
+  )
 
   // Formatta il contenuto markdown (versione semplificata)
   const formatMarkdown = useCallback((content: string) => {
@@ -223,18 +232,17 @@ export function NotesFooterWidget() {
 
               return (
                 <li key={note.id} className="space-y-1">
-                  {/* Titolo della nota - sempre visibile e cliccabile per aprire in modifica */}
+                  {/* Titolo della nota - NON cliccabile, solo testo */}
                   <div className="flex items-start justify-between">
-                    <button
-                      onClick={() => handleEditNote(note.id)}
+                    <div
                       className={cn(
-                        "text-left text-muted-foreground hover:text-primary transition-colors flex-1 line-clamp-1",
+                        "text-left text-muted-foreground flex-1 line-clamp-1",
                         WIDGET_FONT_SIZE,
                       )}
-                      title={`Apri nota: ${note.titolo || "Nota senza titolo"}`}
+                      title={note.titolo || "Nota senza titolo"}
                     >
                       {note.titolo || "Nota senza titolo"}
-                    </button>
+                    </div>
 
                     {/* Pulsante per espandere/contrarre il contenuto - solo se c'è contenuto */}
                     {hasContent && (
@@ -250,17 +258,17 @@ export function NotesFooterWidget() {
                     )}
                   </div>
 
-                  {/* Contenuto della nota - con scrollbar se necessario, senza troncamento */}
+                  {/* Contenuto della nota - doppio click per aprire in data-explorer */}
                   {hasContent && isExpanded && (
                     <div className="ml-2 pl-2 border-l-2 border-l-primary/30">
                       <ScrollArea className="max-h-32 w-full">
                         <div
                           className={cn(
-                            "text-muted-foreground prose prose-sm max-w-none cursor-pointer pr-2",
+                            "text-muted-foreground prose prose-sm max-w-none cursor-pointer pr-2 select-text",
                             WIDGET_FONT_SIZE,
                           )}
-                          onClick={() => handleEditNote(note.id)}
-                          title="Clicca per aprire la nota in modifica"
+                          onDoubleClick={(e) => handleContentDoubleClick(note.id, e)}
+                          title="Doppio click per aprire la nota in data-explorer"
                           dangerouslySetInnerHTML={{
                             __html: formatMarkdown(note.contenuto),
                           }}
