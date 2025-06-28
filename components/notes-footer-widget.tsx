@@ -32,7 +32,7 @@ export function NotesFooterWidget() {
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(0)
   const [totalNotes, setTotalNotes] = useState(0)
-  const [expandedNotes, setExpandedNotes] = useState<Set<number>>(new Set())
+  const [expandedNote, setExpandedNote] = useState<number | null>(null) // Solo una nota espansa alla volta
 
   // Calcola se mostrare i controlli di navigazione
   const totalPages = Math.ceil(totalNotes / NOTES_PER_PAGE)
@@ -60,12 +60,12 @@ export function NotesFooterWidget() {
       console.log("Totale note trovate:", count)
       setTotalNotes(count || 0)
 
-      // Query per le note della pagina corrente - VERIFICA FILTRO id_utente
+      // Query per le note della pagina corrente - ORDINE DECRESCENTE (più recenti prima)
       const { data, error } = await supabase
         .from("note")
         .select("id, titolo, contenuto")
         .eq("id_utente", user.id)
-        .order("id", { ascending: false })
+        .order("id", { ascending: false }) // Ordine decrescente per ID (più recenti prima)
         .range(currentPage * NOTES_PER_PAGE, (currentPage + 1) * NOTES_PER_PAGE - 1)
 
       if (error) {
@@ -95,41 +95,40 @@ export function NotesFooterWidget() {
   const handlePrevPage = useCallback(() => {
     if (hasPrevPage) {
       setCurrentPage((prev) => prev - 1)
-      setExpandedNotes(new Set()) // Chiudi tutte le note espanse
+      setExpandedNote(null) // Chiudi la nota espansa quando cambi pagina
     }
   }, [hasPrevPage])
 
   const handleNextPage = useCallback(() => {
     if (hasNextPage) {
       setCurrentPage((prev) => prev + 1)
-      setExpandedNotes(new Set()) // Chiudi tutte le note espanse
+      setExpandedNote(null) // Chiudi la nota espansa quando cambi pagina
     }
   }, [hasNextPage])
 
-  // Crea una nuova nota
+  // Crea una nuova nota e torna al top
   const handleCreateNote = useCallback(() => {
+    // Scorri al top della pagina
+    window.scrollTo({ top: 0, behavior: "smooth" })
     router.push("/data-explorer/note/new")
   }, [router])
 
-  // Apre una nota in modifica
+  // Apre una nota in modifica e torna al top
   const handleEditNote = useCallback(
     (noteId: number) => {
+      // Scorri al top della pagina
+      window.scrollTo({ top: 0, behavior: "smooth" })
       router.push(`/data-explorer/note/${noteId}?edit=true`)
     },
     [router],
   )
 
-  // Gestisce l'espansione/collasso del contenuto delle note
+  // Gestisce l'espansione/collasso del contenuto delle note - solo una alla volta
   const toggleNoteContentExpansion = useCallback((noteId: number, e: React.MouseEvent) => {
     e.stopPropagation() // Previene l'apertura della nota in modifica
-    setExpandedNotes((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(noteId)) {
-        newSet.delete(noteId)
-      } else {
-        newSet.add(noteId)
-      }
-      return newSet
+    setExpandedNote((prev) => {
+      // Se la nota è già espansa, chiudila; altrimenti aprila e chiudi le altre
+      return prev === noteId ? null : noteId
     })
   }, [])
 
@@ -219,12 +218,12 @@ export function NotesFooterWidget() {
         ) : (
           <ul className="space-y-1">
             {notes.map((note) => {
-              const isExpanded = expandedNotes.has(note.id)
+              const isExpanded = expandedNote === note.id
               const hasContent = note.contenuto && note.contenuto.trim().length > 0
 
               return (
                 <li key={note.id} className="space-y-1">
-                  {/* Titolo della nota - sempre visibile */}
+                  {/* Titolo della nota - sempre visibile e cliccabile per aprire in modifica */}
                   <div className="flex items-start justify-between">
                     <button
                       onClick={() => handleEditNote(note.id)}
@@ -232,7 +231,7 @@ export function NotesFooterWidget() {
                         "text-left text-muted-foreground hover:text-primary transition-colors flex-1 line-clamp-1",
                         WIDGET_FONT_SIZE,
                       )}
-                      title={note.titolo || "Nota senza titolo"}
+                      title={`Apri nota: ${note.titolo || "Nota senza titolo"}`}
                     >
                       {note.titolo || "Nota senza titolo"}
                     </button>
@@ -251,12 +250,17 @@ export function NotesFooterWidget() {
                     )}
                   </div>
 
-                  {/* Contenuto della nota - collassato di default */}
+                  {/* Contenuto della nota - collassato di default, solo una espansa alla volta */}
                   {hasContent && isExpanded && (
                     <div className="ml-2 pl-2 border-l-2 border-l-primary/30">
                       <ScrollArea className="max-h-16">
                         <div
-                          className={cn("text-muted-foreground prose prose-sm max-w-none", WIDGET_FONT_SIZE)}
+                          className={cn(
+                            "text-muted-foreground prose prose-sm max-w-none cursor-pointer",
+                            WIDGET_FONT_SIZE,
+                          )}
+                          onClick={() => handleEditNote(note.id)}
+                          title="Clicca per aprire la nota in modifica"
                           dangerouslySetInnerHTML={{
                             __html: formatMarkdown(note.contenuto),
                           }}
