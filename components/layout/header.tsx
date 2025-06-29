@@ -48,26 +48,42 @@ export function Header() {
   } = useSafeCustomTheme()
 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [currentDateTime, setCurrentDateTime] = useState("")
+  const [currentTime, setCurrentTime] = useState("")
+  const [currentDate, setCurrentDate] = useState("")
 
-  // Formattazione data completa
+  // Formattazione data su due righe
   const formatDateTime = useCallback(() => {
     const now = new Date()
-    const options: Intl.DateTimeFormatOptions = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+
+    // Prima riga: "21:35 - domenica"
+    const timeOptions: Intl.DateTimeFormatOptions = {
       hour: "2-digit",
       minute: "2-digit",
     }
-    return now.toLocaleDateString("it-IT", options)
+    const weekdayOptions: Intl.DateTimeFormatOptions = {
+      weekday: "long",
+    }
+    const time = now.toLocaleTimeString("it-IT", timeOptions)
+    const weekday = now.toLocaleDateString("it-IT", weekdayOptions)
+    const timeString = `${time} - ${weekday}`
+
+    // Seconda riga: "29 giugno 2025"
+    const dateOptions: Intl.DateTimeFormatOptions = {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+    const dateString = now.toLocaleDateString("it-IT", dateOptions)
+
+    return { timeString, dateString }
   }, [])
 
   // Aggiorna data/ora ogni minuto
   useEffect(() => {
     const updateDateTime = () => {
-      setCurrentDateTime(formatDateTime())
+      const { timeString, dateString } = formatDateTime()
+      setCurrentTime(timeString)
+      setCurrentDate(dateString)
     }
     updateDateTime()
     const interval = setInterval(updateDateTime, 60000)
@@ -149,8 +165,8 @@ export function Header() {
 
           {/* Centro - Data e Ora (solo desktop) */}
           <div className="hidden md:flex flex-col items-center text-center">
-            <div className="text-sm font-medium text-foreground">{currentDateTime.split(" - ")[0]}</div>
-            <div className="text-xs text-muted-foreground">{currentDateTime.split(" - ")[1]}</div>
+            <div className="text-sm text-foreground">{currentTime}</div>
+            <div className="text-xs text-muted-foreground">{currentDate}</div>
           </div>
 
           {/* Controlli a destra */}
@@ -166,70 +182,72 @@ export function Header() {
               {isDarkMode ? <Sun className="h-4 w-4 text-yellow-500" /> : <Moon className="h-4 w-4 text-blue-600" />}
             </Button>
 
-            {/* Selettore Temi */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 hover:bg-accent/50 transition-colors"
-                  title="Seleziona tema"
-                >
-                  <Palette className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto">
-                <DropdownMenuLabel className="font-semibold">
-                  Temi Disponibili
-                  {currentTheme && (
-                    <div className="text-xs text-muted-foreground font-normal mt-1">
-                      Attuale: {currentTheme.nome_tema}
-                    </div>
-                  )}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {themes.length > 0 ? (
-                  themes.map((theme) => (
-                    <DropdownMenuItem
-                      key={theme.id}
-                      onClick={() => handleThemeChange(theme.id)}
-                      className="flex items-center gap-3 cursor-pointer py-3"
-                    >
-                      {theme.isDefault ? (
-                        <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                          <RotateCcw className="h-3 w-3 text-white" />
-                        </div>
-                      ) : (
-                        <div
-                          className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
-                          style={{
-                            backgroundColor: theme.colore_titolo?.startsWith("#")
-                              ? theme.colore_titolo
-                              : theme.colore_titolo?.includes("%")
-                                ? `hsl(${theme.colore_titolo})`
-                                : "#6366f1",
-                          }}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate text-sm">
-                          {theme.nome_tema}
-                          {theme.isDefault && <span className="ml-2 text-xs text-muted-foreground">(Sistema)</span>}
-                        </div>
+            {/* Selettore Temi - Solo se loggato */}
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 hover:bg-accent/50 transition-colors"
+                    title="Seleziona tema"
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto">
+                  <DropdownMenuLabel className="font-semibold">
+                    Temi Disponibili
+                    {currentTheme && (
+                      <div className="text-xs text-muted-foreground font-normal mt-1">
+                        Attuale: {currentTheme.nome_tema}
                       </div>
-                      {currentTheme?.id === theme.id && <span className="text-primary font-bold text-lg">✓</span>}
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {themes.length > 0 ? (
+                    themes.map((theme) => (
+                      <DropdownMenuItem
+                        key={theme.id}
+                        onClick={() => handleThemeChange(theme.id)}
+                        className="flex items-center gap-3 cursor-pointer py-3"
+                      >
+                        {theme.isDefault ? (
+                          <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                            <RotateCcw className="h-3 w-3 text-white" />
+                          </div>
+                        ) : (
+                          <div
+                            className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
+                            style={{
+                              backgroundColor: theme.colore_titolo?.startsWith("#")
+                                ? theme.colore_titolo
+                                : theme.colore_titolo?.includes("%")
+                                  ? `hsl(${theme.colore_titolo})`
+                                  : "#6366f1",
+                            }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate text-sm">
+                            {theme.nome_tema}
+                            {theme.isDefault && <span className="ml-2 text-xs text-muted-foreground">(Sistema)</span>}
+                          </div>
+                        </div>
+                        {currentTheme?.id === theme.id && <span className="text-primary font-bold text-lg">✓</span>}
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled className="text-muted-foreground py-3">
+                      Nessun tema disponibile
                     </DropdownMenuItem>
-                  ))
-                ) : (
-                  <DropdownMenuItem disabled className="text-muted-foreground py-3">
-                    Nessun tema disponibile
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
-            {/* Menu Utente */}
-            {user ? (
+            {/* Menu Utente - Solo se loggato */}
+            {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 px-3 hover:bg-accent/50 transition-colors">
@@ -309,28 +327,24 @@ export function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : (
-              <Link href="/login">
-                <Button variant="outline" size="sm">
-                  Accedi
-                </Button>
-              </Link>
             )}
 
-            {/* Menu Mobile */}
-            <Button variant="ghost" size="icon" className="md:hidden h-9 w-9" onClick={toggleMenu}>
-              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
+            {/* Menu Mobile - Solo se loggato */}
+            {user && (
+              <Button variant="ghost" size="icon" className="md:hidden h-9 w-9" onClick={toggleMenu}>
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Menu Mobile Espanso */}
-        {isMenuOpen && (
+        {/* Menu Mobile Espanso - Solo se loggato */}
+        {isMenuOpen && user && (
           <div className="md:hidden py-4 border-t bg-background/95">
             {/* Data/Ora Mobile */}
             <div className="flex flex-col items-center space-y-1 mb-4 pb-4 border-b">
-              <div className="text-sm font-medium">{currentDateTime.split(" - ")[0]}</div>
-              <div className="text-xs text-muted-foreground">{currentDateTime.split(" - ")[1]}</div>
+              <div className="text-sm">{currentTime}</div>
+              <div className="text-xs text-muted-foreground">{currentDate}</div>
             </div>
 
             {/* Titolo/Motto Mobile */}
@@ -339,98 +353,96 @@ export function Header() {
               {appMotto && <div className="text-sm text-muted-foreground text-center">{appMotto}</div>}
             </div>
 
-            {user && (
-              <div className="flex flex-col space-y-2">
-                <div className="px-2 py-2 text-sm font-medium border-b">{user.nome || user.username}</div>
+            <div className="flex flex-col space-y-2">
+              <div className="px-2 py-2 text-sm font-medium border-b">{user.nome || user.username}</div>
 
-                {/* Layout Mobile */}
-                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">LAYOUT</div>
-                <button
-                  onClick={() => handleLayoutChange("default")}
-                  className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-                >
-                  <div className="flex items-center">
-                    <Layout className="h-4 w-4 mr-2" />
-                    Layout Standard
-                  </div>
-                  {layout === "default" && <span className="text-primary">✓</span>}
-                </button>
-                <button
-                  onClick={() => handleLayoutChange("fullWidth")}
-                  className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-                >
-                  <div className="flex items-center">
-                    <LayoutGrid className="h-4 w-4 mr-2" />
-                    Layout Esteso
-                  </div>
-                  {layout === "fullWidth" && <span className="text-primary">✓</span>}
-                </button>
-                <button
-                  onClick={() => handleLayoutChange("sidebar")}
-                  className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-                >
-                  <div className="flex items-center">
-                    <LayoutDashboard className="h-4 w-4 mr-2" />
-                    Layout Sidebar
-                  </div>
-                  {layout === "sidebar" && <span className="text-primary">✓</span>}
-                </button>
+              {/* Layout Mobile */}
+              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">LAYOUT</div>
+              <button
+                onClick={() => handleLayoutChange("default")}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+              >
+                <div className="flex items-center">
+                  <Layout className="h-4 w-4 mr-2" />
+                  Layout Standard
+                </div>
+                {layout === "default" && <span className="text-primary">✓</span>}
+              </button>
+              <button
+                onClick={() => handleLayoutChange("fullWidth")}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+              >
+                <div className="flex items-center">
+                  <LayoutGrid className="h-4 w-4 mr-2" />
+                  Layout Esteso
+                </div>
+                {layout === "fullWidth" && <span className="text-primary">✓</span>}
+              </button>
+              <button
+                onClick={() => handleLayoutChange("sidebar")}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+              >
+                <div className="flex items-center">
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Layout Sidebar
+                </div>
+                {layout === "sidebar" && <span className="text-primary">✓</span>}
+              </button>
 
-                {/* Font Size Mobile */}
-                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground mt-2">DIMENSIONE CARATTERE</div>
-                <button
-                  onClick={() => handleFontSizeChange("small")}
-                  className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-                >
-                  <div className="flex items-center">
-                    <Type className="h-3 w-3 mr-2" />
-                    Piccolo
-                  </div>
-                  {fontSize === "small" && <span className="text-primary">✓</span>}
-                </button>
-                <button
-                  onClick={() => handleFontSizeChange("normal")}
-                  className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-                >
-                  <div className="flex items-center">
-                    <Type className="h-4 w-4 mr-2" />
-                    Normale
-                  </div>
-                  {fontSize === "normal" && <span className="text-primary">✓</span>}
-                </button>
-                <button
-                  onClick={() => handleFontSizeChange("large")}
-                  className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-                >
-                  <div className="flex items-center">
-                    <Type className="h-5 w-5 mr-2" />
-                    Grande
-                  </div>
-                  {fontSize === "large" && <span className="text-primary">✓</span>}
-                </button>
+              {/* Font Size Mobile */}
+              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground mt-2">DIMENSIONE CARATTERE</div>
+              <button
+                onClick={() => handleFontSizeChange("small")}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+              >
+                <div className="flex items-center">
+                  <Type className="h-3 w-3 mr-2" />
+                  Piccolo
+                </div>
+                {fontSize === "small" && <span className="text-primary">✓</span>}
+              </button>
+              <button
+                onClick={() => handleFontSizeChange("normal")}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+              >
+                <div className="flex items-center">
+                  <Type className="h-4 w-4 mr-2" />
+                  Normale
+                </div>
+                {fontSize === "normal" && <span className="text-primary">✓</span>}
+              </button>
+              <button
+                onClick={() => handleFontSizeChange("large")}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+              >
+                <div className="flex items-center">
+                  <Type className="h-5 w-5 mr-2" />
+                  Grande
+                </div>
+                {fontSize === "large" && <span className="text-primary">✓</span>}
+              </button>
 
-                {/* Admin Link Mobile */}
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent mt-2"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Dashboard Admin
-                  </Link>
-                )}
-
-                {/* Logout Mobile */}
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive mt-2"
+              {/* Admin Link Mobile */}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent mt-2"
+                  onClick={() => setIsMenuOpen(false)}
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </button>
-              </div>
-            )}
+                  <Settings className="h-4 w-4 mr-2" />
+                  Dashboard Admin
+                </Link>
+              )}
+
+              {/* Logout Mobile */}
+              <button
+                onClick={handleLogout}
+                className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive mt-2"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </button>
+            </div>
           </div>
         )}
       </div>
