@@ -5,6 +5,12 @@ import { useRouter, useParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
 import {
@@ -18,6 +24,8 @@ import {
   Briefcase,
   Users,
   StickyNote,
+  ArrowLeft,
+  Save,
 } from "lucide-react"
 
 // Definizione delle tabelle disponibili
@@ -657,4 +665,293 @@ export default function NewItemPage() {
         description: "Il nuovo elemento è stato salvato nel database",
         action: (
           <div className="flex items-center">
-            <CheckCircle2 className="\
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+          </div>
+        ),
+      })
+
+      // Reindirizza alla pagina di dettaglio dell'elemento appena creato
+      if (data && data[0]) {
+        router.push(`/data-explorer/${tableName}/${data[0].id}`)
+      } else {
+        router.push(`/data-explorer/${tableName}`)
+      }
+    } catch (error: any) {
+      console.error("Errore durante il salvataggio:", error)
+      toast({
+        title: "Errore durante il salvataggio",
+        description: error.message || "Si è verificato un errore imprevisto",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Renderizza un campo del form
+  const renderField = (field: string) => {
+    const fieldType = fieldTypes[field]
+    const fieldValue = formData[field]
+    const hasError = !!errors[field]
+    const isRequired = requiredFields.includes(field)
+
+    // Non renderizzare i campi automatici
+    if (autoFields.includes(field)) return null
+
+    const commonProps = {
+      id: field,
+      value: fieldValue || "",
+      onChange: (e: any) => handleFieldChange(field, e.target.value),
+      className: hasError ? "border-red-500" : "",
+    }
+
+    switch (fieldType) {
+      case "string":
+      case "email":
+      case "tel":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input {...commonProps} type={fieldType === "email" ? "email" : fieldType === "tel" ? "tel" : "text"} />
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "text":
+      case "richtext":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Textarea {...commonProps} rows={fieldType === "richtext" ? 8 : 4} />
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "number":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input
+              {...commonProps}
+              type="number"
+              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value) || 0)}
+            />
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "datetime":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input
+              {...commonProps}
+              type="datetime-local"
+              value={fieldValue ? new Date(fieldValue).toISOString().slice(0, 16) : ""}
+              onChange={(e) => handleFieldChange(field, e.target.value ? new Date(e.target.value).toISOString() : "")}
+            />
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "boolean":
+        return (
+          <div key={field} className="flex items-center space-x-2">
+            <Checkbox
+              id={field}
+              checked={!!fieldValue}
+              onCheckedChange={(checked) => handleFieldChange(field, checked)}
+            />
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+            </Label>
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "select":
+        const options = selectOptions[field] || []
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Select value={fieldValue || ""} onValueChange={(value) => handleFieldChange(field, value)}>
+              <SelectTrigger className={hasError ? "border-red-500" : ""}>
+                <SelectValue placeholder="Seleziona..." />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "priority_select":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Select
+              value={fieldValue?.toString() || ""}
+              onValueChange={(value) => handleFieldChange(field, Number.parseInt(value))}
+            >
+              <SelectTrigger className={hasError ? "border-red-500" : ""}>
+                <SelectValue placeholder="Seleziona priorità..." />
+              </SelectTrigger>
+              <SelectContent>
+                {priorityOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value.toString()}>
+                    {option.nome}
+                    {option.descrizione && <span className="text-sm text-gray-500 ml-2">({option.descrizione})</span>}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      case "color":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <ColorPicker value={fieldValue || ""} onChange={(value) => handleFieldChange(field, value)} />
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+
+      default:
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
+              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <Input {...commonProps} />
+            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+          </div>
+        )
+    }
+  }
+
+  // Se la tabella non è valida, mostra un errore
+  if (!isValidTable) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-red-600 mb-4">Tabella non trovata</h1>
+              <p className="text-gray-600 mb-4">La tabella "{tableName}" non è disponibile.</p>
+              <Button onClick={() => router.push("/data-explorer")} variant="outline">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Torna al Data Explorer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Se non c'è configurazione per la tabella
+  if (!tableConfig) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-red-600 mb-4">Configurazione mancante</h1>
+              <p className="text-gray-600 mb-4">La configurazione per la tabella "{tableName}" non è disponibile.</p>
+              <Button onClick={() => router.push("/data-explorer")} variant="outline">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Torna al Data Explorer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const tableInfo = AVAILABLE_TABLES.find((table) => table.id === tableName)
+  const Icon = tableInfo?.icon || FileText
+
+  return (
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-6">
+        <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline" className="mb-4">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Torna alla lista
+        </Button>
+
+        <div className="flex items-center space-x-3 mb-2">
+          <Icon className="w-8 h-8 text-blue-600" />
+          <h1 className="text-3xl font-bold">Nuovo {tableInfo?.label}</h1>
+        </div>
+        <p className="text-gray-600">Crea un nuovo elemento nella tabella {tableName}</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Icon className="w-5 h-5" />
+            <span>Dettagli {tableInfo?.label}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {fieldOrder.length > 0
+              ? fieldOrder.map((field) => renderField(field))
+              : Object.keys(fieldTypes)
+                  .filter((field) => !autoFields.includes(field))
+                  .map((field) => renderField(field))}
+          </div>
+
+          <div className="flex justify-end space-x-4 pt-6 border-t">
+            <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline">
+              Annulla
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
