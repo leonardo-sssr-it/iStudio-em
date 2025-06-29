@@ -1,213 +1,438 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 
-export type Theme = "light" | "dark" | "system"
-export type Layout = "standard" | "full-width" | "sidebar"
-export type FontSize = "small" | "normal" | "large"
-
-interface CustomTheme {
-  id: string
-  nome: string
-  colore_primario: string
-  colore_secondario: string
-  colore_sfondo: string
-  colore_testo: string
-  colore_accento: string
+// Tipi per i temi
+interface Theme {
+  id: number
+  nome_tema: string
+  colore_titolo?: string
+  colore_sfondo?: string
+  colore_testo?: string
+  colore_accento?: string
+  carattere_tipo?: string
+  carattere_dimensione?: number
+  carattere_colore?: string
+  colore_header?: string
+  colore_footer?: string
+  colore_background?: string
+  colore_card?: string
+  colore_tabs?: string
+  colore_div?: string
+  border_radius?: string
+  css_variables?: Record<string, string> | string | null
+  isDefault?: boolean
 }
 
+// Tipi per il context
 interface ThemeContextType {
-  // Theme management
-  theme: Theme
-  setTheme: (theme: Theme) => void
-
-  // Layout management
-  layout: Layout
-  setLayout: (layout: Layout) => void
-
-  // Font size management
-  fontSize: FontSize
-  setFontSize: (fontSize: FontSize) => void
-
-  // Custom themes
-  customThemes: CustomTheme[]
-  currentCustomTheme: CustomTheme | null
-  setCustomTheme: (theme: CustomTheme | null) => void
-
-  // Loading state
-  isLoading: boolean
+  themes: Theme[]
+  currentTheme: Theme | null
+  applyTheme: (themeId: number) => void
+  resetToDefault: () => void
+  layout: "default" | "fullWidth" | "sidebar"
+  setLayout: (layout: "default" | "fullWidth" | "sidebar") => void
+  toggleDarkMode: () => void
+  isDarkMode: boolean
+  fontSize: "small" | "normal" | "large"
+  setFontSize: (size: "small" | "normal" | "large") => void
+  mounted: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const DEFAULT_THEME: CustomTheme = {
-  id: "default",
-  nome: "Default",
-  colore_primario: "221.2 83.2% 53.3%",
-  colore_secondario: "210 40% 96%",
-  colore_sfondo: "0 0% 100%",
-  colore_testo: "222.2 84% 4.9%",
-  colore_accento: "210 40% 96%",
+// Tema predefinito
+const defaultTheme: Theme = {
+  id: 0,
+  nome_tema: "Sistema",
+  isDefault: true,
+}
+
+// Hook sicuro per usare il context
+export function useSafeCustomTheme(): ThemeContextType {
+  const context = useContext(ThemeContext)
+  if (!context) {
+    // Fallback sicuro se il context non è disponibile
+    return {
+      themes: [defaultTheme],
+      currentTheme: defaultTheme,
+      applyTheme: () => {},
+      resetToDefault: () => {},
+      layout: "default",
+      setLayout: () => {},
+      toggleDarkMode: () => {},
+      isDarkMode: false,
+      fontSize: "normal",
+      setFontSize: () => {},
+      mounted: false,
+    }
+  }
+  return context
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("system")
-  const [layout, setLayoutState] = useState<Layout>("sidebar")
-  const [fontSize, setFontSizeState] = useState<FontSize>("normal")
-  const [customThemes, setCustomThemes] = useState<CustomTheme[]>([DEFAULT_THEME])
-  const [currentCustomTheme, setCurrentCustomTheme] = useState<CustomTheme | null>(DEFAULT_THEME)
-  const [isLoading, setIsLoading] = useState(true)
+  const { supabase, isConnected } = useSupabase()
+  const [themes, setThemes] = useState<Theme[]>([defaultTheme])
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
+  const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
+  const [mounted, setMounted] = useState(false)
 
-  const { supabase } = useSupabase()
+  // Funzione per convertire colori hex in HSL
+  const hexToHsl = useCallback((hex: string): string => {
+    if (!hex || hex === "") return "0 0% 50%"
 
-  // Load themes from database
-  const loadCustomThemes = useCallback(async () => {
-    if (!supabase) return
+    // Se il colore è già in formato HSL, restituiscilo così com'è
+    if (hex.includes("hsl") || hex.includes("%")) return hex.replace("hsl(", "").replace(")", "")
 
-    try {
-      const { data, error } = await supabase.from("temi").select("*").order("nome")
+    // Rimuovi il # se presente
+    hex = hex.replace("#", "")
 
-      if (error) {
-        console.warn("Error loading themes:", error)
-        return
+    // Converti hex in RGB
+    const r = Number.parseInt(hex.substr(0, 2), 16) / 255
+    const g = Number.parseInt(hex.substr(2, 2), 16) / 255
+    const b = Number.parseInt(hex.substr(4, 2), 16) / 255
+
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    let h = 0,
+      s = 0,
+      l = (max + min) / 2
+
+    if (max !== min) {
+      const d = max - min
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+      switch (max) {
+        case r:
+          h = (g - b) / d + (g < b ? 6 : 0)
+          break
+        case g:
+          h = (b - r) / d + 2
+          break
+        case b:
+          h = (r - g) / d + 4
+          break
       }
-
-      if (data && data.length > 0) {
-        const themes = data.map((theme) => ({
-          id: theme.id.toString(),
-          nome: theme.nome,
-          colore_primario: theme.colore_primario || DEFAULT_THEME.colore_primario,
-          colore_secondario: theme.colore_secondario || DEFAULT_THEME.colore_secondario,
-          colore_sfondo: theme.colore_sfondo || DEFAULT_THEME.colore_sfondo,
-          colore_testo: theme.colore_testo || DEFAULT_THEME.colore_testo,
-          colore_accento: theme.colore_accento || DEFAULT_THEME.colore_accento,
-        }))
-
-        setCustomThemes([DEFAULT_THEME, ...themes])
-      }
-    } catch (error) {
-      console.warn("Error loading themes:", error)
+      h /= 6
     }
-  }, [supabase])
 
-  // Load preferences from localStorage
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
+  }, [])
+
+  // Applica gli stili del tema
+  const applyThemeStyles = useCallback(
+    (theme: Theme) => {
+      if (typeof window === "undefined") return
+
+      const root = document.documentElement
+
+      console.log("=== APPLICANDO TEMA ===")
+      console.log("Nome tema:", theme.nome_tema)
+      console.log("Tema data:", theme)
+
+      if (theme.isDefault) {
+        // Resetta al tema predefinito
+        console.log("Resettando al tema predefinito")
+        const customProperties = [
+          "--primary",
+          "--secondary",
+          "--accent",
+          "--background",
+          "--foreground",
+          "--card",
+          "--card-foreground",
+          "--popover",
+          "--popover-foreground",
+          "--header",
+          "--footer",
+          "--div",
+        ]
+
+        customProperties.forEach((prop) => {
+          root.style.removeProperty(prop)
+        })
+
+        // Resetta il font family
+        document.body.style.fontFamily = ""
+
+        // Resetta il border radius
+        root.style.removeProperty("--radius")
+      } else {
+        // Applica i colori del tema personalizzato
+        console.log("Applicando tema personalizzato")
+
+        if (theme.colore_titolo) {
+          const titleHsl = hexToHsl(theme.colore_titolo)
+          root.style.setProperty("--primary", titleHsl)
+          console.log(`✓ Primary color applicato: ${titleHsl}`)
+        }
+
+        if (theme.colore_card) {
+          const cardHsl = hexToHsl(theme.colore_card)
+          root.style.setProperty("--secondary", cardHsl)
+          console.log(`✓ Secondary color applicato: ${cardHsl}`)
+        }
+
+        if (theme.colore_tabs) {
+          const tabsHsl = hexToHsl(theme.colore_tabs)
+          root.style.setProperty("--accent", tabsHsl)
+          console.log(`✓ Accent color applicato: ${tabsHsl}`)
+        }
+
+        if (theme.colore_background) {
+          const bgHsl = hexToHsl(theme.colore_background)
+          root.style.setProperty("--background", bgHsl)
+          root.style.setProperty("--card", bgHsl)
+          root.style.setProperty("--popover", bgHsl)
+          console.log(`✓ Background color applicato: ${bgHsl}`)
+        }
+
+        if (theme.carattere_colore) {
+          const textHsl = hexToHsl(theme.carattere_colore)
+          root.style.setProperty("--foreground", textHsl)
+          root.style.setProperty("--card-foreground", textHsl)
+          root.style.setProperty("--popover-foreground", textHsl)
+          console.log(`✓ Text color applicato: ${textHsl}`)
+        }
+
+        if (theme.colore_header) {
+          const headerHsl = hexToHsl(theme.colore_header)
+          root.style.setProperty("--header", headerHsl)
+          console.log(`✓ Header color applicato: ${headerHsl}`)
+        }
+
+        if (theme.colore_footer) {
+          const footerHsl = hexToHsl(theme.colore_footer)
+          root.style.setProperty("--footer", footerHsl)
+          console.log(`✓ Footer color applicato: ${footerHsl}`)
+        }
+
+        if (theme.colore_div) {
+          const divHsl = hexToHsl(theme.colore_div)
+          root.style.setProperty("--div", divHsl)
+          console.log(`✓ Div color applicato: ${divHsl}`)
+        }
+
+        // Applica le variabili CSS personalizzate se presenti
+        if (theme.css_variables) {
+          let cssVars: Record<string, string> = {}
+
+          if (typeof theme.css_variables === "string") {
+            try {
+              cssVars = JSON.parse(theme.css_variables)
+            } catch (e) {
+              console.error("Errore nel parsing delle CSS variables:", e)
+            }
+          } else if (typeof theme.css_variables === "object") {
+            cssVars = theme.css_variables
+          }
+
+          Object.entries(cssVars).forEach(([key, value]) => {
+            if (value && typeof value === "string") {
+              root.style.setProperty(`--${key}`, value)
+              console.log(`✓ Variabile CSS personalizzata applicata: --${key} = ${value}`)
+            }
+          })
+        }
+
+        // Applica il font family
+        if (theme.carattere_tipo) {
+          document.body.style.fontFamily = theme.carattere_tipo
+          console.log(`✓ Font family applicato: ${theme.carattere_tipo}`)
+        }
+
+        // Applica il border radius
+        if (theme.border_radius) {
+          root.style.setProperty("--radius", theme.border_radius)
+          console.log(`✓ Border radius applicato: ${theme.border_radius}`)
+        }
+      }
+
+      // Forza il re-render aggiungendo una classe temporanea
+      document.body.classList.add("theme-transition")
+      setTimeout(() => {
+        document.body.classList.remove("theme-transition")
+      }, 300)
+
+      console.log("=== TEMA APPLICATO CON SUCCESSO ===")
+    },
+    [hexToHsl],
+  )
+
+  // Carica le preferenze dal localStorage
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as Theme
-    const savedLayout = localStorage.getItem("layout") as Layout
-    const savedFontSize = localStorage.getItem("fontSize") as FontSize
-    const savedCustomTheme = localStorage.getItem("customTheme")
+    if (typeof window !== "undefined") {
+      const savedLayout = localStorage.getItem("app-layout") as "default" | "fullWidth" | "sidebar" | null
+      const savedDarkMode = localStorage.getItem("app-dark-mode")
+      const savedFontSize = localStorage.getItem("app-font-size") as "small" | "normal" | "large" | null
 
-    if (savedTheme) setThemeState(savedTheme)
-    if (savedLayout) setLayoutState(savedLayout)
-    if (savedFontSize) setFontSizeState(savedFontSize)
+      if (savedLayout) setLayoutState(savedLayout)
+      if (savedDarkMode) setIsDarkMode(savedDarkMode === "true")
+      if (savedFontSize) setFontSizeState(savedFontSize)
 
-    if (savedCustomTheme) {
+      setMounted(true)
+    }
+  }, [])
+
+  // Carica i temi dal database
+  useEffect(() => {
+    const loadThemes = async () => {
+      if (!supabase || !isConnected) return
+
       try {
-        const parsed = JSON.parse(savedCustomTheme)
-        setCurrentCustomTheme(parsed)
+        console.log("Loading themes from database...")
+        const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
+
+        if (error) {
+          console.error("Error loading themes:", error)
+          return
+        }
+
+        // Processa i temi da Supabase
+        const supabaseThemes = data
+          ? data.map((theme) => ({
+              ...theme,
+              carattere_colore: theme.carattere_colore || "#111827",
+              colore_header: theme.colore_header || "#F7FAFC",
+              colore_footer: theme.colore_footer || "#2D3748",
+              colore_titolo: theme.colore_titolo || "#1A202C",
+              colore_background: theme.colore_background || "#FFFFFF",
+              colore_card: theme.colore_card || "#E2E8F0",
+              carattere_tipo: theme.carattere_tipo || "Tahoma, sans-serif",
+              border_radius: theme.border_radius || "0.5rem",
+              css_variables:
+                typeof theme.css_variables === "string" ? JSON.parse(theme.css_variables) : theme.css_variables || {},
+              isDefault: false,
+            }))
+          : []
+
+        const allThemes = [defaultTheme, ...supabaseThemes]
+        setThemes(allThemes)
+        console.log("Themes loaded:", allThemes.length)
+
+        // Applica il tema salvato o quello di default
+        const savedThemeId = localStorage.getItem("app-theme")
+        if (savedThemeId) {
+          const savedTheme = allThemes.find((t) => t.id.toString() === savedThemeId)
+          if (savedTheme) {
+            setCurrentTheme(savedTheme)
+            applyThemeStyles(savedTheme)
+          }
+        } else {
+          // Applica il tema di default
+          setCurrentTheme(defaultTheme)
+          applyThemeStyles(defaultTheme)
+        }
       } catch (error) {
-        console.warn("Error parsing saved custom theme:", error)
+        console.error("Error in loadThemes:", error)
       }
     }
 
-    loadCustomThemes().finally(() => setIsLoading(false))
-  }, [loadCustomThemes])
+    if (mounted) {
+      loadThemes()
+    }
+  }, [supabase, isConnected, mounted, applyThemeStyles])
 
-  // Apply theme to document
+  // Applica le dimensioni del font
+  const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
+    if (typeof window === "undefined") return
+
+    const root = document.documentElement
+    const sizes = {
+      small: "14px",
+      normal: "16px",
+      large: "18px",
+    }
+
+    root.style.setProperty("--font-size-base", sizes[size])
+    root.classList.remove("font-small", "font-normal", "font-large")
+    root.classList.add(`font-${size}`)
+    console.log(`Font size changed to: ${size} (${sizes[size]})`)
+  }, [])
+
+  // Applica il dark mode
+  const applyDarkMode = useCallback((dark: boolean) => {
+    if (typeof window === "undefined") return
+
+    const root = document.documentElement
+    if (dark) {
+      root.classList.add("dark")
+    } else {
+      root.classList.remove("dark")
+    }
+    console.log(`Dark mode: ${dark}`)
+  }, [])
+
+  // Effetti per applicare le impostazioni quando cambiano
   useEffect(() => {
-    const root = window.document.documentElement
-
-    // Remove existing theme classes
-    root.classList.remove("light", "dark", "font-small", "font-normal", "font-large")
-
-    // Apply theme
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-      root.classList.add(systemTheme)
-    } else {
-      root.classList.add(theme)
+    if (mounted) {
+      applyFontSize(fontSize)
     }
+  }, [fontSize, mounted, applyFontSize])
 
-    // Apply font size
-    root.classList.add(`font-${fontSize}`)
-
-    // Apply custom theme colors
-    if (currentCustomTheme) {
-      root.style.setProperty("--primary", currentCustomTheme.colore_primario)
-      root.style.setProperty("--secondary", currentCustomTheme.colore_secondario)
-      root.style.setProperty("--background", currentCustomTheme.colore_sfondo)
-      root.style.setProperty("--foreground", currentCustomTheme.colore_testo)
-      root.style.setProperty("--accent", currentCustomTheme.colore_accento)
+  useEffect(() => {
+    if (mounted) {
+      applyDarkMode(isDarkMode)
     }
-  }, [theme, fontSize, currentCustomTheme])
+  }, [isDarkMode, mounted, applyDarkMode])
 
-  // Theme setters with persistence
-  const setTheme = useCallback((newTheme: Theme) => {
-    setThemeState(newTheme)
-    localStorage.setItem("theme", newTheme)
-  }, [])
+  // Funzioni per cambiare le impostazioni
+  const applyTheme = useCallback(
+    (themeId: number) => {
+      const theme = themes.find((t) => t.id === themeId)
+      if (theme) {
+        console.log("Applying theme:", theme.nome_tema)
+        setCurrentTheme(theme)
+        applyThemeStyles(theme)
+        localStorage.setItem("app-theme", themeId.toString())
+      }
+    },
+    [themes, applyThemeStyles],
+  )
 
-  const setLayout = useCallback((newLayout: Layout) => {
+  const resetToDefault = useCallback(() => {
+    console.log("Resetting to default theme")
+    setCurrentTheme(defaultTheme)
+    applyThemeStyles(defaultTheme)
+    localStorage.setItem("app-theme", "0")
+  }, [applyThemeStyles])
+
+  const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
     setLayoutState(newLayout)
-    localStorage.setItem("layout", newLayout)
+    localStorage.setItem("app-layout", newLayout)
+    console.log("Layout changed to:", newLayout)
   }, [])
 
-  const setFontSize = useCallback((newFontSize: FontSize) => {
-    setFontSizeState(newFontSize)
-    localStorage.setItem("fontSize", newFontSize)
-  }, [])
+  const toggleDarkMode = useCallback(() => {
+    const newDarkMode = !isDarkMode
+    setIsDarkMode(newDarkMode)
+    localStorage.setItem("app-dark-mode", newDarkMode.toString())
+    console.log("Dark mode toggled:", newDarkMode)
+  }, [isDarkMode])
 
-  const setCustomTheme = useCallback((newCustomTheme: CustomTheme | null) => {
-    setCurrentCustomTheme(newCustomTheme)
-    if (newCustomTheme) {
-      localStorage.setItem("customTheme", JSON.stringify(newCustomTheme))
-    } else {
-      localStorage.removeItem("customTheme")
-    }
+  const setFontSize = useCallback((size: "small" | "normal" | "large") => {
+    setFontSizeState(size)
+    localStorage.setItem("app-font-size", size)
+    console.log("Font size changed to:", size)
   }, [])
 
   const value: ThemeContextType = {
-    theme,
-    setTheme,
+    themes,
+    currentTheme,
+    applyTheme,
+    resetToDefault,
     layout,
     setLayout,
+    toggleDarkMode,
+    isDarkMode,
     fontSize,
     setFontSize,
-    customThemes,
-    currentCustomTheme,
-    setCustomTheme,
-    isLoading,
+    mounted,
   }
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider")
-  }
-  return context
-}
-
-// Safe version that doesn't throw
-export function useSafeCustomTheme() {
-  const context = useContext(ThemeContext)
-  if (context === undefined) {
-    return {
-      theme: "system" as Theme,
-      setTheme: () => {},
-      layout: "sidebar" as Layout,
-      setLayout: () => {},
-      fontSize: "normal" as FontSize,
-      setFontSize: () => {},
-      customThemes: [DEFAULT_THEME],
-      currentCustomTheme: DEFAULT_THEME,
-      setCustomTheme: () => {},
-      isLoading: false,
-    }
-  }
-  return context
 }

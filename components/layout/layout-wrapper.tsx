@@ -51,7 +51,7 @@ export function LayoutWrapper({
         exit={{ opacity: 0, width: 0 }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
         className={cn(
-          "h-full flex-shrink-0 bg-background border-e dark:border-slate-700",
+          "h-full flex-shrink-0 bg-background border-e dark:border-slate-700", // Aggiunto sfondo e bordo
           layoutConfig.sidebarPosition === "right" && "border-s dark:border-slate-700 border-e-0",
         )}
       >
@@ -80,10 +80,16 @@ export function LayoutWrapper({
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header */}
-      <Header />
+      <div className="w-full">
+        {" "}
+        {/* Header wrapper per larghezza piena */}
+        <Header />
+      </div>
 
       {/* Corpo Centrale */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
+        {" "}
+        {/* Aggiunto overflow-hidden */}
         {/* Sidebar Mobile (Overlay) */}
         <AnimatePresence>
           {showSidebar && !actualIsCollapsed && isMobile && (
@@ -97,38 +103,34 @@ export function LayoutWrapper({
           )}
         </AnimatePresence>
         {mobileSidebarComponent}
-
         {/* Sidebar Desktop */}
         {layoutConfig.sidebarPosition === "left" && sidebarComponent}
-
         {/* Contenuto Principale */}
         <motion.main
           key="main-content"
-          className="flex-1 min-w-0 overflow-y-auto"
+          className="flex-1 min-w-0 overflow-y-auto" // Aggiunto overflow-y-auto
           layout
           transition={{ duration: 0.3, type: "spring", bounce: 0.1 }}
         >
           <div
             className={cn(
-              "h-full",
-              // Rimuovo il padding eccessivo e uso solo quello necessario
-              themeLayoutChoice === "full-width"
-                ? "w-full"
-                : isDashboardPage
-                  ? "w-full px-4 sm:px-6 lg:px-8 py-6"
-                  : "container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-full",
+              "py-6 h-full",
+              isDashboardPage ? "w-full px-4 sm:px-6 lg:px-8" : "container mx-auto px-4 sm:px-6 lg:px-8 max-w-full",
             )}
           >
             {children}
           </div>
         </motion.main>
-
         {/* Sidebar Desktop (se a destra) */}
         {layoutConfig.sidebarPosition === "right" && sidebarComponent}
       </div>
 
       {/* Footer */}
-      <Footer />
+      <div className="w-full">
+        {" "}
+        {/* Footer wrapper per larghezza piena */}
+        <Footer />
+      </div>
     </div>
   )
 }
