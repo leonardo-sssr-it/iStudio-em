@@ -2,377 +2,248 @@
 
 import type React from "react"
 
-import { useState, useCallback, memo, useEffect, useRef } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Loader2,
-  LogOut,
-  LayoutDashboard,
-  Settings,
-  Shield,
-  ArrowRight,
-  Lock,
-  Mail,
-  AlertCircle,
-  Database,
-} from "lucide-react"
-import Link from "next/link"
-import { toast } from "@/components/ui/use-toast"
-import { useCustomTheme } from "@/contexts/theme-context"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { motion } from "framer-motion"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/lib/auth-provider"
+import { Loader2, LogIn, UserPlus, Settings, ChevronRight, User } from "lucide-react"
 
-// Regex per validazione email
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-// Componente ottimizzato con memo per evitare re-render inutili
-export const AuthWidget = memo(function AuthWidget() {
-  // Stati
-  const [usernameOrEmail, setUsernameOrEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errors, setErrors] = useState<{
-    usernameOrEmail?: string
-    password?: string
-    general?: string
-  }>({})
-  const [showPassword, setShowPassword] = useState(false)
-  const [loginAttempts, setLoginAttempts] = useState(0)
-
-  // Refs
-  const usernameInputRef = useRef<HTMLInputElement>(null)
-  const formRef = useRef<HTMLFormElement>(null)
-  const isMountedRef = useRef(true)
-
-  // Hooks
-  const { login, user, isAdmin, logout } = useAuth()
-  const { isDarkMode } = useCustomTheme()
+export function AuthWidget() {
+  const { user, signIn, signUp, signOut, loading, isAdmin } = useAuth()
   const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Focus sull'input username al caricamento
-  useEffect(() => {
-    if (!user && usernameInputRef.current) {
-      usernameInputRef.current.focus()
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
+
+    try {
+      const { error } = await signIn(email, password)
+      if (error) {
+        setError(error.message)
+      }
+    } catch (err) {
+      setError("Errore durante il login")
+    } finally {
+      setIsLoading(false)
     }
-  }, [user])
+  }
 
-  // Aggiungere nell'useEffect di cleanup
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
 
-  // Validazione input
-  const validateInputs = useCallback(() => {
-    const newErrors: {
-      usernameOrEmail?: string
-      password?: string
-    } = {}
-
-    // Validazione username/email
-    if (!usernameOrEmail.trim()) {
-      newErrors.usernameOrEmail = "Username o email richiesti"
-    } else if (usernameOrEmail.includes("@") && !EMAIL_REGEX.test(usernameOrEmail)) {
-      newErrors.usernameOrEmail = "Formato email non valido"
-    }
-
-    // Validazione password
-    if (!password) {
-      newErrors.password = "Password richiesta"
-    } else if (password.length < 6) {
-      newErrors.password = "Password troppo corta"
+    if (password !== confirmPassword) {
+      setError("Le password non coincidono")
+      return
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }, [usernameOrEmail, password])
+    setIsLoading(true)
 
-  // Gestione submit
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault()
-
-      // Validazione
-      if (!validateInputs()) {
-        return
+    try {
+      const { error } = await signUp(email, password)
+      if (error) {
+        setError(error.message)
       }
+    } catch (err) {
+      setError("Errore durante la registrazione")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-      // Evita doppi submit
-      if (isSubmitting) {
-        return
-      }
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      router.push("/")
+    } catch (err) {
+      setError("Errore durante il logout")
+    }
+  }
 
-      setIsSubmitting(true)
-      setErrors({})
-
-      try {
-        // Utilizziamo una variabile locale per evitare race conditions
-        const loginSuccess = await login(usernameOrEmail, password)
-
-        // Solo se il componente è ancora montato, aggiorniamo lo stato
-        if (loginSuccess) {
-          // Non resettiamo i campi qui, lasciamo che sia il redirect a gestire il cambio di vista
-          setLoginAttempts(0)
-        } else {
-          // Incrementa tentativi falliti
-          setLoginAttempts((prev) => prev + 1)
-          setErrors({
-            general: "Credenziali non valide. Riprova.",
-          })
-          toast({
-            title: "Errore di accesso",
-            description: "Credenziali non valide. Riprova.",
-            variant: "destructive",
-          })
-        }
-      } catch (error) {
-        console.error("Errore durante il login:", error)
-        setErrors({
-          general: "Si è verificato un errore durante l'accesso.",
-        })
-        toast({
-          title: "Errore di accesso",
-          description: "Si è verificato un errore. Riprova più tardi.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsSubmitting(false)
-      }
-    },
-    [usernameOrEmail, password, login, validateInputs, isSubmitting],
-  )
-
-  // Gestione logout
-  const handleLogout = useCallback(() => {
-    logout()
-    toast({
-      title: "Logout effettuato",
-      description: "Arrivederci!",
-    })
-  }, [logout])
-
-  // Gestione tasto invio
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !isSubmitting && formRef.current) {
-        formRef.current.requestSubmit()
-      }
-    },
-    [isSubmitting],
-  )
-
-  // Componente per utente autenticato
-  if (user) {
+  if (loading) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        key={user ? "logged-in" : "logged-out"} // Aggiungere una key per forzare l'animazione corretta
-      >
-        <Card className="w-full shadow-md transition-all hover:shadow-lg border-primary/20">
-          <CardHeader className="text-center pb-2">
-            <CardTitle className="text-2xl font-bold">Bentornato!</CardTitle>
-            <CardDescription className="text-lg font-medium">{user.nome || user.username}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-2">
-            <div className="text-center p-4 bg-muted rounded-lg border border-border">
-              <div className="flex items-center justify-center space-x-2 text-sm">
-                <Shield className="h-4 w-4 text-primary" />
-                <span className="font-medium">Ruolo: {isAdmin ? "Amministratore" : "Utente"}</span>
-              </div>
-            </div>
-
-            {/* Pulsanti principali */}
-            <div className="space-y-3">
-              <Button variant="outline" className="w-full h-12 text-sm bg-transparent" asChild>
-                <Link
-                  href={isAdmin ? "/admin" : "/dashboard"}
-                  className="flex items-center justify-center gap-2 whitespace-nowrap"
-                >
-                  <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
-                  <span className="flex-1 text-center">
-                    {isAdmin ? "Vai alla Dashboard Admin" : "Vai alla Dashboard"}
-                  </span>
-                  <ArrowRight className="h-4 w-4 flex-shrink-0" />
-                </Link>
-              </Button>
-
-              {/* Altri pulsanti secondari */}
-              <div className="grid grid-cols-2 gap-2">
-                <Link href="/profile" className="block">
-                  <Button
-                    variant="outline"
-                    className="w-full h-10 text-xs border-primary/30 hover:bg-primary/10 bg-transparent"
-                  >
-                    <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-                      <Settings className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span>Profilo</span>
-                    </div>
-                  </Button>
-                </Link>
-
-                <Button
-                  variant="outline"
-                  className="w-full h-10 text-xs border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive bg-transparent"
-                  onClick={handleLogout}
-                >
-                  <div className="flex items-center justify-center gap-1 whitespace-nowrap">
-                    <LogOut className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>Esci</span>
-                  </div>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="pt-0 text-center text-xs text-muted-foreground">
-            <p className="w-full">Ultimo accesso: {new Date().toLocaleDateString()}</p>
-          </CardFooter>
-        </Card>
-      </motion.div>
+      <Card className="w-full max-w-md mx-auto">
+        <CardContent className="flex items-center justify-center p-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="ml-2">Caricamento...</span>
+        </CardContent>
+      </Card>
     )
   }
 
-  // Componente per utente non autenticato
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      key={user ? "logged-in" : "logged-out"} // Aggiungere una key per forzare l'animazione corretta
-    >
-      <Card className="w-full shadow-md transition-all hover:shadow-lg border-primary/20">
-        <CardHeader className="text-center pb-2">
-          <div className="flex items-center justify-center gap-2">
-            <Database className="h-6 w-6 text-primary" />
-            <CardTitle className="text-2xl font-bold">Accedi a iStudio</CardTitle>
+  if (user) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader className="text-center">
+          <div className="flex items-center justify-center mb-2">
+            <User className="h-8 w-8 text-primary" />
           </div>
-          <CardDescription className="mt-1">Inserisci le tue credenziali per continuare</CardDescription>
+          <CardTitle className="text-xl">Benvenuto!</CardTitle>
+          <CardDescription>
+            Sei connesso come <strong>{user.email}</strong>
+          </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit} ref={formRef}>
-          <CardContent className="space-y-4 pt-2">
-            {/* Errore generale */}
-            {errors.general && (
-              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span>{errors.general}</span>
+        <CardContent className="space-y-4">
+          {isAdmin && (
+            <Button onClick={() => router.push("/admin")} className="w-full h-10 text-sm" variant="default">
+              <div className="flex items-center justify-center gap-2 whitespace-nowrap w-full">
+                <Settings className="h-4 w-4 flex-shrink-0" />
+                <span className="flex-1 text-center">Vai alla Dashboard Admin</span>
+                <ChevronRight className="h-4 w-4 flex-shrink-0" />
               </div>
-            )}
+            </Button>
+          )}
 
-            {/* Campo username/email */}
-            <div className="space-y-2">
-              <Label htmlFor="usernameOrEmail" className="flex items-center gap-1">
-                <Mail className="h-3.5 w-3.5" />
-                <span>Username o Email</span>
-              </Label>
-              <div className="relative">
+          <div className="space-y-2">
+            <Button onClick={() => router.push("/dashboard")} className="w-full h-9 text-sm" variant="outline">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <Settings className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>Dashboard</span>
+              </div>
+            </Button>
+
+            <Button onClick={() => router.push("/profile")} className="w-full h-9 text-sm" variant="outline">
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <User className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>Profilo</span>
+              </div>
+            </Button>
+          </div>
+
+          <Button onClick={handleSignOut} variant="destructive" className="w-full h-9 text-sm">
+            Logout
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">iStudio</CardTitle>
+        <CardDescription>Accedi al tuo account o registrati</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="signin" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Accedi</TabsTrigger>
+            <TabsTrigger value="signup">Registrati</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="signin">
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="signin-email">Email</Label>
                 <Input
-                  id="usernameOrEmail"
-                  type="text"
-                  placeholder="mario.rossi o mario@esempio.it"
-                  value={usernameOrEmail}
-                  onChange={(e) => {
-                    setUsernameOrEmail(e.target.value)
-                    if (errors.usernameOrEmail) {
-                      setErrors((prev) => ({ ...prev, usernameOrEmail: undefined }))
-                    }
-                  }}
+                  id="signin-email"
+                  type="email"
+                  placeholder="La tua email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isSubmitting}
-                  className={cn(
-                    "pl-9 focus:ring-2 focus:ring-primary",
-                    errors.usernameOrEmail && "border-destructive focus:ring-destructive",
-                  )}
-                  aria-invalid={!!errors.usernameOrEmail}
-                  aria-describedby={errors.usernameOrEmail ? "usernameOrEmail-error" : undefined}
-                  ref={usernameInputRef}
-                  onKeyDown={handleKeyDown}
                 />
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
-              {errors.usernameOrEmail && (
-                <p id="usernameOrEmail-error" className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {errors.usernameOrEmail}
-                </p>
-              )}
-            </div>
-
-            {/* Campo password */}
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-1">
-                <Lock className="h-3.5 w-3.5" />
-                <span>Password</span>
-              </Label>
-              <div className="relative">
+              <div className="space-y-2">
+                <Label htmlFor="signin-password">Password</Label>
                 <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  id="signin-password"
+                  type="password"
+                  placeholder="La tua password"
                   value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                    if (errors.password) {
-                      setErrors((prev) => ({ ...prev, password: undefined }))
-                    }
-                  }}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isSubmitting}
-                  className={cn(
-                    "pl-9 focus:ring-2 focus:ring-primary",
-                    errors.password && "border-destructive focus:ring-destructive",
-                  )}
-                  aria-invalid={!!errors.password}
-                  aria-describedby={errors.password ? "password-error" : undefined}
-                  onKeyDown={handleKeyDown}
                 />
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? "Nascondi" : "Mostra"}
-                </button>
               </div>
-              {errors.password && (
-                <p id="password-error" className="text-xs text-destructive flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {errors.password}
-                </p>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
-            </div>
-
-            {/* Pulsante Accedi */}
-            <Button
-              type="submit"
-              variant="outline"
-              className="w-full h-12 text-sm bg-transparent"
-              disabled={isSubmitting}
-            >
-              <div className="flex items-center justify-center gap-2 whitespace-nowrap">
-                {isSubmitting ? (
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
-                    <span>Accesso in corso...</span>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Accesso in corso...
                   </>
                 ) : (
                   <>
-                    <span>Accedi</span>
-                    <ArrowRight className="h-4 w-4 flex-shrink-0" />
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Accedi
                   </>
                 )}
+              </Button>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="signup">
+            <form onSubmit={handleSignUp} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="signup-email">Email</Label>
+                <Input
+                  id="signup-email"
+                  type="email"
+                  placeholder="La tua email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
-            </Button>
-          </CardContent>
-        </form>
-      </Card>
-    </motion.div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-password">Password</Label>
+                <Input
+                  id="signup-password"
+                  type="password"
+                  placeholder="Scegli una password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Conferma Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  placeholder="Conferma la password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Registrazione in corso...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Registrati
+                  </>
+                )}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   )
-})
+}
