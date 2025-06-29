@@ -20,7 +20,7 @@ import { LogIn, LogOut, User, UserPlus, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useDebugConfig } from "@/hooks/use-debug-config"
 
-export default function AuthWidget() {
+export function AuthWidget() {
   const { user, login, signUp, signOut, loading: authLoading, error: authError } = useAuth()
   const { debug, log: debugLog } = useDebugConfig()
   const [email, setEmail] = useState("")
