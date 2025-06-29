@@ -111,173 +111,171 @@ function SidebarContent({
       <div className="sidebar-section">
         <h2 className="sidebar-title">
           iStudio
+          <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
         <div className="space-y-1">
-          <Button
-            asChild
-            variant={pathname === "/dashboard" ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+          <Link
+            href="/dashboard"
+            className={cn(
+              "sidebar-button",
+              pathname === "/dashboard"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/dashboard">
-              <LayoutDashboard />
-              <span>Dashboard</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname === "/dashboard-u" ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+            <LayoutDashboard />
+            <span>Dashboard</span>
+          </Link>
+          <Link
+            href="/dashboard-u"
+            className={cn(
+              "sidebar-button",
+              pathname === "/dashboard-u"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/dashboard-u">
-              <LayoutDashboard />
-              <span>Dashboard U</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname === "/dashboard-utente" ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+            <LayoutDashboard />
+            <span>Dashboard U</span>
+          </Link>
+          <Link
+            href="/dashboard-utente"
+            className={cn(
+              "sidebar-button",
+              pathname === "/dashboard-utente"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/dashboard-utente">
-              <LayoutDashboard />
-              <span>Dashboard Utente</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname === "/dashboard-mobile" ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+            <LayoutDashboard />
+            <span>Dashboard Utente</span>
+          </Link>
+          <Link
+            href="/dashboard-mobile"
+            className={cn(
+              "sidebar-button",
+              pathname === "/dashboard-mobile"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/dashboard-mobile">
-              <LayoutDashboard />
-              <span>Dashboard Mobile</span>
-            </Link>
-          </Button>
+            <LayoutDashboard />
+            <span>Dashboard Mobile</span>
+          </Link>
         </div>
       </div>
 
       <div className="sidebar-section">
         <h2 className="sidebar-section-title">Gestione</h2>
         <div className="space-y-1">
-          <Button
-            asChild
-            variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+          <Link
+            href="/pagine"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/pagine")
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/pagine">
-              <FileText />
-              <span>Pagine</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname?.includes("/note") ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+            <FileText />
+            <span>Pagine</span>
+          </Link>
+          <Link
+            href="/note"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/note")
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/note">
-              <StickyNote />
-              <span>Note</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
+            <StickyNote />
+            <span>Note</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=appuntamenti"
+            className={cn(
+              "sidebar-button",
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "appuntamenti"
-                ? "secondary"
-                : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=appuntamenti">
-              <Calendar />
-              <span>Appuntamenti</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita" ? "secondary" : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+            <Calendar />
+            <span>Appuntamenti</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=attivita"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=attivita">
-              <ClipboardList />
-              <span>Attività</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze" ? "secondary" : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+            <ClipboardList />
+            <span>Attività</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=scadenze"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=scadenze">
-              <Clock />
-              <span>Scadenze</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist" ? "secondary" : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+            <Clock />
+            <span>Scadenze</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=todolist"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=todolist">
-              <CheckSquare />
-              <span>To-Do List</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti" ? "secondary" : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+            <CheckSquare />
+            <span>To-Do List</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=progetti"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=progetti">
-              <BarChart3 />
-              <span>Progetti</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+            <BarChart3 />
+            <span>Progetti</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=clienti"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=clienti">
-              <Users />
-              <span>Clienti</span>
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine" ? "secondary" : "ghost"
-            }
-            className="sidebar-button"
-            size="sm"
+            <Users />
+            <span>Clienti</span>
+          </Link>
+          <Link
+            href="/data-explorer?table=pagine"
+            className={cn(
+              "sidebar-button",
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=pagine">
-              <FileText />
-              <span>Pagine</span>
-            </Link>
-          </Button>
+            <FileText />
+            <span>Pagine</span>
+          </Link>
         </div>
       </div>
 
@@ -286,50 +284,66 @@ function SidebarContent({
         <div className="sidebar-section">
           <h2 className="sidebar-section-title">Amministrazione</h2>
           <div className="space-y-1">
-            <Button
-              asChild
-              variant={pathname === "/admin" ? "secondary" : "ghost"}
-              className="sidebar-button"
-              size="sm"
+            <Link
+              href="/admin"
+              className={cn(
+                "sidebar-button",
+                pathname === "/admin"
+                  ? "bg-secondary text-secondary-foreground"
+                  : "hover:bg-accent hover:text-accent-foreground",
+              )}
             >
-              <Link href="/admin">
-                <Settings />
-                <span>Admin Panel</span>
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
-              className="sidebar-button"
-              size="sm"
+              <Settings />
+              <span>Admin Panel</span>
+            </Link>
+            <Link
+              href="/admin/users"
+              className={cn(
+                "sidebar-button",
+                pathname?.includes("/admin/users")
+                  ? "bg-secondary text-secondary-foreground"
+                  : "hover:bg-accent hover:text-accent-foreground",
+              )}
             >
-              <Link href="/admin/users">
-                <Users />
-                <span>Gestione Utenti</span>
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/data-explorer") ? "secondary" : "ghost"}
-              className="sidebar-button"
-              size="sm"
+              <Users />
+              <span>Gestione Utenti</span>
+            </Link>
+            <Link
+              href="/data-explorer"
+              className={cn(
+                "sidebar-button",
+                pathname?.includes("/data-explorer")
+                  ? "bg-secondary text-secondary-foreground"
+                  : "hover:bg-accent hover:text-accent-foreground",
+              )}
             >
-              <Link href="/data-explorer">
-                <Database />
-                <span>Data Explorer</span>
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/table-explorer") ? "secondary" : "ghost"}
-              className="sidebar-button"
-              size="sm"
+              <Database />
+              <span>Data Explorer</span>
+            </Link>
+            <Link
+              href="/table-explorer"
+              className={cn(
+                "sidebar-button",
+                pathname?.includes("/table-explorer")
+                  ? "bg-secondary text-secondary-foreground"
+                  : "hover:bg-accent hover:text-accent-foreground",
+              )}
             >
-              <Link href="/table-explorer">
-                <Layers />
-                <span>Table Explorer</span>
-              </Link>
-            </Button>
+              <Layers />
+              <span>Table Explorer</span>
+            </Link>
+            <Link
+              href="/debug-scadenze"
+              className={cn(
+                "sidebar-button",
+                pathname?.includes("/debug-scadenze")
+                  ? "bg-secondary text-secondary-foreground"
+                  : "hover:bg-accent hover:text-accent-foreground",
+              )}
+            >
+              <AlertTriangle />
+              <span>Debug Scadenze</span>
+            </Link>
           </div>
         </div>
       )}
@@ -337,17 +351,18 @@ function SidebarContent({
       {/* Sezione Profilo */}
       <div className="sidebar-section mt-auto">
         <div className="space-y-1">
-          <Button
-            asChild
-            variant={pathname === "/profile" ? "secondary" : "ghost"}
-            className="sidebar-button"
-            size="sm"
+          <Link
+            href="/profile"
+            className={cn(
+              "sidebar-button",
+              pathname === "/profile"
+                ? "bg-secondary text-secondary-foreground"
+                : "hover:bg-accent hover:text-accent-foreground",
+            )}
           >
-            <Link href="/profile">
-              <Users />
-              <span>Profilo</span>
-            </Link>
-          </Button>
+            <Users />
+            <span>Profilo</span>
+          </Link>
         </div>
 
         {/* Indicatore di stato connessione */}
