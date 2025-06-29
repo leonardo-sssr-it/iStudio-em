@@ -6,6 +6,7 @@ import { useTheme as useNextTheme } from "next-themes"
 import { useThemes, type Theme } from "@/hooks/use-themes"
 
 type LayoutType = "default" | "fullWidth" | "sidebar"
+type FontSizeType = "small" | "normal" | "large"
 
 interface ThemeContextType {
   currentTheme: Theme | null
@@ -17,6 +18,8 @@ interface ThemeContextType {
   setLayout: (layout: LayoutType) => void
   toggleDarkMode: () => void
   isDarkMode: boolean
+  fontSize: FontSizeType
+  setFontSize: (size: FontSizeType) => void
   mounted: boolean
 }
 
@@ -64,14 +67,43 @@ function hexToHsl(hex: string): string {
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
 }
 
+// Funzione per applicare la dimensione del carattere
+function applyFontSize(size: FontSizeType) {
+  if (typeof window === "undefined") return
+
+  const root = document.documentElement
+
+  switch (size) {
+    case "small":
+      root.style.setProperty("--font-size-base", "0.875rem") // 14px
+      root.style.setProperty("--font-size-sm", "0.75rem") // 12px
+      root.style.setProperty("--font-size-lg", "1rem") // 16px
+      root.style.setProperty("--font-size-xl", "1.125rem") // 18px
+      break
+    case "large":
+      root.style.setProperty("--font-size-base", "1.125rem") // 18px
+      root.style.setProperty("--font-size-sm", "1rem") // 16px
+      root.style.setProperty("--font-size-lg", "1.25rem") // 20px
+      root.style.setProperty("--font-size-xl", "1.375rem") // 22px
+      break
+    default: // normal
+      root.style.setProperty("--font-size-base", "1rem") // 16px
+      root.style.setProperty("--font-size-sm", "0.875rem") // 14px
+      root.style.setProperty("--font-size-lg", "1.125rem") // 18px
+      root.style.setProperty("--font-size-xl", "1.25rem") // 20px
+      break
+  }
+
+  // Applica la classe al body per l'effetto immediato
+  document.body.className = document.body.className.replace(/font-size-\w+/g, "")
+  document.body.classList.add(`font-size-${size}`)
+}
+
 // Funzione per resettare al tema predefinito
 function resetToDefaultTheme() {
   if (typeof window === "undefined") return
 
   const root = document.documentElement
-
-  // Rimuovi questo console.log che causa rumore nella console
-  // console.log("=== RESETTANDO AL TEMA PREDEFINITO ===")
 
   try {
     // Rimuovi tutte le variabili CSS personalizzate
@@ -119,11 +151,6 @@ function applyCustomTheme(theme: Theme, isDark: boolean) {
   }
 
   const root = document.documentElement
-
-  // Rimuovi questo console.log che causa rumore nella console
-  // console.log("=== APPLICANDO TEMA ===")
-  // console.log("Nome tema:", theme.nome_tema)
-  // console.log("Dark mode:", isDark)
 
   try {
     // Applica i colori principali
@@ -240,6 +267,8 @@ const defaultThemeContext: ThemeContextType = {
   setLayout: () => {},
   toggleDarkMode: () => {},
   isDarkMode: false,
+  fontSize: "normal",
+  setFontSize: () => {},
   mounted: false,
 }
 
@@ -252,6 +281,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return (savedLayout as LayoutType) || "default"
     }
     return "default"
+  })
+  const [fontSize, setFontSizeState] = useState<FontSizeType>(() => {
+    if (typeof window !== "undefined") {
+      const savedFontSize = localStorage.getItem("preferredFontSize")
+      return (savedFontSize as FontSizeType) || "normal"
+    }
+    return "normal"
   })
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -268,14 +304,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [layout])
 
+  // Salva la dimensione del carattere nel localStorage quando cambia
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("preferredFontSize", fontSize)
+      applyFontSize(fontSize)
+    }
+  }, [fontSize])
+
   // Sincronizziamo il tema di sistema con il nostro stato
   useEffect(() => {
     if (mounted) {
       const resolvedTheme = theme === "system" ? systemTheme : theme
       setIsDarkMode(resolvedTheme === "dark")
-
-      // Rimuovi questo console.log che causa rumore nella console
-      // console.log("Tema risolto:", resolvedTheme, "isDark:", resolvedTheme === "dark")
     }
   }, [theme, systemTheme, mounted])
 
@@ -283,8 +324,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (mounted && currentTheme && typeof window !== "undefined") {
       const resolvedTheme = theme === "system" ? systemTheme : theme
-      // Rimuovi questo console.log che causa rumore nella console
-      // console.log("Applicando tema personalizzato:", currentTheme.nome_tema, "isDark:", resolvedTheme === "dark")
 
       // Aggiungi una verifica per evitare reset inutili del tema predefinito
       const lastAppliedTheme = window.localStorage.getItem("lastAppliedThemeId")
@@ -296,6 +335,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [currentTheme, theme, systemTheme, mounted])
+
+  // Applica la dimensione del carattere al mount
+  useEffect(() => {
+    if (mounted) {
+      applyFontSize(fontSize)
+    }
+  }, [mounted, fontSize])
 
   // Funzione per cambiare il tema chiaro/scuro
   const toggleDarkMode = useCallback(() => {
@@ -312,6 +358,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     console.log("=== FINE TOGGLE DARK MODE ===")
   }, [theme, setTheme, isDarkMode, mounted])
 
+  // Funzione per cambiare la dimensione del carattere
+  const setFontSize = useCallback((size: FontSizeType) => {
+    setFontSizeState(size)
+  }, [])
+
   // Creiamo il valore del contesto con useMemo per evitare render inutili
   const contextValue = useMemo(
     () => ({
@@ -324,9 +375,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setLayout,
       toggleDarkMode,
       isDarkMode,
+      fontSize,
+      setFontSize,
       mounted,
     }),
-    [currentTheme, themes, applyTheme, resetToDefault, isLoading, layout, toggleDarkMode, isDarkMode, mounted],
+    [
+      currentTheme,
+      themes,
+      applyTheme,
+      resetToDefault,
+      isLoading,
+      layout,
+      toggleDarkMode,
+      isDarkMode,
+      fontSize,
+      setFontSize,
+      mounted,
+    ],
   )
 
   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>

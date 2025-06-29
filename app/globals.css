@@ -23,12 +23,18 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.75rem;
+    --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Font size variables */
+    --font-size-base: 1rem;
+    --font-size-sm: 0.875rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
   }
 
   .dark {
@@ -65,112 +71,179 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: var(--font-size-base);
+  }
+
+  /* Font size classes */
+  .font-size-small {
+    font-size: var(--font-size-base);
+  }
+
+  .font-size-small .text-sm {
+    font-size: var(--font-size-sm);
+  }
+
+  .font-size-small .text-lg {
+    font-size: var(--font-size-lg);
+  }
+
+  .font-size-small .text-xl {
+    font-size: var(--font-size-xl);
+  }
+
+  .font-size-normal {
+    font-size: var(--font-size-base);
+  }
+
+  .font-size-normal .text-sm {
+    font-size: var(--font-size-sm);
+  }
+
+  .font-size-normal .text-lg {
+    font-size: var(--font-size-lg);
+  }
+
+  .font-size-normal .text-xl {
+    font-size: var(--font-size-xl);
+  }
+
+  .font-size-large {
+    font-size: var(--font-size-base);
+  }
+
+  .font-size-large .text-sm {
+    font-size: var(--font-size-sm);
+  }
+
+  .font-size-large .text-lg {
+    font-size: var(--font-size-lg);
+  }
+
+  .font-size-large .text-xl {
+    font-size: var(--font-size-xl);
+  }
+
+  /* Theme transition */
+  .theme-transition {
+    transition: all 0.3s ease-in-out;
   }
 }
 
-/* Stili personalizzati per la sidebar con !important per forzare le dimensioni */
-.sidebar-container {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
-  overflow: hidden !important;
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
 }
 
-.sidebar-link {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 8px 12px !important;
-  border-radius: 6px !important;
-  text-decoration: none !important;
-  color: hsl(var(--muted-foreground)) !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  line-height: 1.2 !important;
-  white-space: nowrap !important;
-  flex-wrap: nowrap !important;
-  transition: all 0.2s ease !important;
-  min-height: 32px !important;
-  height: 32px !important;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.sidebar-link:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 4px;
 }
 
-.sidebar-link.active {
-  background-color: hsl(var(--primary)) !important;
-  color: hsl(var(--primary-foreground)) !important;
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
 }
 
-.sidebar-link svg {
-  width: 14px !important;
-  height: 14px !important;
-  flex-shrink: 0 !important;
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 
-.sidebar-link span {
-  flex: 1 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted));
 }
 
-.sidebar-section-title {
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: hsl(var(--foreground)) !important;
-  margin: 16px 0 8px 0 !important;
-  padding: 0 12px !important;
+/* Loading animations */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
-.sidebar-section-title:first-child {
-  margin-top: 8px !important;
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Stili per auth widget */
-.auth-widget-button {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  white-space: nowrap !important;
-  font-size: 14px !important;
-}
-
-.auth-widget-button svg {
-  width: 16px !important;
-  height: 16px !important;
-  flex-shrink: 0 !important;
-}
-
-.auth-widget-secondary-button {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 8px !important;
-  white-space: nowrap !important;
-  font-size: 13px !important;
-}
-
-.auth-widget-secondary-button svg {
-  width: 14px !important;
-  height: 14px !important;
-  flex-shrink: 0 !important;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .sidebar-link {
-    padding: 10px 16px !important;
-    font-size: 13px !important;
-    min-height: 40px !important;
-    height: 40px !important;
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
   }
 
-  .sidebar-link svg {
-    width: 16px !important;
-    height: 16px !important;
+  body {
+    font-size: 12pt;
+    line-height: 1.4;
   }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid;
+  }
+
+  p,
+  li {
+    page-break-inside: avoid;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 0 0% 0%;
+    --input: 0 0% 0%;
+  }
+
+  .dark {
+    --border: 0 0% 100%;
+    --input: 0 0% 100%;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .theme-transition {
+    transition: none !important;
+  }
+}
+
+/* Focus visible improvements */
+.focus-visible:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Custom focus styles for interactive elements */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
