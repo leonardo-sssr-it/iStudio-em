@@ -31,10 +31,7 @@
     --chart-5: 27 87% 67%;
 
     /* Font size variables */
-    --font-size-base: 1rem;
-    --font-size-sm: 0.875rem;
-    --font-size-lg: 1.125rem;
-    --font-size-xl: 1.25rem;
+    --font-size-base: 16px;
   }
 
   .dark {
@@ -73,253 +70,152 @@
     @apply bg-background text-foreground;
     font-size: var(--font-size-base);
   }
-
-  /* Font size classes */
-  .font-size-small {
-    font-size: var(--font-size-base);
-  }
-
-  .font-size-small .text-sm {
-    font-size: var(--font-size-sm);
-  }
-
-  .font-size-small .text-lg {
-    font-size: var(--font-size-lg);
-  }
-
-  .font-size-small .text-xl {
-    font-size: var(--font-size-xl);
-  }
-
-  .font-size-normal {
-    font-size: var(--font-size-base);
-  }
-
-  .font-size-normal .text-sm {
-    font-size: var(--font-size-sm);
-  }
-
-  .font-size-normal .text-lg {
-    font-size: var(--font-size-lg);
-  }
-
-  .font-size-normal .text-xl {
-    font-size: var(--font-size-xl);
-  }
-
-  .font-size-large {
-    font-size: var(--font-size-base);
-  }
-
-  .font-size-large .text-sm {
-    font-size: var(--font-size-sm);
-  }
-
-  .font-size-large .text-lg {
-    font-size: var(--font-size-lg);
-  }
-
-  .font-size-large .text-xl {
-    font-size: var(--font-size-xl);
-  }
-
-  /* Theme transition */
-  .theme-transition {
-    transition: all 0.3s ease-in-out;
-  }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Font size classes */
+.font-small {
+  --font-size-base: 14px;
 }
 
-/* Stili personalizzati per la sidebar con !important per forzare le dimensioni */
-.sidebar-container {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
-  overflow: hidden !important;
+.font-normal {
+  --font-size-base: 16px;
 }
 
-.sidebar-link {
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  padding: 8px 12px !important;
-  border-radius: 6px !important;
-  text-decoration: none !important;
-  color: hsl(var(--muted-foreground)) !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  line-height: 1.2 !important;
-  white-space: nowrap !important;
-  flex-wrap: nowrap !important;
-  transition: all 0.2s ease !important;
-  min-height: 32px !important;
-  height: 32px !important;
+.font-large {
+  --font-size-base: 18px;
 }
 
-.sidebar-link:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
+/* Custom theme variables support */
+:root {
+  --color-primary: var(--primary);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
 }
 
-.sidebar-link.active {
-  background-color: hsl(var(--primary)) !important;
-  color: hsl(var(--primary-foreground)) !important;
-}
-
-.sidebar-link svg {
-  width: 14px !important;
-  height: 14px !important;
-  flex-shrink: 0 !important;
-}
-
-.sidebar-link span {
-  flex: 1 !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}
-
-.sidebar-section-title {
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: hsl(var(--foreground)) !important;
-  margin: 16px 0 8px 0 !important;
-  padding: 0 12px !important;
-}
-
-.sidebar-section-title:first-child {
-  margin-top: 8px !important;
-}
-
-/* Stili per auth widget */
-.auth-widget-button {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  white-space: nowrap !important;
-  font-size: 14px !important;
-}
-
-.auth-widget-button svg {
-  width: 16px !important;
-  height: 16px !important;
-  flex-shrink: 0 !important;
-}
-
-.auth-widget-secondary-button {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 8px !important;
-  white-space: nowrap !important;
-  font-size: 13px !important;
-}
-
-.auth-widget-secondary-button svg {
-  width: 14px !important;
-  height: 14px !important;
-  flex-shrink: 0 !important;
-}
-
-/* Fix per dropdown menu - assicura che siano visibili */
-[data-radix-popper-content-wrapper] {
-  z-index: 9999 !important;
-}
-
-[data-radix-dropdown-menu-content] {
-  z-index: 9999 !important;
-  background: hsl(var(--popover)) !important;
-  border: 1px solid hsl(var(--border)) !important;
-  border-radius: calc(var(--radius) - 2px) !important;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
-  padding: 4px !important;
-  min-width: 8rem !important;
-  overflow: hidden !important;
-  color: hsl(var(--popover-foreground)) !important;
-  animation: fadeIn 0.2s ease-out !important;
-}
-
-[data-radix-dropdown-menu-item] {
-  position: relative !important;
-  display: flex !important;
-  cursor: default !important;
-  user-select: none !important;
-  align-items: center !important;
-  border-radius: calc(var(--radius) - 4px) !important;
-  padding: 6px 8px !important;
-  font-size: 14px !important;
-  outline: none !important;
-  transition: colors 0.2s !important;
-}
-
-[data-radix-dropdown-menu-item]:focus,
-[data-radix-dropdown-menu-item]:hover {
-  background-color: hsl(var(--accent)) !important;
-  color: hsl(var(--accent-foreground)) !important;
-}
-
-[data-radix-dropdown-menu-item][data-disabled] {
-  pointer-events: none !important;
-  opacity: 0.5 !important;
-}
-
-[data-radix-dropdown-menu-label] {
-  padding: 6px 8px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-[data-radix-dropdown-menu-separator] {
-  height: 1px !important;
-  background-color: hsl(var(--border)) !important;
-  margin: 4px 0 !important;
-}
-
-/* Animazione per dropdown */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .sidebar-link {
-    padding: 10px 16px !important;
-    font-size: 13px !important;
-    min-height: 40px !important;
-    height: 40px !important;
-  }
-
-  .sidebar-link svg {
-    width: 16px !important;
-    height: 16px !important;
-  }
-}
-
-/* Assicura che i dropdown siano sempre sopra tutto */
+/* Dropdown menu styling for custom menus */
 .dropdown-menu-content {
-  z-index: 9999 !important;
-  position: relative !important;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
-/* Fix per header sticky e dropdown */
-header {
-  z-index: 40 !important;
+/* Ensure proper z-index for overlays */
+.header-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
 }
 
-header [data-radix-popper-content-wrapper] {
-  z-index: 50 !important;
+.header-menu-content {
+  position: absolute;
+  z-index: 50;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Responsive font scaling */
+@media (max-width: 640px) {
+  .font-small {
+    --font-size-base: 13px;
+  }
+
+  .font-normal {
+    --font-size-base: 15px;
+  }
+
+  .font-large {
+    --font-size-base: 17px;
+  }
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Custom scrollbar for dropdown menus */
+.dropdown-menu-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-menu-content::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.dropdown-menu-content::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 3px;
+}
+
+.dropdown-menu-content::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground));
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 0 0% 0%;
+    --input: 0 0% 0%;
+  }
+
+  .dark {
+    --border: 0 0% 100%;
+    --input: 0 0% 100%;
+  }
+}
+
+/* Focus visible improvements */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Button hover states */
+button:hover {
+  transition: all 0.2s ease;
+}
+
+/* Card hover effects */
+.card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+/* Loading states */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  * {
+    background: white !important;
+    color: black !important;
+  }
 }
