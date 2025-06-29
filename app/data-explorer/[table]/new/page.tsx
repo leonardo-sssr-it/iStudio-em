@@ -923,7 +923,7 @@ export default function NewItemPage() {
 
             {/* Titolo e descrizione */}
             <div>
-              <CardTitle className="text-xl sm:text-2xl">Nuovo {getTableTitle().slice(0, -1)}</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">Nuovo elemento per il modulo {getTableTitle()}</CardTitle>
               <CardDescription className="text-sm sm:text-base">
                 Compila i campi per creare un nuovo elemento
               </CardDescription>
