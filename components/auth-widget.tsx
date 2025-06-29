@@ -2,160 +2,380 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useCallback, memo, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/auth-provider"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useAuth } from "@/lib/auth-provider"
-import { useToast } from "@/hooks/use-toast"
-import { Loader2, LogIn, Settings, ArrowRight, User } from "lucide-react"
+import {
+  Loader2,
+  LogOut,
+  LayoutDashboard,
+  Settings,
+  Shield,
+  ArrowRight,
+  Lock,
+  Mail,
+  AlertCircle,
+  Database,
+} from "lucide-react"
+import Link from "next/link"
+import { toast } from "@/components/ui/use-toast"
+import { useCustomTheme } from "@/contexts/theme-context"
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { motion } from "framer-motion"
 
-export function AuthWidget() {
-  const [email, setEmail] = useState("")
+// Regex per validazione email
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Componente ottimizzato con memo per evitare re-render inutili
+export const AuthWidget = memo(function AuthWidget() {
+  // Stati
+  const [usernameOrEmail, setUsernameOrEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState("")
-  const { user, signIn, isAdmin } = useAuth()
-  const router = useRouter()
-  const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<{
+    usernameOrEmail?: string
+    password?: string
+    general?: string
+  }>({})
+  const [showPassword, setShowPassword] = useState(false)
+  const [loginAttempts, setLoginAttempts] = useState(0)
+
+  // Refs
+  const usernameInputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   const isMountedRef = useRef(true)
 
+  // Hooks - CORREZIONE: uso login invece di signIn
+  const { login, user, isAdmin, logout } = useAuth()
+  const { isDarkMode } = useCustomTheme()
+  const router = useRouter()
+
+  // Focus sull'input username al caricamento
   useEffect(() => {
-    isMountedRef.current = true
+    if (!user && usernameInputRef.current) {
+      usernameInputRef.current.focus()
+    }
+  }, [user])
+
+  // Aggiungere nell'useEffect di cleanup
+  useEffect(() => {
     return () => {
       isMountedRef.current = false
     }
   }, [])
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !password) {
-      setError("Email e password sono obbligatori")
-      return
+  // Validazione input
+  const validateInputs = useCallback(() => {
+    const newErrors: {
+      usernameOrEmail?: string
+      password?: string
+    } = {}
+
+    // Validazione username/email
+    if (!usernameOrEmail.trim()) {
+      newErrors.usernameOrEmail = "Username o email richiesti"
+    } else if (usernameOrEmail.includes("@") && !EMAIL_REGEX.test(usernameOrEmail)) {
+      newErrors.usernameOrEmail = "Formato email non valido"
     }
 
-    setIsLoading(true)
-    setError("")
-
-    try {
-      console.log("🔐 Tentativo di login per:", email)
-      const result = await signIn(email, password)
-
-      if (!isMountedRef.current) return
-
-      if (result.error) {
-        console.error("❌ Errore login:", result.error)
-        setError(result.error.message || "Errore durante il login")
-      } else {
-        console.log("✅ Login riuscito:", result.data?.user?.email)
-        toast({
-          title: "Login effettuato",
-          description: "Benvenuto in iStudio!",
-        })
-        router.push("/dashboard")
-      }
-    } catch (err) {
-      console.error("❌ Errore imprevisto durante il login:", err)
-      if (isMountedRef.current) {
-        setError("Errore imprevisto durante il login")
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoading(false)
-      }
+    // Validazione password
+    if (!password) {
+      newErrors.password = "Password richiesta"
+    } else if (password.length < 6) {
+      newErrors.password = "Password troppo corta"
     }
-  }
 
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }, [usernameOrEmail, password])
+
+  // Gestione submit - CORREZIONE: uso login invece di signIn
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      // Validazione
+      if (!validateInputs()) {
+        return
+      }
+
+      // Evita doppi submit
+      if (isSubmitting) {
+        return
+      }
+
+      setIsSubmitting(true)
+      setErrors({})
+
+      try {
+        console.log("🔐 Tentativo di login con:", { usernameOrEmail, password: "***" })
+
+        // CORREZIONE: uso login invece di signIn
+        const loginSuccess = await login(usernameOrEmail, password)
+
+        console.log("✅ Risultato login:", loginSuccess)
+
+        // Solo se il componente è ancora montato, aggiorniamo lo stato
+        if (isMountedRef.current) {
+          if (loginSuccess) {
+            // Non resettiamo i campi qui, lasciamo che sia il redirect a gestire il cambio di vista
+            setLoginAttempts(0)
+            toast({
+              title: "Accesso effettuato",
+              description: "Benvenuto in iStudio!",
+            })
+          } else {
+            // Incrementa tentativi falliti
+            setLoginAttempts((prev) => prev + 1)
+            setErrors({
+              general: "Credenziali non valide. Riprova.",
+            })
+            toast({
+              title: "Errore di accesso",
+              description: "Credenziali non valide. Riprova.",
+              variant: "destructive",
+            })
+          }
+        }
+      } catch (error) {
+        console.error("❌ Errore durante il login:", error)
+        if (isMountedRef.current) {
+          setErrors({
+            general: "Si è verificato un errore durante l'accesso.",
+          })
+          toast({
+            title: "Errore di accesso",
+            description: "Si è verificato un errore. Riprova più tardi.",
+            variant: "destructive",
+          })
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setIsSubmitting(false)
+        }
+      }
+    },
+    [usernameOrEmail, password, login, validateInputs, isSubmitting],
+  )
+
+  // Gestione logout
+  const handleLogout = useCallback(() => {
+    logout()
+    toast({
+      title: "Logout effettuato",
+      description: "Arrivederci!",
+    })
+  }, [logout])
+
+  // Gestione tasto invio
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !isSubmitting && formRef.current) {
+        formRef.current.requestSubmit()
+      }
+    },
+    [isSubmitting],
+  )
+
+  // Componente per utente autenticato
   if (user) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Benvenuto
-          </CardTitle>
-          <CardDescription>Sei connesso come {user.email}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button onClick={() => router.push("/dashboard")} className="auth-widget-button w-full">
-            <ArrowRight />
-            <span>Vai alla Dashboard</span>
-          </Button>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        key={user ? "logged-in" : "logged-out"}
+      >
+        <Card className="w-full shadow-md transition-all hover:shadow-lg border-primary/20">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-2xl font-bold">Bentornato!</CardTitle>
+            <CardDescription className="text-lg font-medium">{user.nome || user.username}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-2">
+            <div className="text-center p-4 bg-muted rounded-lg border border-border">
+              <div className="flex items-center justify-center space-x-2 text-sm">
+                <Shield className="h-4 w-4 text-primary" />
+                <span className="font-medium">Ruolo: {isAdmin ? "Amministratore" : "Utente"}</span>
+              </div>
+            </div>
 
-          {isAdmin && (
-            <Button
-              variant="outline"
-              onClick={() => router.push("/admin")}
-              className="auth-widget-secondary-button w-full"
-            >
-              <Settings />
-              <span>Vai alla Dashboard Admin</span>
-              <ArrowRight />
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+            {/* Pulsanti principali */}
+            <div className="space-y-3">
+              <Link
+                href={isAdmin ? "/admin" : "/dashboard"}
+                className="auth-widget-button w-full h-12 bg-transparent border border-input hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              >
+                <LayoutDashboard />
+                <span>{isAdmin ? "Vai alla Dashboard Admin" : "Vai alla Dashboard"}</span>
+                <ArrowRight />
+              </Link>
+
+              {/* Altri pulsanti secondari */}
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href="/profile"
+                  className="auth-widget-secondary-button h-10 bg-transparent border border-primary/30 hover:bg-primary/10 inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Settings />
+                  <span>Profilo</span>
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="auth-widget-secondary-button h-10 bg-transparent border border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <LogOut />
+                  <span>Esci</span>
+                </button>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="pt-0 text-center text-xs text-muted-foreground">
+            <p className="w-full">Ultimo accesso: {new Date().toLocaleDateString()}</p>
+          </CardFooter>
+        </Card>
+      </motion.div>
     )
   }
 
+  // Componente per utente non autenticato
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LogIn className="h-5 w-5" />
-          Accedi
-        </CardTitle>
-        <CardDescription>Inserisci le tue credenziali per accedere</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="tua@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
-              required
-            />
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      key={user ? "logged-in" : "logged-out"}
+    >
+      <Card className="w-full shadow-md transition-all hover:shadow-lg border-primary/20">
+        <CardHeader className="text-center pb-2">
+          <div className="flex items-center justify-center gap-2">
+            <Database className="h-6 w-6 text-primary" />
+            <CardTitle className="text-2xl font-bold">Accedi a iStudio</CardTitle>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-          </div>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Accesso in corso...
-              </>
-            ) : (
-              <>
-                <LogIn className="mr-2 h-4 w-4" />
-                Accedi
-              </>
+          <CardDescription className="mt-1">Inserisci le tue credenziali per continuare</CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit} ref={formRef}>
+          <CardContent className="space-y-4 pt-2">
+            {/* Errore generale */}
+            {errors.general && (
+              <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-md flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <span>{errors.general}</span>
+              </div>
             )}
-          </Button>
+
+            {/* Campo username/email */}
+            <div className="space-y-2">
+              <Label htmlFor="usernameOrEmail" className="flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" />
+                <span>Username o Email</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="usernameOrEmail"
+                  type="text"
+                  placeholder="mario.rossi o mario@esempio.it"
+                  value={usernameOrEmail}
+                  onChange={(e) => {
+                    setUsernameOrEmail(e.target.value)
+                    if (errors.usernameOrEmail) {
+                      setErrors((prev) => ({ ...prev, usernameOrEmail: undefined }))
+                    }
+                  }}
+                  required
+                  disabled={isSubmitting}
+                  className={cn(
+                    "pl-9 focus:ring-2 focus:ring-primary",
+                    errors.usernameOrEmail && "border-destructive focus:ring-destructive",
+                  )}
+                  aria-invalid={!!errors.usernameOrEmail}
+                  aria-describedby={errors.usernameOrEmail ? "usernameOrEmail-error" : undefined}
+                  ref={usernameInputRef}
+                  onKeyDown={handleKeyDown}
+                />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
+              {errors.usernameOrEmail && (
+                <p id="usernameOrEmail-error" className="text-xs text-destructive flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.usernameOrEmail}
+                </p>
+              )}
+            </div>
+
+            {/* Campo password */}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center gap-1">
+                <Lock className="h-3.5 w-3.5" />
+                <span>Password</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (errors.password) {
+                      setErrors((prev) => ({ ...prev, password: undefined }))
+                    }
+                  }}
+                  required
+                  disabled={isSubmitting}
+                  className={cn(
+                    "pl-9 focus:ring-2 focus:ring-primary",
+                    errors.password && "border-destructive focus:ring-destructive",
+                  )}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? "password-error" : undefined}
+                  onKeyDown={handleKeyDown}
+                />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "Nascondi" : "Mostra"}
+                </button>
+              </div>
+              {errors.password && (
+                <p id="password-error" className="text-xs text-destructive flex items-center gap-1 mt-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.password}
+                </p>
+              )}
+            </div>
+
+            {/* Pulsante Accedi */}
+            <Button
+              type="submit"
+              variant="outline"
+              className="w-full h-12 text-sm bg-transparent"
+              disabled={isSubmitting}
+            >
+              <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                    <span>Accesso in corso...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Accedi</span>
+                    <ArrowRight className="h-4 w-4 flex-shrink-0" />
+                  </>
+                )}
+              </div>
+            </Button>
+          </CardContent>
         </form>
-      </CardContent>
-    </Card>
+      </Card>
+    </motion.div>
   )
-}
+})

@@ -23,7 +23,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -68,88 +68,68 @@
   }
 }
 
-/* Stili specifici per la sidebar con !important */
+/* Stili personalizzati per la sidebar con !important per forzare le dimensioni */
 .sidebar-container {
-  background-color: hsl(var(--background)) !important;
-  border-right: 1px solid hsl(var(--border)) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
-.sidebar-content {
-  padding: 16px 0 !important;
-}
-
-.sidebar-section {
-  padding: 8px 12px !important;
-}
-
-.sidebar-title {
-  margin-bottom: 8px !important;
-  padding: 0 8px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-.sidebar-section-title {
-  margin-bottom: 8px !important;
-  padding: 0 8px !important;
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-.sidebar-button {
-  width: 100% !important;
-  justify-content: flex-start !important;
-  height: 32px !important;
-  padding: 0 8px !important;
-  font-size: 12px !important;
+.sidebar-link {
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
-  white-space: nowrap !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
   text-decoration: none !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  flex-wrap: nowrap !important;
+  transition: all 0.2s ease !important;
+  min-height: 32px !important;
+  height: 32px !important;
 }
 
-.sidebar-button svg {
+.sidebar-link:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+.sidebar-link.active {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.sidebar-link svg {
   width: 14px !important;
   height: 14px !important;
   flex-shrink: 0 !important;
 }
 
-.sidebar-button span {
+.sidebar-link span {
+  flex: 1 !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
 
-.sidebar-status {
-  margin-top: 16px !important;
-  padding: 4px 8px !important;
-  font-size: 11px !important;
-  color: hsl(var(--muted-foreground)) !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 4px !important;
+.sidebar-section-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+  margin: 16px 0 8px 0 !important;
+  padding: 0 12px !important;
 }
 
-.sidebar-status svg {
-  width: 12px !important;
-  height: 12px !important;
-  flex-shrink: 0 !important;
-}
-
-.sidebar-user-info {
+.sidebar-section-title:first-child {
   margin-top: 8px !important;
-  padding: 4px 8px !important;
-  font-size: 11px !important;
-  color: hsl(var(--muted-foreground)) !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
 }
 
-/* Stili per il widget auth */
+/* Stili per auth widget */
 .auth-widget-button {
   display: flex !important;
   align-items: center !important;
@@ -168,7 +148,8 @@
 .auth-widget-secondary-button {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
   white-space: nowrap !important;
   font-size: 13px !important;
 }
@@ -177,4 +158,19 @@
   width: 14px !important;
   height: 14px !important;
   flex-shrink: 0 !important;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .sidebar-link {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+  }
+
+  .sidebar-link svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
 }
