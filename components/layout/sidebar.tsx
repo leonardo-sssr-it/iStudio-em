@@ -114,158 +114,144 @@ function SidebarContent({
           <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
         <div className="space-y-1">
-          <Button
-            variant={pathname === "/dashboard" ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+          <Link
+            href="/dashboard"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname === "/dashboard" && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/dashboard">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
-            </Link>
-          </Button>
-          <Button
-            variant={pathname === "/dashboard-u" ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Link>
+          <Link
+            href="/dashboard-u"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname === "/dashboard-u" && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/dashboard-u">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard U
-            </Link>
-          </Button>
-          <Button
-            variant={pathname === "/dashboard-utente" ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard U
+          </Link>
+          <Link
+            href="/dashboard-utente"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname === "/dashboard-utente" && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/dashboard-utente">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard Utente
-            </Link>
-          </Button>
-          <Button
-            variant={pathname === "/dashboard-mobile" ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard Utente
+          </Link>
+          <Link
+            href="/dashboard-mobile"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname === "/dashboard-mobile" && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/dashboard-mobile">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard Mobile
-            </Link>
-          </Button>
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard Mobile
+          </Link>
         </div>
       </div>
 
       <div className="sidebar-section">
         <h2 className="sidebar-section-title">Gestione</h2>
         <div className="space-y-1">
-          <Button
-            variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+          <Link
+            href="/pagine"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/pagine") && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/pagine">
-              <FileText className="mr-2 h-4 w-4" />
-              Pagine
-            </Link>
-          </Button>
-          <Button
-            variant={pathname?.includes("/note") ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <FileText className="h-4 w-4" />
+            Pagine
+          </Link>
+          <Link
+            href="/note"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/note") && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/note">
-              <StickyNote className="mr-2 h-4 w-4" />
-              Note
-            </Link>
-          </Button>
-          <Button
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "appuntamenti"
-                ? "secondary"
-                : "ghost"
-            }
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <StickyNote className="h-4 w-4" />
+            Note
+          </Link>
+          <Link
+            href="/data-explorer?table=appuntamenti"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "appuntamenti" &&
+                "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=appuntamenti">
-              <Calendar className="mr-2 h-4 w-4" />
-              Appuntamenti
-            </Link>
-          </Button>
-          <Button
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita" ? "secondary" : "ghost"
-            }
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <Calendar className="h-4 w-4" />
+            Appuntamenti
+          </Link>
+          <Link
+            href="/data-explorer?table=attivita"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "attivita" &&
+                "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=attivita">
-              <ClipboardList className="mr-2 h-4 w-4" />
-              Attività
-            </Link>
-          </Button>
-          <Button
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze" ? "secondary" : "ghost"
-            }
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <ClipboardList className="h-4 w-4" />
+            Attività
+          </Link>
+          <Link
+            href="/data-explorer?table=scadenze"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "scadenze" &&
+                "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=scadenze">
-              <Clock className="mr-2 h-4 w-4" />
-              Scadenze
-            </Link>
-          </Button>
-          <Button
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist" ? "secondary" : "ghost"
-            }
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <Clock className="h-4 w-4" />
+            Scadenze
+          </Link>
+          <Link
+            href="/data-explorer?table=todolist"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "todolist" &&
+                "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=todolist">
-              <CheckSquare className="mr-2 h-4 w-4" />
-              To-Do List
-            </Link>
-          </Button>
-          <Button
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti" ? "secondary" : "ghost"
-            }
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <CheckSquare className="h-4 w-4" />
+            To-Do List
+          </Link>
+          <Link
+            href="/data-explorer?table=progetti"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "progetti" &&
+                "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=progetti">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Progetti
-            </Link>
-          </Button>
-          <Button
-            variant={
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
-            }
-            size="sm"
-            className="w-full justify-start"
-            asChild
+            <BarChart3 className="h-4 w-4" />
+            Progetti
+          </Link>
+          <Link
+            href="/data-explorer?table=clienti"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "clienti" &&
+                "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/data-explorer?table=clienti">
-              <Users className="mr-2 h-4 w-4" />
-              Clienti
-            </Link>
-          </Button>
+            <Users className="h-4 w-4" />
+            Clienti
+          </Link>
         </div>
       </div>
 
@@ -274,61 +260,56 @@ function SidebarContent({
         <div className="sidebar-section">
           <h2 className="sidebar-section-title">Amministrazione</h2>
           <div className="space-y-1">
-            <Button
-              variant={pathname === "/admin" ? "secondary" : "ghost"}
-              size="sm"
-              className="w-full justify-start"
-              asChild
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                pathname === "/admin" && "bg-secondary text-secondary-foreground",
+              )}
             >
-              <Link href="/admin">
-                <Settings className="mr-2 h-4 w-4" />
-                Admin Panel
-              </Link>
-            </Button>
-            <Button
-              variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
-              size="sm"
-              className="w-full justify-start"
-              asChild
+              <Settings className="h-4 w-4" />
+              Admin Panel
+            </Link>
+            <Link
+              href="/admin/users"
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                pathname?.includes("/admin/users") && "bg-secondary text-secondary-foreground",
+              )}
             >
-              <Link href="/admin/users">
-                <Users className="mr-2 h-4 w-4" />
-                Gestione Utenti
-              </Link>
-            </Button>
-            <Button
-              variant={pathname?.includes("/data-explorer") ? "secondary" : "ghost"}
-              size="sm"
-              className="w-full justify-start"
-              asChild
+              <Users className="h-4 w-4" />
+              Gestione Utenti
+            </Link>
+            <Link
+              href="/data-explorer"
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                pathname?.includes("/data-explorer") && "bg-secondary text-secondary-foreground",
+              )}
             >
-              <Link href="/data-explorer">
-                <Database className="mr-2 h-4 w-4" />
-                Data Explorer
-              </Link>
-            </Button>
-            <Button
-              variant={pathname?.includes("/table-explorer") ? "secondary" : "ghost"}
-              size="sm"
-              className="w-full justify-start"
-              asChild
+              <Database className="h-4 w-4" />
+              Data Explorer
+            </Link>
+            <Link
+              href="/table-explorer"
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                pathname?.includes("/table-explorer") && "bg-secondary text-secondary-foreground",
+              )}
             >
-              <Link href="/table-explorer">
-                <Layers className="mr-2 h-4 w-4" />
-                Table Explorer
-              </Link>
-            </Button>
-            <Button
-              variant={pathname?.includes("/debug-scadenze") ? "secondary" : "ghost"}
-              size="sm"
-              className="w-full justify-start"
-              asChild
+              <Layers className="h-4 w-4" />
+              Table Explorer
+            </Link>
+            <Link
+              href="/debug-scadenze"
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+                pathname?.includes("/debug-scadenze") && "bg-secondary text-secondary-foreground",
+              )}
             >
-              <Link href="/debug-scadenze">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Debug Scadenze
-              </Link>
-            </Button>
+              <AlertTriangle className="h-4 w-4" />
+              Debug Scadenze
+            </Link>
           </div>
         </div>
       )}
@@ -336,17 +317,16 @@ function SidebarContent({
       {/* Sezione Profilo */}
       <div className="sidebar-section mt-auto">
         <div className="space-y-1">
-          <Button
-            variant={pathname === "/profile" ? "secondary" : "ghost"}
-            size="sm"
-            className="w-full justify-start"
-            asChild
+          <Link
+            href="/profile"
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              pathname === "/profile" && "bg-secondary text-secondary-foreground",
+            )}
           >
-            <Link href="/profile">
-              <Users className="mr-2 h-4 w-4" />
-              Profilo
-            </Link>
-          </Button>
+            <Users className="h-4 w-4" />
+            Profilo
+          </Link>
         </div>
 
         {/* Indicatore di stato connessione */}
