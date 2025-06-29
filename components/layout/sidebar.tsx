@@ -107,18 +107,18 @@ function SidebarContent({
   const searchParams = useSearchParams()
 
   return (
-    <div className="space-y-4 py-4 h-full flex flex-col sidebar-content">
+    <div className="space-y-3 py-3 h-full flex flex-col sidebar-content">
       <div className="sidebar-section">
         <h2 className="sidebar-title">
           iStudio
           <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <Link
             href="/dashboard"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname === "/dashboard" && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard" && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <LayoutDashboard className="h-4 w-4" />
@@ -127,8 +127,8 @@ function SidebarContent({
           <Link
             href="/dashboard-u"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname === "/dashboard-u" && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard-u" && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <LayoutDashboard className="h-4 w-4" />
@@ -137,8 +137,8 @@ function SidebarContent({
           <Link
             href="/dashboard-utente"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname === "/dashboard-utente" && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard-utente" && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <LayoutDashboard className="h-4 w-4" />
@@ -147,8 +147,8 @@ function SidebarContent({
           <Link
             href="/dashboard-mobile"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname === "/dashboard-mobile" && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard-mobile" && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <LayoutDashboard className="h-4 w-4" />
@@ -159,12 +159,12 @@ function SidebarContent({
 
       <div className="sidebar-section">
         <h2 className="sidebar-section-title">Gestione</h2>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <Link
             href="/pagine"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname?.includes("/pagine") && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/pagine") && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <FileText className="h-4 w-4" />
@@ -173,8 +173,8 @@ function SidebarContent({
           <Link
             href="/note"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname?.includes("/note") && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/note") && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <StickyNote className="h-4 w-4" />
@@ -183,10 +183,10 @@ function SidebarContent({
           <Link
             href="/data-explorer?table=appuntamenti"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
               pathname?.includes("/data-explorer") &&
                 searchParams?.get("table") === "appuntamenti" &&
-                "bg-secondary text-secondary-foreground",
+                "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <Calendar className="h-4 w-4" />
@@ -195,10 +195,10 @@ function SidebarContent({
           <Link
             href="/data-explorer?table=attivita"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
               pathname?.includes("/data-explorer") &&
                 searchParams?.get("table") === "attivita" &&
-                "bg-secondary text-secondary-foreground",
+                "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <ClipboardList className="h-4 w-4" />
@@ -207,10 +207,10 @@ function SidebarContent({
           <Link
             href="/data-explorer?table=scadenze"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
               pathname?.includes("/data-explorer") &&
                 searchParams?.get("table") === "scadenze" &&
-                "bg-secondary text-secondary-foreground",
+                "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <Clock className="h-4 w-4" />
@@ -219,10 +219,10 @@ function SidebarContent({
           <Link
             href="/data-explorer?table=todolist"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
               pathname?.includes("/data-explorer") &&
                 searchParams?.get("table") === "todolist" &&
-                "bg-secondary text-secondary-foreground",
+                "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <CheckSquare className="h-4 w-4" />
@@ -231,10 +231,10 @@ function SidebarContent({
           <Link
             href="/data-explorer?table=progetti"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
               pathname?.includes("/data-explorer") &&
                 searchParams?.get("table") === "progetti" &&
-                "bg-secondary text-secondary-foreground",
+                "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <BarChart3 className="h-4 w-4" />
@@ -243,10 +243,10 @@ function SidebarContent({
           <Link
             href="/data-explorer?table=clienti"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
               pathname?.includes("/data-explorer") &&
                 searchParams?.get("table") === "clienti" &&
-                "bg-secondary text-secondary-foreground",
+                "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <Users className="h-4 w-4" />
@@ -259,12 +259,12 @@ function SidebarContent({
       {isAdmin && (
         <div className="sidebar-section">
           <h2 className="sidebar-section-title">Amministrazione</h2>
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <Link
               href="/admin"
               className={cn(
-                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname === "/admin" && "bg-secondary text-secondary-foreground",
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname === "/admin" && "bg-primary text-primary-foreground font-medium shadow-sm",
               )}
             >
               <Settings className="h-4 w-4" />
@@ -273,8 +273,8 @@ function SidebarContent({
             <Link
               href="/admin/users"
               className={cn(
-                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname?.includes("/admin/users") && "bg-secondary text-secondary-foreground",
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/admin/users") && "bg-primary text-primary-foreground font-medium shadow-sm",
               )}
             >
               <Users className="h-4 w-4" />
@@ -283,8 +283,8 @@ function SidebarContent({
             <Link
               href="/data-explorer"
               className={cn(
-                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname?.includes("/data-explorer") && "bg-secondary text-secondary-foreground",
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/data-explorer") && "bg-primary text-primary-foreground font-medium shadow-sm",
               )}
             >
               <Database className="h-4 w-4" />
@@ -293,8 +293,8 @@ function SidebarContent({
             <Link
               href="/table-explorer"
               className={cn(
-                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname?.includes("/table-explorer") && "bg-secondary text-secondary-foreground",
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/table-explorer") && "bg-primary text-primary-foreground font-medium shadow-sm",
               )}
             >
               <Layers className="h-4 w-4" />
@@ -303,8 +303,8 @@ function SidebarContent({
             <Link
               href="/debug-scadenze"
               className={cn(
-                "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname?.includes("/debug-scadenze") && "bg-secondary text-secondary-foreground",
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/debug-scadenze") && "bg-primary text-primary-foreground font-medium shadow-sm",
               )}
             >
               <AlertTriangle className="h-4 w-4" />
@@ -316,12 +316,12 @@ function SidebarContent({
 
       {/* Sezione Profilo */}
       <div className="sidebar-section mt-auto">
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <Link
             href="/profile"
             className={cn(
-              "flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground",
-              pathname === "/profile" && "bg-secondary text-secondary-foreground",
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/profile" && "bg-primary text-primary-foreground font-medium shadow-sm",
             )}
           >
             <Users className="h-4 w-4" />
@@ -330,7 +330,7 @@ function SidebarContent({
         </div>
 
         {/* Indicatore di stato connessione */}
-        <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
           {isOnline ? (
             <>
               <Wifi className="h-4 w-4 text-green-500" />
@@ -345,7 +345,7 @@ function SidebarContent({
         </div>
 
         {/* Info utente */}
-        {user && <div className="px-3 py-2 text-xs text-muted-foreground truncate">{user.username || user.email}</div>}
+        {user && <div className="px-2 py-1 text-xs text-muted-foreground truncate">{user.username || user.email}</div>}
       </div>
     </div>
   )

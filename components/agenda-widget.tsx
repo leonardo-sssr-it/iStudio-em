@@ -33,7 +33,6 @@ import {
   AlertCircle,
   Globe,
   User,
-  HelpCircle,
   Bug,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -45,8 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useAuth } from "@/lib/auth-provider" // Ensure this path is correct
+import { useAuth } from "@/lib/auth-provider"
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import { cn } from "@/lib/utils"
 
@@ -117,9 +115,9 @@ const AgendaItemComponent = ({ item }: { item: AgendaItem }) => {
           className="flex items-stretch p-0 rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity overflow-hidden"
           style={{ backgroundColor: item.colore }}
         >
-          {/* Tipo in verticale */}
-          <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 vertical-text">
-            {typeAbbr}
+          {/* Tipo in verticale ruotato di 90° */}
+          <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 w-4">
+            <span className="transform rotate-90 whitespace-nowrap">{typeAbbr}</span>
           </div>
 
           {/* Contenuto principale */}
@@ -682,9 +680,9 @@ const MonthlyView = ({
                               className="text-[10px] rounded truncate flex items-stretch overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
                               style={{ backgroundColor: item.colore }}
                             >
-                              {/* Tipo in verticale */}
-                              <div className="bg-black text-white text-[6px] font-bold flex items-center justify-center px-0.5 writing-vertical-rl">
-                                {typeAbbr}
+                              {/* Tipo in verticale ruotato di 90° */}
+                              <div className="bg-black text-white text-[6px] font-bold flex items-center justify-center px-0.5 w-3">
+                                <span className="transform rotate-90 whitespace-nowrap">{typeAbbr}</span>
                               </div>
 
                               {/* Contenuto principale */}
@@ -780,9 +778,9 @@ const MonthlyView = ({
                                     className="text-xs rounded overflow-hidden flex items-stretch cursor-pointer hover:opacity-90 transition-opacity"
                                     style={{ backgroundColor: item.colore }}
                                   >
-                                    {/* Tipo in verticale */}
-                                    <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 writing-vertical-rl">
-                                      {typeAbbr}
+                                    {/* Tipo in verticale ruotato di 90° */}
+                                    <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 w-4">
+                                      <span className="transform rotate-90 whitespace-nowrap">{typeAbbr}</span>
                                     </div>
 
                                     {/* Contenuto principale */}
@@ -942,40 +940,6 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
 
   const { items, isLoading, error, tableStats } = useAgendaItems(startDate, endDate)
 
-  // Rimuovi questo useEffect che causa il loop
-  /*
-  useEffect(() => {
-    if (items && items.length > 0 && isDebugAllowed) {
-      // Aggiungi un debounce per evitare loop
-      const timeoutId = setTimeout(() => {
-        const invalidItems = checkInvalidDates(items)
-        if (invalidItems.length > 0) {
-          console.warn("AgendaWidget - Elementi con date non valide:", invalidItems)
-          addLog(`Trovati ${invalidItems.length} elementi con date non valide`)
-        }
-        const debugData = items.map((item) => ({
-          id: item.id,
-          titolo: item.titolo,
-          tipo: item.tipo,
-          generale: item.generale,
-          data_inizio: formatDateForDebug(item.data_inizio),
-          data_fine: formatDateForDebug(item.data_fine),
-          data_scadenza: formatDateForDebug(item.data_scadenza),
-          tabella_origine: item.tabella_origine,
-          matchesCurrentDate: item.data_inizio instanceof Date && isSameDay(item.data_inizio, currentDate),
-        }))
-        setDebugItems(debugData)
-        conditionalLog("AgendaWidget - Dettagli elementi:", debugData, isDebugAllowed)
-        addLog(
-          `Caricati ${items.length} elementi, di cui ${debugData.filter((i) => i.matchesCurrentDate).length} corrispondono alla data corrente`,
-        )
-      }, 100)
-
-      return () => clearTimeout(timeoutId)
-    }
-  }, [items, isDebugAllowed, addLog])
-  */
-
   // Sostituisci con una versione più stabile
   useEffect(() => {
     if (items && items.length > 0 && isDebugAllowed) {
@@ -991,24 +955,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
       }))
       setDebugItems(debugData)
     }
-  }, [items.length, isDebugAllowed]) // Usa items.length invece di items per evitare loop
-
-  // Commenta o rimuovi questi useEffect
-  /*
-  useEffect(() => {
-    if (isDebugAllowed) {
-      addLog(`Selected date: ${currentDate.toISOString()}`)
-      addLog(`View: ${view}`)
-      if (items) {
-        addLog(`Items count: ${items.length}`)
-        if (items.length > 0)
-          addLog(
-            `First item: ${JSON.stringify({ id: items[0].id, titolo: items[0].titolo, tipo: items[0].tipo, data_inizio: formatDateForDebug(items[0].data_inizio) })}`,
-          )
-      }
-    }
-  }, [currentDate, view, items, isDebugAllowed, addLog])
-  */
+  }, [items, items.length, isDebugAllowed]) // Usa items.length invece di items per evitare loop
 
   useMemo(() => {
     if (items.length > 0) {
@@ -1172,8 +1119,6 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                   mode === "mobile"
                     ? "grid w-full grid-cols-2"
                     : "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-                  // For desktop, we use the default shadcn/ui classes for TabsList or simply 'inline-flex' if you want minimal styling.
-                  // The default classes provide the standard look and feel.
                 )}
               >
                 <TabsTrigger value="daily" className="flex items-center gap-1 text-xs sm:text-sm">
@@ -1202,7 +1147,11 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 text-xs sm:text-sm bg-transparent"
+                  >
                     <Filter className="h-3 w-3 sm:h-4 sm:w-4" /> Filtri
                   </Button>
                 </DropdownMenuTrigger>
@@ -1312,25 +1261,11 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                   variant="outline"
                   size="sm"
                   onClick={exportAgenda}
-                  className="flex items-center gap-1 text-xs sm:text-sm"
+                  className="flex items-center gap-1 text-xs sm:text-sm bg-transparent"
                 >
                   <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
                 </Button>
               )}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
-                      <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="sr-only">Legenda</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="end" className="w-auto">
-                    <div className="text-sm font-medium mb-1">Legenda colori</div>
-                    <ColorLegend />
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
           </div>
           <ColorLegend />
@@ -1379,24 +1314,33 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
                 />
               )}
               <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
-                <div className="flex items-center">
-                  <Info className="h-3 w-3 mr-1" /> Elementi visualizzati: {filteredItems.length} di {items.length}{" "}
-                  totali
-                </div>
-                <div className="flex gap-2">
-                  {Object.entries(tableStats).map(([tipo, count]) => (
-                    <Badge key={tipo} variant="outline" className="text-xs">
-                      {tipo === "scadenze_generali" ? (
-                        <span className="flex items-center">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <div className="flex items-center cursor-pointer hover:text-gray-700">
+                      <Info className="h-3 w-3 mr-1" />
+                      Elementi visualizzati: {filteredItems.length} di {items.length} totali
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Dettaglio per tipo</h4>
+                      <div className="space-y-1 text-xs">
+                        <div>Attività: {filteredItems.filter((item) => item.tipo === "attivita").length}</div>
+                        <div>Progetti: {filteredItems.filter((item) => item.tipo === "progetto").length}</div>
+                        <div>Appuntamenti: {filteredItems.filter((item) => item.tipo === "appuntamento").length}</div>
+                        <div>
+                          Scadenze: {filteredItems.filter((item) => item.tipo === "scadenza" && !item.generale).length}
+                        </div>
+                        <div>Todo: {filteredItems.filter((item) => item.tipo === "todolist").length}</div>
+                        <div className="flex items-center">
                           <Globe className="h-3 w-3 mr-1" />
-                          Scadenze generali: {count}
-                        </span>
-                      ) : (
-                        `${tipo}: ${count}`
-                      )}
-                    </Badge>
-                  ))}
-                </div>
+                          Scadenze generali:{" "}
+                          {filteredItems.filter((item) => item.tipo === "scadenza" && item.generale).length}
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </>
           )}
