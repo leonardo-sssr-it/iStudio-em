@@ -4,10 +4,23 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
+import { TagInput } from "@/components/ui/tag-input"
 import { parseISO, formatISO } from "date-fns"
 import {
+  ArrowLeft,
+  X,
+  AlertCircle,
   CheckCircle2,
   FileText,
   Settings,
@@ -657,4 +670,352 @@ export default function NewItemPage() {
         description: "Il nuovo elemento è stato salvato nel database",
         action: (
           <div className="flex items-center">
-            <CheckCircle2 className="\
+            <CheckCircle2 className="h-4 w-4 text-green-600 mr-2" />
+            <span>Salvato</span>
+          </div>
+        ),
+      })
+
+      // Reindirizza alla pagina di dettaglio
+      router.push(`/data-explorer/${tableName}/${data[0].id}`)
+    } catch (error: any) {
+      console.error("Errore durante il salvataggio:", error)
+      toast({
+        title: "Errore durante il salvataggio",
+        description: error.message || "Si è verificato un errore imprevisto",
+        variant: "destructive",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Renderizza un campo del form
+  const renderField = (field: string) => {
+    const type = fieldTypes[field] || "string"
+    const value = formData[field] || ""
+    const hasError = !!errors[field]
+    const isRequired = requiredFields.includes(field)
+    const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
+
+    // Non renderizzare i campi automatici
+    if (autoFields.includes(field)) return null
+
+    const fieldProps = {
+      id: field,
+      value,
+      onChange: (newValue: any) => handleFieldChange(field, newValue),
+      className: cn("mt-1", hasError && "border-red-500"),
+      placeholder: isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`,
+    }
+
+    switch (type) {
+      case "text":
+      case "richtext":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Textarea
+              {...fieldProps}
+              rows={type === "richtext" ? 8 : 4}
+              onChange={(e) => fieldProps.onChange(e.target.value)}
+            />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "boolean":
+        return (
+          <div key={field} className="flex items-center space-x-2">
+            <Switch id={field} checked={value || false} onCheckedChange={(checked) => fieldProps.onChange(checked)} />
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label}
+            </Label>
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "datetime":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <EnhancedDatePicker
+              {...fieldProps}
+              onChange={(date) => fieldProps.onChange(date)}
+              showTimeSelect
+              dateFormat="dd/MM/yyyy HH:mm"
+            />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "number":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Input
+              {...fieldProps}
+              type="number"
+              onChange={(e) => fieldProps.onChange(Number.parseFloat(e.target.value) || null)}
+            />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "email":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Input {...fieldProps} type="email" onChange={(e) => fieldProps.onChange(e.target.value)} />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "tel":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Input {...fieldProps} type="tel" onChange={(e) => fieldProps.onChange(e.target.value)} />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "priority_select":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            {priorityOptions.length > 0 ? (
+              <Select value={String(value || "")} onValueChange={(val) => fieldProps.onChange(Number(val))}>
+                <SelectTrigger className={fieldProps.className}>
+                  <SelectValue placeholder={fieldProps.placeholder} />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
+                </div>
+                <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={loadPriorityOptions}>
+                  Riprova caricamento
+                </Button>
+              </div>
+            )}
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "select":
+        const options = selectOptions[field] || []
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Select value={value || ""} onValueChange={(val) => fieldProps.onChange(val)}>
+              <SelectTrigger className={fieldProps.className}>
+                <SelectValue placeholder={fieldProps.placeholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((option: any) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "color":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <ColorPicker value={value || "#000000"} onChange={(val) => fieldProps.onChange(val)} />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "tags":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <TagInput
+              id={field}
+              value={Array.isArray(value) ? value : []}
+              onChange={(tags) => fieldProps.onChange(tags)}
+              placeholder="Aggiungi tag..."
+              className={fieldProps.className}
+            />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      case "array":
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <TagInput
+              id={field}
+              value={Array.isArray(value) ? value : []}
+              onChange={(items) => fieldProps.onChange(items)}
+              placeholder={`Aggiungi ${label.toLowerCase()}...`}
+              className={fieldProps.className}
+            />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+
+      default:
+        return (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={field} className={cn("text-sm font-medium", hasError && "text-red-600")}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Input {...fieldProps} type="text" onChange={(e) => fieldProps.onChange(e.target.value)} />
+            {hasError && <p className="text-sm text-red-600">{errors[field]}</p>}
+          </div>
+        )
+    }
+  }
+
+  // Ottieni il titolo della tabella
+  const getTableTitle = () => {
+    const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
+    return table ? table.label : "Nuovo elemento"
+  }
+
+  // Se la tabella non è valida
+  if (!isValidTable) {
+    return (
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl text-red-600">Errore</CardTitle>
+            <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/data-explorer")}>
+              <ArrowLeft size={16} className="mr-2" /> Torna a Data Explorer
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Se non c'è la configurazione della tabella
+  if (!tableConfig) {
+    return (
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl text-red-600">Configurazione mancante</CardTitle>
+            <CardDescription>La configurazione per la tabella "{tableName}" non è disponibile.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/data-explorer")}>
+              <ArrowLeft size={16} className="mr-2" /> Torna a Data Explorer
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto py-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <Button variant="ghost" onClick={() => router.push(`/data-explorer?table=${tableName}`)} className="mb-2">
+                <ArrowLeft size={16} className="mr-2" /> Torna alla lista
+              </Button>
+              <CardTitle className="text-2xl">Nuovo {getTableTitle()}</CardTitle>
+              <CardDescription>Compila i campi per creare un nuovo elemento</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          <div className="space-y-6">
+            {/* Campi obbligatori */}
+            {requiredFields.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Badge variant="destructive">Obbligatori</Badge>
+                  <span className="text-sm text-muted-foreground">I campi contrassegnati con * sono obbligatori</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {requiredFields.map((field) => renderField(field))}
+                </div>
+              </div>
+            )}
+
+            {/* Altri campi */}
+            {fieldOrder.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Badge variant="secondary">Opzionali</Badge>
+                  <span className="text-sm text-muted-foreground">Campi aggiuntivi</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {fieldOrder
+                    .filter((field) => !requiredFields.includes(field) && !autoFields.includes(field))
+                    .map((field) => renderField(field))}
+                </div>
+              </div>
+            )}
+
+            {/* Campi non configurati nell'ordine */}
+            {Object.keys(formData)
+              .filter(
+                (field) =>
+                  !requiredFields.includes(field) &&
+                  !fieldOrder.includes(field) &&
+                  !autoFields.includes(field) &&
+                  field !== "id_utente",
+              )
+              .map((field) => renderField(field))}
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex justify-between">
+          <Button variant="outline" onClick={() => router.push(`/data-explorer?table=${tableName}`)}>
+            <X size={16} className="mr-2" /> Annulla
+          </Button>
+          <Button onClick={handleSave} disabled={saving} className="min-w-[150px]">
+            {saving ? "Salvataggio..." : "Crea elemento"}
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  )
+}
