@@ -125,7 +125,6 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "priority_select",
       note: "text",
       luogo: "string",
       tags: "tags",

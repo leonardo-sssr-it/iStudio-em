@@ -1,103 +1,100 @@
-"use client"
-
-import Link from "next/link"
-import { useAuth } from "@/lib/auth-provider"
 import { NotesFooterWidget } from "@/components/notes-footer-widget"
 
 export function Footer() {
-  const { user } = useAuth()
-
   return (
-    <footer className="bg-gray-50 border-t">
+    <footer className="bg-background border-t">
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* iStudio */}
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-4">iStudio</h3>
-            <ul className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-3">
+            <h4 className="font-semibold">iStudio</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/about" className="hover:text-gray-900">
+                <a href="/about" className="hover:text-primary transition-colors">
                   Chi siamo
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/features" className="hover:text-gray-900">
+                <a href="/features" className="hover:text-primary transition-colors">
                   Funzionalità
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/pricing" className="hover:text-gray-900">
+                <a href="/pricing" className="hover:text-primary transition-colors">
                   Prezzi
-                </Link>
+                </a>
+              </li>
+              <li>
+                <a href="/blog" className="hover:text-primary transition-colors">
+                  Blog
+                </a>
               </li>
             </ul>
           </div>
 
           {/* Link Rapidi */}
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Link Rapidi</h3>
-            <ul className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-3">
+            <h4 className="font-semibold">Link Rapidi</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/dashboard" className="hover:text-gray-900">
+                <a href="/dashboard" className="hover:text-primary transition-colors">
                   Dashboard
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/data-explorer" className="hover:text-gray-900">
+                <a href="/data-explorer" className="hover:text-primary transition-colors">
                   Data Explorer
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/note" className="hover:text-gray-900">
+                <a href="/note" className="hover:text-primary transition-colors">
                   Note
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/pagine" className="hover:text-gray-900">
-                  Pagine
-                </Link>
+                <a href="/profile" className="hover:text-primary transition-colors">
+                  Profilo
+                </a>
               </li>
             </ul>
           </div>
 
           {/* Supporto */}
-          <div>
-            <h3 className="font-semibold text-gray-900 mb-4">Supporto</h3>
-            <ul className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-3">
+            <h4 className="font-semibold">Supporto</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/help" className="hover:text-gray-900">
+                <a href="/help" className="hover:text-primary transition-colors">
                   Centro Assistenza
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/contact" className="hover:text-gray-900">
+                <a href="/contact" className="hover:text-primary transition-colors">
                   Contattaci
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/docs" className="hover:text-gray-900">
-                  Documentazione
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="hover:text-gray-900">
+                <a href="/privacy" className="hover:text-primary transition-colors">
                   Privacy Policy
-                </Link>
+                </a>
+              </li>
+              <li>
+                <a href="/terms" className="hover:text-primary transition-colors">
+                  Termini di Servizio
+                </a>
               </li>
             </ul>
           </div>
 
-          {/* Note Widget - Solo per utenti autenticati */}
-          {user && (
-            <div>
-              <NotesFooterWidget />
-            </div>
-          )}
+          {/* Widget Note */}
+          <div>
+            <NotesFooterWidget />
+          </div>
         </div>
 
         {/* Copyright */}
-        <div className="mt-8 pt-8 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-600">© 2024 iStudio. Tutti i diritti riservati.</p>
+        <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
+          <p>&copy; 2024 iStudio. Tutti i diritti riservati.</p>
         </div>
       </div>
     </footer>
