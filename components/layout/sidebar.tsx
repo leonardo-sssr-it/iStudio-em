@@ -12,7 +12,6 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useAuth } from "@/lib/auth-provider"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useSidebarState } from "@/contexts/sidebar-state-context"
-import { useDebugConfig } from "@/hooks/use-debug-config"
 import {
   LayoutDashboard,
   Calendar,
@@ -41,7 +40,6 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   const { user, isAdmin } = useAuth()
   const isOnline = useOnlineStatus()
   const { isSidebarOpen, toggleSidebar } = useSidebarState()
-  const { isDebugEnabled } = useDebugConfig()
   const [isMounted, setIsMounted] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -55,15 +53,6 @@ export function Sidebar({ className, ...props }: SidebarProps) {
     window.addEventListener("resize", checkIfMobile)
     return () => window.removeEventListener("resize", checkIfMobile)
   }, [])
-
-  // Debug condizionale
-  useEffect(() => {
-    if (isDebugEnabled) {
-      console.log("Sidebar: pathname =", pathname)
-      console.log("Sidebar: user =", user)
-      console.log("Sidebar: isAdmin =", isAdmin)
-    }
-  }, [pathname, user, isAdmin, isDebugEnabled])
 
   // Non renderizzare nulla durante SSR
   if (!isMounted) return null
@@ -86,13 +75,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
         <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
           <SheetContent side="left" className="w-[280px] p-0 bg-background border-r z-50">
             <ScrollArea className="h-full">
-              <SidebarContent
-                pathname={pathname}
-                user={user}
-                isAdmin={isAdmin}
-                isOnline={isOnline}
-                isDebugEnabled={isDebugEnabled}
-              />
+              <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
             </ScrollArea>
           </SheetContent>
         </Sheet>
@@ -104,13 +87,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   return (
     <div className={cn("pb-12 w-[240px] flex-shrink-0 sidebar-container", className)} {...props}>
       <ScrollArea className="h-full">
-        <SidebarContent
-          pathname={pathname}
-          user={user}
-          isAdmin={isAdmin}
-          isOnline={isOnline}
-          isDebugEnabled={isDebugEnabled}
-        />
+        <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
       </ScrollArea>
     </div>
   )
@@ -122,21 +99,13 @@ function SidebarContent({
   user,
   isAdmin,
   isOnline,
-  isDebugEnabled,
 }: {
   pathname: string
   user: any
   isAdmin: boolean
   isOnline: boolean
-  isDebugEnabled: boolean
 }) {
   const searchParams = useSearchParams()
-
-  useEffect(() => {
-    if (isDebugEnabled) {
-      console.log("SidebarContent: Rendering with pathname =", pathname)
-    }
-  }, [pathname, isDebugEnabled])
 
   return (
     <div className="space-y-4 py-4 h-full flex flex-col sidebar-content">
@@ -295,18 +264,6 @@ function SidebarContent({
           >
             <Users />
             <span>Clienti</span>
-          </Link>
-          <Link
-            href="/data-explorer?table=pagine"
-            className={cn(
-              "sidebar-button",
-              pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine"
-                ? "bg-secondary text-secondary-foreground"
-                : "hover:bg-accent hover:text-accent-foreground",
-            )}
-          >
-            <FileText />
-            <span>Pagine</span>
           </Link>
         </div>
       </div>

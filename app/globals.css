@@ -23,7 +23,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -70,71 +70,72 @@
 
 /* Stili personalizzati per la sidebar con !important per forzare le dimensioni */
 .sidebar-container {
-  @apply bg-background border-r;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
-.sidebar-content {
-  @apply space-y-4 py-4 h-full flex flex-col;
-}
-
-.sidebar-section {
-  @apply px-3 py-2;
-}
-
-.sidebar-title {
-  @apply mb-2 px-2 font-semibold tracking-tight;
-  font-size: 14px !important;
-}
-
-.sidebar-section-title {
-  @apply mb-2 px-2 font-semibold tracking-tight;
-  font-size: 14px !important;
-}
-
-.sidebar-button {
-  @apply w-full justify-start rounded-md px-2 py-1.5 transition-colors;
-  @apply flex items-center gap-2 whitespace-nowrap;
-  font-size: 12px !important;
-  height: 32px !important;
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
   text-decoration: none !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  flex-wrap: nowrap !important;
+  transition: all 0.2s ease !important;
+  min-height: 32px !important;
+  height: 32px !important;
 }
 
-.sidebar-button:hover {
-  @apply bg-accent text-accent-foreground;
+.sidebar-link:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
 }
 
-.sidebar-button svg {
+.sidebar-link.active {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.sidebar-link svg {
   width: 14px !important;
   height: 14px !important;
   flex-shrink: 0 !important;
 }
 
-.sidebar-button span {
-  font-size: 12px !important;
-  white-space: nowrap !important;
+.sidebar-link span {
+  flex: 1 !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
-.sidebar-status {
-  @apply mt-4 px-2 py-1 text-muted-foreground flex items-center gap-1;
-  font-size: 10px !important;
+.sidebar-section-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+  margin: 16px 0 8px 0 !important;
+  padding: 0 12px !important;
 }
 
-.sidebar-status svg {
-  width: 12px !important;
-  height: 12px !important;
-  flex-shrink: 0 !important;
+.sidebar-section-title:first-child {
+  margin-top: 8px !important;
 }
 
-.sidebar-user-info {
-  @apply mt-2 px-2 py-1 text-muted-foreground truncate;
-  font-size: 10px !important;
-}
-
-/* Stili per il widget auth */
+/* Stili per auth widget */
 .auth-widget-button {
-  @apply flex items-center justify-center gap-2 whitespace-nowrap;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
   font-size: 14px !important;
 }
 
@@ -145,8 +146,12 @@
 }
 
 .auth-widget-secondary-button {
-  @apply flex items-center gap-2 whitespace-nowrap;
-  font-size: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  font-size: 13px !important;
 }
 
 .auth-widget-secondary-button svg {
@@ -155,405 +160,17 @@
   flex-shrink: 0 !important;
 }
 
-/* Stili per elementi responsive */
+/* Responsive design */
 @media (max-width: 768px) {
-  .sidebar-container {
-    @apply w-full;
-  }
-}
-
-/* Stili per il testo verticale nell'agenda */
-.vertical-text {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-}
-
-.writing-vertical-rl {
-  writing-mode: vertical-rl;
-}
-
-/* Scrollbar personalizzata */
-.scrollbar-thin {
-  scrollbar-width: thin;
-}
-
-.scrollbar-thumb-gray-300 {
-  scrollbar-color: rgb(209 213 219) transparent;
-}
-
-.dark .scrollbar-thumb-gray-600 {
-  scrollbar-color: rgb(75 85 99) transparent;
-}
-
-.scrollbar-track-transparent {
-  scrollbar-color: transparent transparent;
-}
-
-/* Stili per il custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgb(203 213 225);
-  border-radius: 3px;
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgb(71 85 105);
-}
-
-/* Stili per line-clamp */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Animazioni personalizzate */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* Stili per il focus accessibile */
-.focus-visible:focus {
-  @apply outline-none ring-2 ring-ring ring-offset-2;
-}
-
-/* Stili per i componenti drag and drop */
-.dragging {
-  @apply opacity-50;
-}
-
-.drag-over {
-  @apply bg-primary/10;
-}
-
-/* Stili per le card hover */
-.card-hover {
-  @apply transition-all duration-200 hover:shadow-md hover:-translate-y-1;
-}
-
-/* Stili per i badge personalizzati */
-.badge-priority-high {
-  @apply bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400;
-}
-
-.badge-priority-medium {
-  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400;
-}
-
-.badge-priority-low {
-  @apply bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400;
-}
-
-/* Stili per le tabelle responsive */
-.table-responsive {
-  @apply overflow-x-auto;
-}
-
-.table-responsive table {
-  @apply min-w-full;
-}
-
-/* Stili per i form */
-.form-section {
-  @apply space-y-4 p-4 border rounded-lg;
-}
-
-.form-field {
-  @apply space-y-2;
-}
-
-.form-error {
-  @apply text-sm text-destructive;
-}
-
-/* Stili per i loading states */
-.loading-skeleton {
-  @apply animate-pulse bg-muted rounded;
-}
-
-/* Stili per i toast personalizzati */
-.toast-success {
-  @apply border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400;
-}
-
-.toast-error {
-  @apply border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400;
-}
-
-.toast-warning {
-  @apply border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400;
-}
-
-/* Stili per i modali */
-.modal-overlay {
-  @apply fixed inset-0 bg-black/50 z-50;
-}
-
-.modal-content {
-  @apply fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50;
-  @apply bg-background border rounded-lg shadow-lg;
-  @apply max-h-[90vh] overflow-y-auto;
-}
-
-/* Stili per i dropdown menu */
-.dropdown-item {
-  @apply flex items-center gap-2 px-2 py-1.5 text-sm;
-  @apply hover:bg-accent hover:text-accent-foreground;
-  @apply cursor-pointer rounded-sm;
-}
-
-/* Stili per i breadcrumb */
-.breadcrumb {
-  @apply flex items-center space-x-1 text-sm text-muted-foreground;
-}
-
-.breadcrumb-separator {
-  @apply mx-1;
-}
-
-/* Stili per i tag input */
-.tag-input-container {
-  @apply flex flex-wrap gap-1 p-2 border rounded-md;
-}
-
-.tag-item {
-  @apply inline-flex items-center gap-1 px-2 py-1 bg-secondary text-secondary-foreground rounded-sm text-xs;
-}
-
-/* Stili per i progress bar */
-.progress-bar {
-  @apply w-full bg-secondary rounded-full h-2;
-}
-
-.progress-fill {
-  @apply h-full bg-primary rounded-full transition-all duration-300;
-}
-
-/* Stili per le card stats */
-.stat-card {
-  @apply p-4 border rounded-lg bg-card text-card-foreground;
-}
-
-.stat-value {
-  @apply text-2xl font-bold;
-}
-
-.stat-label {
-  @apply text-sm text-muted-foreground;
-}
-
-/* Stili per i calendar widget */
-.calendar-day {
-  @apply p-2 text-center text-sm hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer;
-}
-
-.calendar-day-today {
-  @apply bg-primary text-primary-foreground;
-}
-
-.calendar-day-selected {
-  @apply bg-secondary text-secondary-foreground;
-}
-
-/* Stili per i kanban board */
-.kanban-column {
-  @apply flex-shrink-0 w-72 bg-muted/50 rounded-lg p-3;
-}
-
-.kanban-card {
-  @apply p-3 bg-card border rounded-md shadow-sm cursor-pointer;
-  @apply hover:shadow-md transition-shadow;
-}
-
-/* Stili per i gantt chart */
-.gantt-row {
-  @apply border-b last:border-b-0;
-}
-
-.gantt-bar {
-  @apply h-6 rounded bg-primary text-primary-foreground text-xs;
-  @apply flex items-center px-2;
-}
-
-/* Stili per i data table */
-.data-table {
-  @apply w-full border-collapse;
-}
-
-.data-table th {
-  @apply p-2 text-left font-medium border-b;
-}
-
-.data-table td {
-  @apply p-2 border-b;
-}
-
-.data-table tr:hover {
-  @apply bg-muted/50;
-}
-
-/* Stili per i filtri */
-.filter-section {
-  @apply space-y-2 p-3 border rounded-lg;
-}
-
-.filter-group {
-  @apply space-y-1;
-}
-
-.filter-label {
-  @apply text-sm font-medium;
-}
-
-/* Stili per i widget dashboard */
-.dashboard-widget {
-  @apply p-4 border rounded-lg bg-card;
-}
-
-.widget-header {
-  @apply flex items-center justify-between mb-3;
-}
-
-.widget-title {
-  @apply font-semibold;
-}
-
-.widget-content {
-  @apply space-y-2;
-}
-
-/* Stili per i feed reader */
-.feed-item {
-  @apply p-3 border-b last:border-b-0 hover:bg-muted/50 cursor-pointer;
-}
-
-.feed-title {
-  @apply font-medium text-sm;
-}
-
-.feed-date {
-  @apply text-xs text-muted-foreground;
-}
-
-/* Stili per i gallery */
-.gallery-grid {
-  @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4;
-}
-
-.gallery-item {
-  @apply aspect-square overflow-hidden rounded-lg border;
-}
-
-.gallery-image {
-  @apply w-full h-full object-cover hover:scale-105 transition-transform;
-}
-
-/* Stili per i search */
-.search-container {
-  @apply relative;
-}
-
-.search-input {
-  @apply w-full pl-8 pr-4 py-2 border rounded-md;
-}
-
-.search-icon {
-  @apply absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground;
-}
-
-.search-results {
-  @apply absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50;
-}
-
-.search-result-item {
-  @apply p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer;
-}
-
-/* Stili per i tooltip */
-.tooltip {
-  @apply px-2 py-1 text-xs bg-popover text-popover-foreground border rounded shadow-lg;
-}
-
-/* Stili per i sidebar collapsible */
-.sidebar-collapsed {
-  @apply w-16;
-}
-
-.sidebar-expanded {
-  @apply w-64;
-}
-
-/* Stili per i mobile responsive */
-@media (max-width: 640px) {
-  .mobile-hidden {
-    @apply hidden;
+  .sidebar-link {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+    height: 40px !important;
   }
 
-  .mobile-full {
-    @apply w-full;
-  }
-
-  .mobile-stack {
-    @apply flex-col;
-  }
-}
-
-/* Stili per i print */
-@media print {
-  .print-hidden {
-    @apply hidden;
-  }
-
-  .print-break {
-    page-break-after: always;
-  }
-}
-
-/* Stili per l'accessibilità */
-.sr-only {
-  @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
-}
-
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
-}
-
-/* Stili per i high contrast mode */
-@media (prefers-contrast: high) {
-  .high-contrast {
-    @apply border-2 border-foreground;
-  }
-}
-
-/* Stili per reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .motion-reduce {
-    @apply transition-none animate-none;
+  .sidebar-link svg {
+    width: 16px !important;
+    height: 16px !important;
   }
 }
