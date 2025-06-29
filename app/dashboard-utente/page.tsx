@@ -15,7 +15,7 @@ import { FeedReaderWidget } from "@/components/feed-reader-widget"
 import { TodoKanbanWidget } from "@/components/todo-kanban-widget"
 import { Button } from "@/components/ui/button"
 import { RefreshCw, AlertTriangle } from "lucide-react"
-import { UserSummary } from "./_components/user-summary"
+import { UserSummary } from "@/components/user-summary"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // Widget wrapper component for error handling
@@ -215,7 +215,12 @@ export default function UserDashboardPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={reloadWidget} className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reloadWidget}
+              className="flex items-center gap-2 bg-transparent"
+            >
               <RefreshCw className="h-4 w-4" />
               Ricarica Widget
             </Button>
