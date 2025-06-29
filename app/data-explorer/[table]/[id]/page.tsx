@@ -32,7 +32,7 @@ import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
 import { isValid, parseISO } from "date-fns"
-import { Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, FileText, StickyNote } from "lucide-react"
+import { Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, FileText, StickyNote, User } from "lucide-react"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -44,6 +44,7 @@ const AVAILABLE_TABLES = [
   { id: "clienti", label: "Clienti", icon: Users },
   { id: "pagine", label: "Pagine", icon: FileText },
   { id: "note", label: "Note", icon: StickyNote },
+  { id: "utenti", label: "Utenti", icon: User },
 ]
 
 // Definizione dei campi per ogni tabella (CORRETTA e CONSISTENTE)
@@ -341,6 +342,36 @@ const TABLE_FIELDS = {
       "Informazioni di sistema": ["id", "data_creazione", "modifica", "id_utente"],
     },
   },
+  utenti: {
+    listFields: ["id", "username", "email", "nome", "cognome", "ruolo", "attivo"],
+    readOnlyFields: ["id", "data_creazione", "ultimo_accesso"],
+    requiredFields: ["username", "email", "password"],
+    defaultSort: "username",
+    types: {
+      id: "string",
+      username: "string",
+      email: "string",
+      password: "password",
+      nome: "string",
+      cognome: "string",
+      ruolo: "select",
+      attivo: "boolean",
+      ultimo_accesso: "datetime",
+      data_creazione: "datetime",
+    },
+    selectOptions: {
+      ruolo: [
+        { value: "admin", label: "Amministratore" },
+        { value: "user", label: "Utente" },
+        { value: "guest", label: "Ospite" },
+      ],
+    },
+    groups: {
+      "Informazioni principali": ["username", "email", "password", "ruolo", "attivo"],
+      "Dati personali": ["nome", "cognome"],
+      "Informazioni di sistema": ["id", "data_creazione", "ultimo_accesso"],
+    },
+  },
 }
 
 // Funzione per pulire i dati prima del salvataggio
@@ -568,11 +599,17 @@ export default function ItemDetailPage() {
   }
 
   const loadItem = useCallback(async () => {
-    if (!supabase || !tableName || !user?.id || !isValidTable) return
+    if (!supabase || !tableName || !isValidTable) return
     setLoading(true)
     try {
       if (isNewItem) {
-        const newItem: any = { id_utente: user.id }
+        const newItem: any = {}
+
+        // Per la tabella utenti, non usiamo id_utente come filtro
+        if (tableName !== "utenti" && user?.id) {
+          newItem.id_utente = user.id
+        }
+
         // Imposta valori di default specifici per tabella
         if (tableName === "todolist") {
           newItem.titolo = ""
@@ -611,18 +648,28 @@ export default function ItemDetailPage() {
           newItem.contenuto = ""
           newItem.priorita = 1
           newItem.synced = false
+        } else if (tableName === "utenti") {
+          newItem.username = ""
+          newItem.email = ""
+          newItem.password = ""
+          newItem.ruolo = "user"
+          newItem.attivo = true
         }
         setItem(newItem)
         setEditedItem(newItem)
         setLoading(false)
         return
       }
-      const { data, error } = await supabase
-        .from(tableName)
-        .select("*")
-        .eq("id", itemId)
-        .eq("id_utente", user.id)
-        .single()
+
+      // Per la tabella utenti, non filtriamo per id_utente
+      let query = supabase.from(tableName).select("*").eq("id", itemId)
+
+      if (tableName !== "utenti" && user?.id) {
+        query = query.eq("id_utente", user.id)
+      }
+
+      const { data, error } = await query.single()
+
       if (error) throw error
       setItem(data)
       setEditedItem(data)
@@ -635,8 +682,8 @@ export default function ItemDetailPage() {
   }, [supabase, tableName, itemId, user?.id, isNewItem, router, isValidTable])
 
   useEffect(() => {
-    if (supabase && user?.id && tableName && isValidTable) loadItem()
-  }, [supabase, user?.id, loadItem, tableName, isValidTable])
+    if (supabase && tableName && isValidTable) loadItem()
+  }, [supabase, loadItem, tableName, isValidTable])
 
   const handleFieldChange = (field: string, value: any) => {
     setEditedItem((prev: any) => {
@@ -674,7 +721,7 @@ export default function ItemDetailPage() {
   }
 
   const handleSave = async () => {
-    if (!supabase || !tableName || !user?.id || !editedItem || !isValidTable) return
+    if (!supabase || !tableName || !editedItem || !isValidTable) return
     const errors = validateForm()
     if (errors.length > 0) {
       setValidationErrors(errors)
@@ -688,11 +735,20 @@ export default function ItemDetailPage() {
     setSaving(true)
     try {
       const updateData = cleanDataForSave(editedItem, isNewItem ? readOnlyFields : [])
-      updateData.modifica = new Date().toISOString()
+
+      // Per le tabelle che hanno il campo modifica
+      if (fieldTypes.modifica) {
+        updateData.modifica = new Date().toISOString()
+      }
+
       if (isNewItem) {
-        updateData.id_utente = user.id
+        // Solo per tabelle che usano id_utente
+        if (tableName !== "utenti" && user?.id) {
+          updateData.id_utente = user.id
+        }
         if (fieldTypes.data_creazione) updateData.data_creazione = new Date().toISOString()
       }
+
       let result
       if (isNewItem) {
         result = await supabase.from(tableName).insert(updateData).select()
@@ -787,6 +843,22 @@ export default function ItemDetailPage() {
               onChange={(e) => handleFieldChange(field, e.target.value)}
               className={`mt-1 ${hasError ? "border-red-500" : ""}`}
               rows={4}
+              placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
+            />
+          </div>
+        )
+      case "password":
+        return (
+          <div className="mb-4" key={field}>
+            <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
+              {label} {isRequired && <span className="text-red-500">*</span>}
+            </Label>
+            <Input
+              id={field}
+              type="password"
+              value={value || ""}
+              onChange={(e) => handleFieldChange(field, e.target.value)}
+              className={`mt-1 ${hasError ? "border-red-500" : ""}`}
               placeholder={isRequired ? `${label} è obbligatorio` : `Inserisci ${label.toLowerCase()}`}
             />
           </div>
@@ -1008,6 +1080,8 @@ export default function ItemDetailPage() {
         return value ? "✓" : "✗"
       case "number":
         return typeof value === "number" ? value.toLocaleString("it-IT") : value
+      case "password":
+        return "••••••••"
       case "priority_select":
         if (priorityOptions.length === 0) return <span className="text-red-500">Errore configurazione</span>
         const priorityOption = priorityOptions.find((option) => option.value === value)
@@ -1053,6 +1127,7 @@ export default function ItemDetailPage() {
     if (isNewItem) return "Nuovo elemento"
     if (!item) return "Caricamento..."
     if (item.titolo) return item.titolo
+    if (item.username) return item.username
     if (item.nome) return item.cognome ? `${item.nome} ${item.cognome}` : item.nome
     return `ID: ${item.id}`
   }
