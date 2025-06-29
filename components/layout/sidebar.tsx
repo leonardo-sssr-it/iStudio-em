@@ -8,7 +8,7 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useAuth } from "@/lib/auth-provider"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useSidebarState } from "@/contexts/sidebar-state-context"
@@ -60,24 +60,35 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   // Versione mobile della sidebar
   if (isMobile) {
     return (
-      <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="md:hidden fixed left-4 top-3 z-40" aria-label="Toggle Menu">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle Menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-[240px] sm:w-[300px] p-0">
-          <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
-        </SheetContent>
-      </Sheet>
+      <>
+        <Button
+          variant="outline"
+          size="icon"
+          className="md:hidden fixed left-4 top-3 z-50 bg-background border shadow-md"
+          onClick={toggleSidebar}
+          aria-label="Toggle Menu"
+        >
+          <Menu className="h-4 w-4" />
+          <span className="sr-only">Toggle Menu</span>
+        </Button>
+
+        <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
+          <SheetContent side="left" className="w-[280px] p-0 bg-background border-r z-50">
+            <ScrollArea className="h-full">
+              <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      </>
     )
   }
 
   // Versione desktop della sidebar
   return (
-    <div className={cn("pb-12 w-[240px] flex-shrink-0", className)} {...props}>
-      <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
+    <div className={cn("pb-12 w-[240px] flex-shrink-0 bg-background border-r", className)} {...props}>
+      <ScrollArea className="h-full">
+        <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
+      </ScrollArea>
     </div>
   )
 }
@@ -97,221 +108,238 @@ function SidebarContent({
   const searchParams = useSearchParams()
   return (
     <div className="space-y-4 py-4 h-full flex flex-col">
-      <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
+      <div className="px-3 py-2">
+        <h2 className="mb-2 px-2 text-base font-semibold tracking-tight">
           iStudio
           <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
         <div className="space-y-1">
-          <Button asChild variant={pathname === "/dashboard" ? "secondary" : "ghost"} className="w-full justify-start">
-            <Link href="/dashboard">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
+          <Button
+            asChild
+            variant={pathname === "/dashboard" ? "secondary" : "ghost"}
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Dashboard</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname === "/dashboard-u" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
           >
-            <Link href="/dashboard-u">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard U
+            <Link href="/dashboard-u" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Dashboard U</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname === "/dashboard-utente" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
           >
-            <Link href="/dashboard-utente">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard Utente
+            <Link href="/dashboard-utente" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Dashboard Utente</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname === "/dashboard-mobile" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
           >
-            <Link href="/dashboard-mobile">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard Mobile
+            <Link href="/dashboard-mobile" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Dashboard Mobile</span>
             </Link>
           </Button>
         </div>
       </div>
-      <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Gestione</h2>
-        <ScrollArea className="h-[300px] px-1">
-          <div className="space-y-1">
-            <Button
-              asChild
-              variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
-              className="w-full justify-start"
-            >
-              <Link href="/pagine">
-                <FileText className="mr-2 h-4 w-4" />
-                Pagine
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/note") ? "secondary" : "ghost"}
-              className="w-full justify-start"
-            >
-              <Link href="/note">
-                <StickyNote className="mr-2 h-4 w-4" />
-                Note
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "appuntamenti"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=appuntamenti">
-                <Calendar className="mr-2 h-4 w-4" />
-                Appuntamenti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=attivita">
-                <ClipboardList className="mr-2 h-4 w-4" />
-                Attività
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=scadenze">
-                <Clock className="mr-2 h-4 w-4" />
-                Scadenze
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=todolist">
-                <CheckSquare className="mr-2 h-4 w-4" />
-                To-Do List
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=progetti">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Progetti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=clienti">
-                <Users className="mr-2 h-4 w-4" />
-                Clienti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine" ? "secondary" : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=pagine">
-                <FileText className="mr-2 h-4 w-4" />
-                Pagine
-              </Link>
-            </Button>
-          </div>
-        </ScrollArea>
+
+      <div className="px-3 py-2">
+        <h2 className="mb-2 px-2 text-base font-semibold tracking-tight">Gestione</h2>
+        <div className="space-y-1">
+          <Button
+            asChild
+            variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/pagine" className="flex items-center gap-2">
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Pagine</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={pathname?.includes("/note") ? "secondary" : "ghost"}
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/note" className="flex items-center gap-2">
+              <StickyNote className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Note</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "appuntamenti"
+                ? "secondary"
+                : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=appuntamenti" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Appuntamenti</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita" ? "secondary" : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=attivita" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Attività</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze" ? "secondary" : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=scadenze" className="flex items-center gap-2">
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Scadenze</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist" ? "secondary" : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=todolist" className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">To-Do List</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti" ? "secondary" : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=progetti" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Progetti</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=clienti" className="flex items-center gap-2">
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Clienti</span>
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant={
+              pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine" ? "secondary" : "ghost"
+            }
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/data-explorer?table=pagine" className="flex items-center gap-2">
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Pagine</span>
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Sezione Admin */}
       {isAdmin && (
-        <div className="px-4 py-2">
-          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Amministrazione</h2>
+        <div className="px-3 py-2">
+          <h2 className="mb-2 px-2 text-base font-semibold tracking-tight">Amministrazione</h2>
           <div className="space-y-1">
-            <Button asChild variant={pathname === "/admin" ? "secondary" : "ghost"} className="w-full justify-start">
-              <Link href="/admin">
-                <Settings className="mr-2 h-4 w-4" />
-                Admin Panel
+            <Button
+              asChild
+              variant={pathname === "/admin" ? "secondary" : "ghost"}
+              className="w-full justify-start h-9 px-2 text-sm"
+              size="sm"
+            >
+              <Link href="/admin" className="flex items-center gap-2">
+                <Settings className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Admin Panel</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              className="w-full justify-start h-9 px-2 text-sm"
+              size="sm"
             >
-              <Link href="/admin/users">
-                <Users className="mr-2 h-4 w-4" />
-                Gestione Utenti
+              <Link href="/admin/users" className="flex items-center gap-2">
+                <Users className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Gestione Utenti</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/data-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              className="w-full justify-start h-9 px-2 text-sm"
+              size="sm"
             >
-              <Link href="/data-explorer">
-                <Database className="mr-2 h-4 w-4" />
-                Data Explorer
+              <Link href="/data-explorer" className="flex items-center gap-2">
+                <Database className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Data Explorer</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/table-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              className="w-full justify-start h-9 px-2 text-sm"
+              size="sm"
             >
-              <Link href="/table-explorer">
-                <Layers className="mr-2 h-4 w-4" />
-                Table Explorer
+              <Link href="/table-explorer" className="flex items-center gap-2">
+                <Layers className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Table Explorer</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/debug-scadenze") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              className="w-full justify-start h-9 px-2 text-sm"
+              size="sm"
             >
-              <Link href="/debug-scadenze">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Debug Scadenze
+              <Link href="/debug-scadenze" className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Debug Scadenze</span>
               </Link>
             </Button>
           </div>
@@ -319,33 +347,40 @@ function SidebarContent({
       )}
 
       {/* Sezione Profilo */}
-      <div className="px-4 py-2 mt-auto">
+      <div className="px-3 py-2 mt-auto">
         <div className="space-y-1">
-          <Button asChild variant={pathname === "/profile" ? "secondary" : "ghost"} className="w-full justify-start">
-            <Link href="/profile">
-              <Users className="mr-2 h-4 w-4" />
-              Profilo
+          <Button
+            asChild
+            variant={pathname === "/profile" ? "secondary" : "ghost"}
+            className="w-full justify-start h-9 px-2 text-sm"
+            size="sm"
+          >
+            <Link href="/profile" className="flex items-center gap-2">
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Profilo</span>
             </Link>
           </Button>
         </div>
 
         {/* Indicatore di stato connessione */}
-        <div className="mt-4 px-2 py-1 text-xs text-muted-foreground flex items-center">
+        <div className="mt-4 px-2 py-1 text-xs text-muted-foreground flex items-center gap-1">
           {isOnline ? (
             <>
-              <Wifi className="mr-1 h-3 w-3 text-green-500" />
-              Online
+              <Wifi className="h-3 w-3 text-green-500 flex-shrink-0" />
+              <span>Online</span>
             </>
           ) : (
             <>
-              <WifiOff className="mr-1 h-3 w-3 text-red-500" />
-              Offline
+              <WifiOff className="h-3 w-3 text-red-500 flex-shrink-0" />
+              <span>Offline</span>
             </>
           )}
         </div>
 
         {/* Info utente */}
-        {user && <div className="mt-2 px-2 py-1 text-xs text-muted-foreground">{user.username || user.email}</div>}
+        {user && (
+          <div className="mt-2 px-2 py-1 text-xs text-muted-foreground truncate">{user.username || user.email}</div>
+        )}
       </div>
     </div>
   )
