@@ -6,17 +6,11 @@ import { useAuth } from "@/lib/auth-provider"
 import { useAppConfig } from "@/hooks/use-app-config"
 import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import {
   Menu,
-  X,
   Moon,
   Sun,
   Palette,
@@ -28,6 +22,7 @@ import {
   LayoutDashboard,
   Type,
   RotateCcw,
+  ChevronDown,
 } from "lucide-react"
 
 export function Header() {
@@ -50,8 +45,8 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
   const [currentDate, setCurrentDate] = useState("")
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [showThemeMenu, setShowThemeMenu] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   // Debug per capire lo stato dell'utente
   useEffect(() => {
@@ -107,23 +102,17 @@ export function Header() {
     (themeId: number) => {
       console.log("Changing theme to:", themeId)
       applyTheme(themeId)
-      setThemeMenuOpen(false)
+      setShowThemeMenu(false)
     },
     [applyTheme],
   )
-
-  const handleResetToDefault = useCallback(() => {
-    console.log("Resetting to default theme")
-    resetToDefault()
-    setThemeMenuOpen(false)
-  }, [resetToDefault])
 
   const handleLayoutChange = useCallback(
     (newLayout: string) => {
       console.log("Changing layout to:", newLayout)
       setLayout(newLayout as any)
+      setShowUserMenu(false)
       setIsMenuOpen(false)
-      setUserMenuOpen(false)
     },
     [setLayout],
   )
@@ -132,8 +121,8 @@ export function Header() {
     (size: string) => {
       console.log("Changing font size to:", size)
       setFontSize(size as any)
+      setShowUserMenu(false)
       setIsMenuOpen(false)
-      setUserMenuOpen(false)
     },
     [setFontSize],
   )
@@ -141,8 +130,8 @@ export function Header() {
   const handleLogout = useCallback(() => {
     console.log("Logging out")
     logout()
+    setShowUserMenu(false)
     setIsMenuOpen(false)
-    setUserMenuOpen(false)
   }, [logout])
 
   // Memoizza i valori per evitare re-render inutili
@@ -214,289 +203,333 @@ export function Header() {
 
             {/* Selettore Temi - Solo se loggato */}
             {user && (
-              <DropdownMenu open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 hover:bg-accent/50 transition-colors"
-                    title="Seleziona tema"
-                    onClick={() => {
-                      console.log("Theme button clicked, current state:", themeMenuOpen)
-                      setThemeMenuOpen(!themeMenuOpen)
-                    }}
-                  >
-                    <Palette className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-64 max-h-96 overflow-y-auto dropdown-menu-content"
-                  style={{ zIndex: 9999 }}
-                  onCloseAutoFocus={(e) => e.preventDefault()}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 hover:bg-accent/50 transition-colors"
+                  title="Seleziona tema"
+                  onClick={() => {
+                    console.log("Theme button clicked")
+                    setShowThemeMenu(!showThemeMenu)
+                    setShowUserMenu(false)
+                  }}
                 >
-                  <DropdownMenuLabel className="font-semibold">
-                    Temi Disponibili
-                    {currentTheme && (
-                      <div className="text-xs text-muted-foreground font-normal mt-1">
-                        Attuale: {currentTheme.nome_tema}
-                      </div>
-                    )}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {themes.length > 0 ? (
-                    themes.map((theme) => (
-                      <DropdownMenuItem
-                        key={theme.id}
-                        onClick={() => handleThemeChange(theme.id)}
-                        className="flex items-center gap-3 cursor-pointer py-3"
-                      >
-                        {theme.isDefault ? (
-                          <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                            <RotateCcw className="h-3 w-3 text-white" />
-                          </div>
-                        ) : (
-                          <div
-                            className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
-                            style={{
-                              backgroundColor: theme.colore_titolo?.startsWith("#")
-                                ? theme.colore_titolo
-                                : theme.colore_titolo?.includes("%")
-                                  ? `hsl(${theme.colore_titolo})`
-                                  : "#6366f1",
-                            }}
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate text-sm">
-                            {theme.nome_tema}
-                            {theme.isDefault && <span className="ml-2 text-xs text-muted-foreground">(Sistema)</span>}
-                          </div>
-                        </div>
-                        {currentTheme?.id === theme.id && <span className="text-primary font-bold text-lg">✓</span>}
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    <DropdownMenuItem disabled className="text-muted-foreground py-3">
-                      Nessun tema disponibile
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  <Palette className="h-4 w-4" />
+                </Button>
+
+                {/* Menu Temi */}
+                {showThemeMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-popover border border-border rounded-md shadow-lg z-50 max-h-96 overflow-y-auto">
+                    <div className="p-3 border-b">
+                      <div className="font-semibold text-sm">Temi Disponibili</div>
+                      {currentTheme && (
+                        <div className="text-xs text-muted-foreground mt-1">Attuale: {currentTheme.nome_tema}</div>
+                      )}
+                    </div>
+                    <div className="p-1">
+                      {themes.length > 0 ? (
+                        themes.map((theme) => (
+                          <button
+                            key={theme.id}
+                            onClick={() => handleThemeChange(theme.id)}
+                            className="w-full flex items-center gap-3 px-2 py-3 text-left hover:bg-accent rounded-sm transition-colors"
+                          >
+                            {theme.isDefault ? (
+                              <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                                <RotateCcw className="h-3 w-3 text-white" />
+                              </div>
+                            ) : (
+                              <div
+                                className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0 shadow-sm"
+                                style={{
+                                  backgroundColor: theme.colore_titolo?.startsWith("#")
+                                    ? theme.colore_titolo
+                                    : theme.colore_titolo?.includes("%")
+                                      ? `hsl(${theme.colore_titolo})`
+                                      : "#6366f1",
+                                }}
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate text-sm">
+                                {theme.nome_tema}
+                                {theme.isDefault && (
+                                  <span className="ml-2 text-xs text-muted-foreground">(Sistema)</span>
+                                )}
+                              </div>
+                            </div>
+                            {currentTheme?.id === theme.id && <span className="text-primary font-bold text-lg">✓</span>}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-2 py-3 text-muted-foreground text-sm">Nessun tema disponibile</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Menu Utente - Solo se loggato */}
             {user && (
-              <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-9 px-3 hover:bg-accent/50 transition-colors"
-                    onClick={() => {
-                      console.log("User button clicked, current state:", userMenuOpen)
-                      setUserMenuOpen(!userMenuOpen)
-                    }}
-                  >
-                    <User className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline text-sm">{user.nome || user.username}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-56 dropdown-menu-content"
-                  style={{ zIndex: 9999 }}
-                  onCloseAutoFocus={(e) => e.preventDefault()}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  className="h-9 px-3 hover:bg-accent/50 transition-colors"
+                  onClick={() => {
+                    console.log("User button clicked")
+                    setShowUserMenu(!showUserMenu)
+                    setShowThemeMenu(false)
+                  }}
                 >
-                  <DropdownMenuLabel>
-                    {user.nome || user.username}
-                    <div className="text-xs text-muted-foreground font-normal">{user.email}</div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                  <User className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline text-sm">{user.nome || user.username}</span>
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
 
-                  {/* Layout Options */}
-                  <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">LAYOUT</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => handleLayoutChange("default")} className="cursor-pointer">
-                    <Layout className="h-4 w-4 mr-2" />
-                    Layout Standard
-                    {layout === "default" && <span className="ml-auto text-primary">✓</span>}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleLayoutChange("fullWidth")} className="cursor-pointer">
-                    <LayoutGrid className="h-4 w-4 mr-2" />
-                    Layout Esteso
-                    {layout === "fullWidth" && <span className="ml-auto text-primary">✓</span>}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleLayoutChange("sidebar")} className="cursor-pointer">
-                    <LayoutDashboard className="h-4 w-4 mr-2" />
-                    Layout Sidebar
-                    {layout === "sidebar" && <span className="ml-auto text-primary">✓</span>}
-                  </DropdownMenuItem>
+                {/* Menu Utente */}
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-popover border border-border rounded-md shadow-lg z-50">
+                    <div className="p-3 border-b">
+                      <div className="font-medium text-sm">{user.nome || user.username}</div>
+                      <div className="text-xs text-muted-foreground">{user.email}</div>
+                    </div>
 
-                  <DropdownMenuSeparator />
+                    <div className="p-1">
+                      {/* Layout Options */}
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">LAYOUT</div>
+                      <button
+                        onClick={() => handleLayoutChange("default")}
+                        className="w-full flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <Layout className="h-4 w-4 mr-2" />
+                          Layout Standard
+                        </div>
+                        {layout === "default" && <span className="text-primary">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleLayoutChange("fullWidth")}
+                        className="w-full flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <LayoutGrid className="h-4 w-4 mr-2" />
+                          Layout Esteso
+                        </div>
+                        {layout === "fullWidth" && <span className="text-primary">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleLayoutChange("sidebar")}
+                        className="w-full flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <LayoutDashboard className="h-4 w-4 mr-2" />
+                          Layout Sidebar
+                        </div>
+                        {layout === "sidebar" && <span className="text-primary">✓</span>}
+                      </button>
 
-                  {/* Font Size Options */}
-                  <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
-                    DIMENSIONE CARATTERE
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => handleFontSizeChange("small")} className="cursor-pointer">
-                    <Type className="h-3 w-3 mr-2" />
-                    Piccolo
-                    {fontSize === "small" && <span className="ml-auto text-primary">✓</span>}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleFontSizeChange("normal")} className="cursor-pointer">
-                    <Type className="h-4 w-4 mr-2" />
-                    Normale
-                    {fontSize === "normal" && <span className="ml-auto text-primary">✓</span>}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleFontSizeChange("large")} className="cursor-pointer">
-                    <Type className="h-5 w-5 mr-2" />
-                    Grande
-                    {fontSize === "large" && <span className="ml-auto text-primary">✓</span>}
-                  </DropdownMenuItem>
+                      <Separator className="my-2" />
 
-                  <DropdownMenuSeparator />
+                      {/* Font Size Options */}
+                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">DIMENSIONE CARATTERE</div>
+                      <button
+                        onClick={() => handleFontSizeChange("small")}
+                        className="w-full flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <Type className="h-3 w-3 mr-2" />
+                          Piccolo
+                        </div>
+                        {fontSize === "small" && <span className="text-primary">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleFontSizeChange("normal")}
+                        className="w-full flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <Type className="h-4 w-4 mr-2" />
+                          Normale
+                        </div>
+                        {fontSize === "normal" && <span className="text-primary">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleFontSizeChange("large")}
+                        className="w-full flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                      >
+                        <div className="flex items-center">
+                          <Type className="h-5 w-5 mr-2" />
+                          Grande
+                        </div>
+                        {fontSize === "large" && <span className="text-primary">✓</span>}
+                      </button>
 
-                  {/* Admin Link */}
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin" className="cursor-pointer">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Dashboard Admin
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
+                      <Separator className="my-2" />
 
-                  {/* Logout */}
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      {/* Admin Link */}
+                      {isAdmin && (
+                        <>
+                          <Link
+                            href="/admin"
+                            className="w-full flex items-center px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors"
+                            onClick={() => setShowUserMenu(false)}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Dashboard Admin
+                          </Link>
+                          <Separator className="my-2" />
+                        </>
+                      )}
+
+                      {/* Logout */}
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-2 py-2 text-sm hover:bg-accent rounded-sm transition-colors text-destructive"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Menu Mobile - Solo se loggato */}
             {user && (
-              <Button variant="ghost" size="icon" className="md:hidden h-9 w-9" onClick={toggleMenu}>
-                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </Button>
+              <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden h-9 w-9">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[300px] p-0">
+                  <ScrollArea className="h-full">
+                    <div className="p-4">
+                      {/* Data/Ora Mobile - SENZA grassetto */}
+                      <div className="flex flex-col items-center space-y-1 mb-4 pb-4 border-b">
+                        <div className="text-sm font-normal">{currentTime}</div>
+                        <div className="text-xs text-muted-foreground font-normal">{currentDate}</div>
+                      </div>
+
+                      {/* Titolo/Motto Mobile */}
+                      <div className="flex flex-col items-center space-y-1 mb-4 pb-4 border-b sm:hidden">
+                        <div className="font-bold text-lg">{appTitle}</div>
+                        {appMotto && <div className="text-sm text-muted-foreground text-center">{appMotto}</div>}
+                      </div>
+
+                      <div className="flex flex-col space-y-2">
+                        <div className="px-2 py-2 text-sm font-medium border-b">{user.nome || user.username}</div>
+
+                        {/* Layout Mobile */}
+                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">LAYOUT</div>
+                        <button
+                          onClick={() => handleLayoutChange("default")}
+                          className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+                        >
+                          <div className="flex items-center">
+                            <Layout className="h-4 w-4 mr-2" />
+                            Layout Standard
+                          </div>
+                          {layout === "default" && <span className="text-primary">✓</span>}
+                        </button>
+                        <button
+                          onClick={() => handleLayoutChange("fullWidth")}
+                          className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+                        >
+                          <div className="flex items-center">
+                            <LayoutGrid className="h-4 w-4 mr-2" />
+                            Layout Esteso
+                          </div>
+                          {layout === "fullWidth" && <span className="text-primary">✓</span>}
+                        </button>
+                        <button
+                          onClick={() => handleLayoutChange("sidebar")}
+                          className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+                        >
+                          <div className="flex items-center">
+                            <LayoutDashboard className="h-4 w-4 mr-2" />
+                            Layout Sidebar
+                          </div>
+                          {layout === "sidebar" && <span className="text-primary">✓</span>}
+                        </button>
+
+                        {/* Font Size Mobile */}
+                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground mt-2">
+                          DIMENSIONE CARATTERE
+                        </div>
+                        <button
+                          onClick={() => handleFontSizeChange("small")}
+                          className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+                        >
+                          <div className="flex items-center">
+                            <Type className="h-3 w-3 mr-2" />
+                            Piccolo
+                          </div>
+                          {fontSize === "small" && <span className="text-primary">✓</span>}
+                        </button>
+                        <button
+                          onClick={() => handleFontSizeChange("normal")}
+                          className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+                        >
+                          <div className="flex items-center">
+                            <Type className="h-4 w-4 mr-2" />
+                            Normale
+                          </div>
+                          {fontSize === "normal" && <span className="text-primary">✓</span>}
+                        </button>
+                        <button
+                          onClick={() => handleFontSizeChange("large")}
+                          className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
+                        >
+                          <div className="flex items-center">
+                            <Type className="h-5 w-5 mr-2" />
+                            Grande
+                          </div>
+                          {fontSize === "large" && <span className="text-primary">✓</span>}
+                        </button>
+
+                        {/* Admin Link Mobile */}
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent mt-2"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Dashboard Admin
+                          </Link>
+                        )}
+
+                        {/* Logout Mobile */}
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive mt-2"
+                        >
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </SheetContent>
+              </Sheet>
             )}
           </div>
         </div>
-
-        {/* Menu Mobile Espanso - Solo se loggato */}
-        {isMenuOpen && user && (
-          <div className="md:hidden py-4 border-t bg-background/95">
-            {/* Data/Ora Mobile - SENZA grassetto */}
-            <div className="flex flex-col items-center space-y-1 mb-4 pb-4 border-b">
-              <div className="text-sm font-normal">{currentTime}</div>
-              <div className="text-xs text-muted-foreground font-normal">{currentDate}</div>
-            </div>
-
-            {/* Titolo/Motto Mobile */}
-            <div className="flex flex-col items-center space-y-1 mb-4 pb-4 border-b sm:hidden">
-              <div className="font-bold text-lg">{appTitle}</div>
-              {appMotto && <div className="text-sm text-muted-foreground text-center">{appMotto}</div>}
-            </div>
-
-            <div className="flex flex-col space-y-2">
-              <div className="px-2 py-2 text-sm font-medium border-b">{user.nome || user.username}</div>
-
-              {/* Layout Mobile */}
-              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">LAYOUT</div>
-              <button
-                onClick={() => handleLayoutChange("default")}
-                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-              >
-                <div className="flex items-center">
-                  <Layout className="h-4 w-4 mr-2" />
-                  Layout Standard
-                </div>
-                {layout === "default" && <span className="text-primary">✓</span>}
-              </button>
-              <button
-                onClick={() => handleLayoutChange("fullWidth")}
-                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-              >
-                <div className="flex items-center">
-                  <LayoutGrid className="h-4 w-4 mr-2" />
-                  Layout Esteso
-                </div>
-                {layout === "fullWidth" && <span className="text-primary">✓</span>}
-              </button>
-              <button
-                onClick={() => handleLayoutChange("sidebar")}
-                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-              >
-                <div className="flex items-center">
-                  <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Layout Sidebar
-                </div>
-                {layout === "sidebar" && <span className="text-primary">✓</span>}
-              </button>
-
-              {/* Font Size Mobile */}
-              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground mt-2">DIMENSIONE CARATTERE</div>
-              <button
-                onClick={() => handleFontSizeChange("small")}
-                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-              >
-                <div className="flex items-center">
-                  <Type className="h-3 w-3 mr-2" />
-                  Piccolo
-                </div>
-                {fontSize === "small" && <span className="text-primary">✓</span>}
-              </button>
-              <button
-                onClick={() => handleFontSizeChange("normal")}
-                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-              >
-                <div className="flex items-center">
-                  <Type className="h-4 w-4 mr-2" />
-                  Normale
-                </div>
-                {fontSize === "normal" && <span className="text-primary">✓</span>}
-              </button>
-              <button
-                onClick={() => handleFontSizeChange("large")}
-                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent"
-              >
-                <div className="flex items-center">
-                  <Type className="h-5 w-5 mr-2" />
-                  Grande
-                </div>
-                {fontSize === "large" && <span className="text-primary">✓</span>}
-              </button>
-
-              {/* Admin Link Mobile */}
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent mt-2"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  Dashboard Admin
-                </Link>
-              )}
-
-              {/* Logout Mobile */}
-              <button
-                onClick={handleLogout}
-                className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent text-destructive mt-2"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Click outside to close menus */}
+      {(showThemeMenu || showUserMenu) && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            setShowThemeMenu(false)
+            setShowUserMenu(false)
+          }}
+        />
+      )}
     </header>
   )
 }
