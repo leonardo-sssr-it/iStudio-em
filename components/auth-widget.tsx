@@ -8,13 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, User, LogOut, AlertCircle, LayoutDashboard } from "lucide-react"
+import { Loader2, User, LogOut, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-provider"
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import Link from "next/link"
 
 export function AuthWidget() {
-  const { user, login, logout, isLoading } = useAuth()
+  const { user, login, signUp, logout, isLoading } = useAuth()
   const { isDebugEnabled } = useDebugConfig()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState("")
@@ -46,8 +46,7 @@ export function AuthWidget() {
           setError("La password deve essere di almeno 6 caratteri")
           return
         }
-        // Note: signUp function would need to be implemented in auth provider
-        setError("Registrazione non ancora implementata")
+        await signUp(email, password)
       } else {
         await login(email, password)
       }
@@ -91,20 +90,13 @@ export function AuthWidget() {
             <User className="h-5 w-5" />
             Benvenuto
           </CardTitle>
-          <CardDescription>Sei connesso come {user.email || user.username}</CardDescription>
+          <CardDescription>Sei connesso come {user.email}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2">
             <Link
-              href="/dashboard-utente"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-            >
-              <LayoutDashboard className="h-4 w-4 mr-2" />
-              Dashboard Utente
-            </Link>
-            <Link
               href="/profile"
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
             >
               <User className="h-4 w-4 mr-2" />
               Vai al Profilo
@@ -141,15 +133,14 @@ export function AuthWidget() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email o Username</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
               id="email"
-              type="text"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isSubmitting}
-              placeholder="Inserisci email o username"
             />
           </div>
           <div className="space-y-2">
