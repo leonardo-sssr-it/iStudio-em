@@ -48,7 +48,7 @@ const AVAILABLE_TABLES = [
   { id: "note", label: "Note", icon: StickyNote },
 ]
 
-// Definizione dei campi per ogni tabella (CORRETTA in base alla struttura reale del DB)
+// Definizione dei campi per ogni tabella (CORRETTA e CONSISTENTE)
 const TABLE_FIELDS = {
   appuntamenti: {
     listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "luogo"],
@@ -66,12 +66,12 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "string",
+      priorita: "string",
       id_pro: "number",
       id_att: "number",
       id_cli: "number",
       tags: "json",
-      notifica: "array",
-      // progetti non ha il campo completato
+      notifica: "datetime",
     },
   },
   attivita: {
@@ -96,32 +96,30 @@ const TABLE_FIELDS = {
       tags: "json",
       priorita: "string",
       notifica: "datetime",
-      completato: "boolean", // Solo se questa tabella ha il campo
+      completato: "boolean",
     },
   },
   scadenze: {
-    listFields: ["id", "titolo", "scadenza", "stato", "id_pro"],
+    listFields: ["id", "titolo", "scadenza", "stato", "privato"],
     readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "scadenza",
     types: {
       id: "number",
       modifica: "datetime",
-      attivo: "boolean",
       id_utente: "number",
       id_pro: "number",
       scadenza: "date",
       titolo: "string",
       descrizione: "text",
-      tag: "array",
       note: "text",
       stato: "string",
       privato: "boolean",
       notifica: "datetime",
-      completato: "boolean", // Solo se questa tabella ha il campo
+      completato: "boolean",
     },
   },
   todolist: {
-    listFields: ["id", "titolo", "descrizione", "scadenza", "priorita"],
+    listFields: ["id", "titolo", "descrizione", "scadenza", "completato"],
     readOnlyFields: ["id", "modifica", "id_utente"],
     defaultSort: "scadenza",
     types: {
@@ -129,12 +127,11 @@ const TABLE_FIELDS = {
       id_utente: "number",
       descrizione: "text",
       modifica: "datetime",
-      tag: "json",
       scadenza: "date",
       priorita: "string",
       notifica: "time",
       titolo: "string",
-      completato: "boolean", // Solo se questa tabella ha il campo
+      completato: "boolean",
     },
   },
   progetti: {
@@ -157,13 +154,11 @@ const TABLE_FIELDS = {
       note: "text",
       data_inizio: "datetime",
       data_fine: "datetime",
-      tag: "array",
       gruppo: "string",
       colore: "string",
       notifica: "datetime",
       priorita: "string",
       allegati: "json",
-      // progetti non ha il campo completato
     },
   },
   clienti: {
@@ -190,7 +185,6 @@ const TABLE_FIELDS = {
       note: "text",
       attivo: "boolean",
       qr: "string",
-      // clienti non ha il campo completato
     },
   },
   pagine: {
@@ -206,15 +200,14 @@ const TABLE_FIELDS = {
       estratto: "text",
       contenuto: "text",
       categoria: "string",
-      tag: "json",
+      tags: "json",
       immagine: "string",
       pubblicato: "datetime",
       privato: "boolean",
-      // pagine non ha il campo completato
     },
   },
   note: {
-    listFields: ["id", "titolo", "data_creazione", "modifica", "priorita"],
+    listFields: ["id", "titolo", "data_creazione", "modifica", "synced"],
     readOnlyFields: ["id", "data_creazione", "modifica", "id_utente"],
     defaultSort: "data_creazione",
     types: {
@@ -229,7 +222,7 @@ const TABLE_FIELDS = {
       notebook_id: "string",
       id_utente: "string",
       synced: "boolean",
-      completato: "boolean", // Solo se questa tabella ha il campo
+      completato: "boolean",
     },
   },
 }
@@ -882,10 +875,15 @@ export default function DataExplorerPage() {
                 >
                   {view === "list" ? <Grid3X3 className="h-4 w-4" /> : <List className="h-4 w-4" />}
                 </Button>
-                <Button variant="outline" size="icon" onClick={loadTableData} className="shrink-0">
+                <Button variant="outline" size="icon" onClick={loadTableData} className="shrink-0 bg-transparent">
                   <RefreshCw className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" onClick={handleCreateNew} disabled={!selectedTable} className="shrink-0">
+                <Button
+                  variant="outline"
+                  onClick={handleCreateNew}
+                  disabled={!selectedTable}
+                  className="shrink-0 bg-transparent"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Nuovo</span>
                 </Button>
@@ -936,7 +934,7 @@ export default function DataExplorerPage() {
                   <Button
                     key={table.id}
                     variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors"
+                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors bg-transparent"
                     onClick={() => handleTableSelect(table.id)}
                   >
                     <table.icon className="h-6 w-6" />

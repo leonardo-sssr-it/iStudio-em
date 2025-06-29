@@ -1,9 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
-import { useSupabase } from "@/lib/supabase-provider"
-import { useAuth } from "@/lib/auth-provider"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,30 +24,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Save, Trash2, Edit, X, AlertCircle } from "lucide-react"
-import { formatValue } from "@/lib/utils-db"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
 import { isValid, parseISO } from "date-fns"
-import {
-  Search,
-  SortAsc,
-  SortDesc,
-  Plus,
-  RefreshCw,
-  Calendar,
-  CheckSquare,
-  Clock,
-  ListTodo,
-  Briefcase,
-  Users,
-  FolderKanban,
-  FilePlus,
-  FileText,
-  Grid3X3,
-  List,
-  StickyNote,
-} from "lucide-react"
+import { Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, FileText, StickyNote } from "lucide-react"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -64,7 +42,7 @@ const AVAILABLE_TABLES = [
   { id: "note", label: "Note", icon: StickyNote },
 ]
 
-// Definizione dei campi per ogni tabella
+// Definizione dei campi per ogni tabella (CORRETTA e CONSISTENTE)
 const TABLE_FIELDS = {
   appuntamenti: {
     listFields: ["id", "titolo", "data_inizio", "data_fine", "stato", "priorita"],
@@ -76,8 +54,8 @@ const TABLE_FIELDS = {
       titolo: "string",
       descrizione: "text",
       luogo: "text",
-      data_inizio: "datetime", // Preserva orario
-      data_fine: "datetime", // Preserva orario
+      data_inizio: "datetime",
+      data_fine: "datetime",
       data_creazione: "datetime",
       stato: "select",
       priorita: "priority_select",
@@ -119,8 +97,8 @@ const TABLE_FIELDS = {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      data_inizio: "datetime", // Preserva orario
-      data_fine: "datetime", // Preserva orario
+      data_inizio: "datetime",
+      data_fine: "datetime",
       stato: "select",
       priorita: "priority_select",
       note: "text",
@@ -137,12 +115,12 @@ const TABLE_FIELDS = {
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"], // Aggiunto luogo, tags, notifica se esistono
+      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
       "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
     },
   },
   scadenze: {
-    listFields: ["id", "titolo", "scadenza", "stato", "priorita", "privato"],
+    listFields: ["id", "titolo", "scadenza", "stato", "privato"],
     readOnlyFields: ["id", "id_utente", "modifica"],
     requiredFields: ["titolo"],
     defaultSort: "scadenza",
@@ -150,16 +128,14 @@ const TABLE_FIELDS = {
       id: "number",
       titolo: "string",
       descrizione: "text",
-      scadenza: "datetime", // Normalizza a fine giornata
+      scadenza: "datetime",
       stato: "select",
-      priorita: "priority_select",
       note: "text",
       id_utente: "number",
       id_pro: "number",
       modifica: "datetime",
       notifica: "datetime",
       privato: "boolean",
-      tags: "json",
     },
     selectOptions: {
       stato: [
@@ -169,8 +145,8 @@ const TABLE_FIELDS = {
       ],
     },
     groups: {
-      "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "scadenza"],
-      Dettagli: ["note", "tags", "notifica", "privato", "id_pro"],
+      "Informazioni principali": ["titolo", "descrizione", "stato", "scadenza"],
+      Dettagli: ["note", "notifica", "privato", "id_pro"],
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
   },
@@ -185,11 +161,10 @@ const TABLE_FIELDS = {
       descrizione: "text",
       completato: "boolean",
       priorita: "priority_select",
-      scadenza: "datetime", // Normalizza a fine giornata
+      scadenza: "datetime",
       notifica: "datetime",
       note: "text",
       stato: "text",
-      tags: "json",
       id_utente: "number",
       modifica: "datetime",
     },
@@ -212,7 +187,6 @@ const TABLE_FIELDS = {
         "scadenza",
         "note",
         "notifica",
-        "tags",
       ],
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
     },
@@ -228,8 +202,8 @@ const TABLE_FIELDS = {
       descrizione: "text",
       stato: "select",
       priorita: "priority_select",
-      data_inizio: "datetime", // Preserva orario
-      data_fine: "datetime", // Preserva orario
+      data_inizio: "datetime",
+      data_fine: "datetime",
       budget: "number",
       note: "text",
       id_utente: "number",
@@ -237,7 +211,6 @@ const TABLE_FIELDS = {
       colore: "color",
       gruppo: "group_select",
       avanzamento: "progress",
-      tags: "json",
       allegati: "json",
       notifica: "datetime",
     },
@@ -263,7 +236,7 @@ const TABLE_FIELDS = {
         "data_fine",
         "avanzamento",
       ],
-      "Note e dettagli": ["note", "allegati", "notifica", "tags"],
+      "Note e dettagli": ["note", "allegati", "notifica"],
       "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_att", "id_app", "id_cli", "id_sca"],
     },
   },
@@ -317,14 +290,13 @@ const TABLE_FIELDS = {
       meta_description: "text",
       id_utente: "number",
       modifica: "datetime",
-      // Aggiunti campi mancanti dalla definizione della tabella utente
       estratto: "text",
       categoria: "string",
       tags: "json",
-      immagine: "string", // Potrebbe essere un URL o un riferimento a un file
-      pubblicato: "datetime", // Preserva orario
+      immagine: "string",
+      pubblicato: "datetime",
       privato: "boolean",
-      attivo: "boolean", // Assicurati che sia presente se usato
+      attivo: "boolean",
     },
     selectOptions: {
       stato: [
@@ -474,16 +446,19 @@ const ProgressBar = ({
             background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`,
           }}
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>0%</span> <span>50%</span> <span>100%</span>
-        </div>
-      </div>
+        <div className="flex justify#e5e7eb ${percentage}%,#e5e7eb 100%)`,
+          }}
+        />
+        <div className="flex justify-between text-xs text-gray-500 mt-1\">\
+          <span>0%</span> <span>50%</span> <span>100%</span>\
+        </div>\
+      </div>\
     </div>
   )
 }
 
 // Componente principale
-export default function ItemDetailPage() {
+export default function ItemDetailPage() {\
   const { supabase } = useSupabase()
   const { user } = useAuth()
   const router = useRouter()
@@ -497,9 +472,9 @@ export default function ItemDetailPage() {
   const [deleting, setDeleting] = useState<boolean>(false)
   const [item, setItem] = useState<any>(null)
   const [editedItem, setEditedItem] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<string>("main")
-  const [validationErrors, setValidationErrors] = useState<string[]>([])
-  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<string>("main")\
+  const [validationErrors, setValidationErrors] = useState<string[]>([])\
+  const [priorityOptions, setPriorityOptions] = useState<any[]>([])\
   const [groupOptions, setGroupOptions] = useState<any[]>([])
 
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -515,86 +490,86 @@ export default function ItemDetailPage() {
   const fieldGroups = tableConfig?.groups || {}
   const selectOptions = tableConfig?.selectOptions || {}
 
-  const loadPriorityOptions = useCallback(async () => {
+  const loadPriorityOptions = useCallback(async () => {\
     if (!supabase) return
-    try {
+    try {\
       const { data, error } = await supabase.from("configurazione").select("priorita").single()
       if (error) throw error
       let priorityArray = null
-      if (data?.priorita) {
+      if (data?.priorita) {\
         if (Array.isArray(data.priorita)) priorityArray = data.priorita
         else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
         else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
       }
       if (!priorityArray || priorityArray.length === 0) {
-        setPriorityOptions([])
+        setPriorityOptions([])\
         return
       }
-      const mappedPriorities = priorityArray.map((item: any) => ({
+      const mappedPriorities = priorityArray.map((item: any) => ({\
         value: item.livello || item.value,
         nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
         descrizione: item.descrizione || item.description || "",
       }))
       setPriorityOptions(mappedPriorities)
     } catch (error: any) {
-      console.error("Errore nel caricamento delle priorità:", error)
+      console.error("Errore nel caricamento delle priorità:", error)\
       setPriorityOptions([])
     }
   }, [supabase])
 
-  const loadGroupOptions = useCallback(async () => {
+  const loadGroupOptions = useCallback(async () => {\
     if (!supabase) return
-    try {
+    try {\
       const { data, error } = await supabase.from("configurazione").select("gruppi").single()
       if (error) throw error
       let groupArray = null
-      if (data?.gruppi) {
+      if (data?.gruppi) {\
         if (Array.isArray(data.gruppi)) groupArray = data.gruppi
         else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) groupArray = data.gruppi.gruppi
       }
       if (!groupArray || groupArray.length === 0) {
-        setGroupOptions([])
+        setGroupOptions([])\
         return
       }
-      const mappedGroups = groupArray.map((item: any) => ({
+      const mappedGroups = groupArray.map((item: any) => ({\
         value: item.id || item.value,
         nome: item.gruppo || item.nome || item.label || `Gruppo ${item.id || item.value}`,
         descrizione: item.descrizione || item.description || "",
       }))
       setGroupOptions(mappedGroups)
     } catch (error: any) {
-      console.error("Errore nel caricamento dei gruppi:", error)
+      console.error("Errore nel caricamento dei gruppi:", error)\
       setGroupOptions([])
     }
   }, [supabase])
 
-  useEffect(() => {
+  useEffect(() => {\
     if (supabase) {
-      loadPriorityOptions()
+      loadPriorityOptions()\
       loadGroupOptions()
     }
   }, [supabase, loadPriorityOptions, loadGroupOptions])
 
-  const validateForm = (): string[] => {
+  const validateForm = (): string[] => {\
     const errors: string[] = []
     if (!editedItem) return errors
-    requiredFields.forEach((field) => {
+    requiredFields.forEach((field) => {\
       const value = editedItem[field]
-      if (!value || (typeof value === "string" && value.trim() === "")) {
+      if (!value || (typeof value === "string" && value.trim() === "")) {\
         const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
         errors.push(`Il campo "${label}" è obbligatorio`)
       }
     })
-    if (tableName === "todolist" && editedItem.descrizione && editedItem.descrizione.trim().length < 3) {
-      errors.push("La descrizione deve contenere almeno 3 caratteri")
+    if (tableName === "todolist" && editedItem.descrizione && editedItem.descrizione.trim().length < 3) {\
+      errors.push(\"La descrizione deve contenere almeno 3 caratteri")
     }
     return errors
   }
 
-  const loadItem = useCallback(async () => {
+  const loadItem = useCallback(async () => {\
     if (!supabase || !tableName || !user?.id || !isValidTable) return
     setLoading(true)
-    try {
+    try {\
       if (isNewItem) {
         const newItem: any = { id_utente: user.id }
         // Imposta valori di default specifici per tabella
@@ -602,7 +577,7 @@ export default function ItemDetailPage() {
           newItem.titolo = ""
           newItem.descrizione = ""
           newItem.completato = false
-          newItem.priorita = 1 // Assumendo che 1 sia una priorità valida
+          newItem.priorita = 1
         } else if (tableName === "clienti") {
           newItem.nome = ""
           newItem.cognome = ""
@@ -624,7 +599,6 @@ export default function ItemDetailPage() {
         } else if (tableName === "scadenze") {
           newItem.titolo = ""
           newItem.stato = "attivo"
-          newItem.priorita = 1
           newItem.privato = false
         } else if (tableName === "pagine") {
           newItem.titolo = ""
@@ -679,28 +653,20 @@ export default function ItemDetailPage() {
           const normalized = normalizeDate(value, needsNormalization)
           processedValue = normalized ? normalized.toISOString() : null
         } else {
-          // Per tutti gli altri datetime, preserva l'orario.
-          // EnhancedDatePicker restituisce una stringa ISO o un oggetto Date.
-          // Converti in stringa ISO se è un oggetto Date.
           if (value instanceof Date) {
             processedValue = value.toISOString()
           } else if (typeof value === "string") {
-            // Se è una stringa, prova a parsare e riformattare per consistenza,
-            // ma solo se è una data valida, altrimenti mantieni la stringa (es. per input parziali)
             const parsedDate = parseISO(value)
             if (isValid(parsedDate)) {
               processedValue = parsedDate.toISOString()
             } else {
-              processedValue = value // Mantieni stringa se non parsabile (es. input in corso)
+              processedValue = value
             }
           } else {
-            processedValue = null // o gestisci come errore se non è né Date né stringa
+            processedValue = null
           }
         }
       }
-      // Non c'è più la logica di auto-impostazione di data_fine basata su data_inizio qui
-      // per evitare normalizzazioni indesiderate.
-      // Se necessaria, andrà reimplementata con attenzione agli orari.
       return { ...prev, [field]: processedValue }
     })
     setValidationErrors([])
@@ -788,7 +754,6 @@ export default function ItemDetailPage() {
       let displayValue = value
       if (type === "datetime") {
         let valueToFormat = value
-        // Applica normalizzazione solo per i campi specifici
         if (tableName === "scadenze" && field === "scadenza") {
           const normalized = normalizeDate(value, "end")
           valueToFormat = normalized || value
@@ -796,7 +761,6 @@ export default function ItemDetailPage() {
           const normalized = normalizeDate(value, "end")
           valueToFormat = normalized || value
         }
-        // Per tutti gli altri datetime, formatta il valore così com'è (preservando l'orario)
         displayValue = formatDateDisplay(valueToFormat)
       } else {
         displayValue = renderFieldValue(value, type)
@@ -845,14 +809,12 @@ export default function ItemDetailPage() {
             </Label>
             <EnhancedDatePicker
               id={field}
-              // EnhancedDatePicker si aspetta una stringa ISO o un oggetto Date.
-              // `value` qui dovrebbe essere una stringa ISO dal database o da una modifica precedente.
               value={value || ""}
-              onChange={(newValue) => handleFieldChange(field, newValue)} // newValue è stringa ISO o Date
+              onChange={(newValue) => handleFieldChange(field, newValue)}
               placeholder={`Seleziona ${label.toLowerCase()}`}
               className={`mt-1 ${hasError ? "border-red-500" : ""}`}
-              showTimeSelect // Abilita sempre la selezione dell'orario
-              dateFormat="dd/MM/yyyy HH:mm" // Mostra l'orario nel formato
+              showTimeSelect
+              dateFormat="dd/MM/yyyy HH:mm"
             />
           </div>
         )
@@ -897,7 +859,7 @@ export default function ItemDetailPage() {
                   <AlertCircle className="h-4 w-4" />
                   <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
                 </div>
-                <Button variant="outline" size="sm" className="mt-2" onClick={loadPriorityOptions}>
+                <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={loadPriorityOptions}>
                   Riprova caricamento
                 </Button>
               </div>
@@ -929,7 +891,7 @@ export default function ItemDetailPage() {
                   <AlertCircle className="h-4 w-4" />
                   <span>Impossibile caricare le opzioni di gruppo. Verificare la configurazione.</span>
                 </div>
-                <Button variant="outline" size="sm" className="mt-2" onClick={loadGroupOptions}>
+                <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={loadGroupOptions}>
                   Riprova caricamento
                 </Button>
               </div>
@@ -992,7 +954,7 @@ export default function ItemDetailPage() {
                   const parsed = JSON.parse(e.target.value)
                   handleFieldChange(field, parsed)
                 } catch {
-                  handleFieldChange(field, e.target.value) // Mantieni come stringa se non è JSON valido
+                  handleFieldChange(field, e.target.value)
                 }
               }}
               className="mt-1 font-mono text-sm"
@@ -1017,7 +979,7 @@ export default function ItemDetailPage() {
             </div>
           </div>
         )
-      default: // string
+      default:
         return (
           <div className="mb-4" key={field}>
             <Label htmlFor={field} className={hasError ? "text-red-600" : ""}>
@@ -1040,7 +1002,6 @@ export default function ItemDetailPage() {
     if (value === null || value === undefined) return "-"
     switch (type) {
       case "datetime":
-        // La formattazione specifica per normalizzazione è gestita in renderField
         return formatDateDisplay(value)
       case "boolean":
         return value ? "✓" : "✗"
@@ -1129,11 +1090,10 @@ export default function ItemDetailPage() {
               <TabsContent key={group} value={group.toLowerCase().replace(/\s+/g, "-")}>
                 <div className="space-y-4">
                   {groupFields.map((field) => {
-                    if (!allFields.includes(field) && !isNewItem) return null // Mostra tutti i campi per i nuovi item
+                    if (!allFields.includes(field) && !isNewItem) return null
                     const isReadOnly = readOnlyFields.includes(field)
                     const fieldType = fieldTypes[field as keyof typeof fieldTypes] || "string"
 
-                    // Gestione speciale per data_inizio e data_fine sulla stessa riga
                     if (
                       field === "data_inizio" &&
                       groupFields.includes("data_fine") &&
@@ -1182,50 +1142,7 @@ export default function ItemDetailPage() {
                         </div>
                       )
                     }
-                    // Gestione speciale per priorita e scadenza sulla stessa riga
-                    if (
-                      field === "priorita" &&
-                      groupFields.includes("scadenza") &&
-                      (allFields.includes("scadenza") || isNewItem)
-                    ) {
-                      if (!isEditMode) {
-                        return (
-                          <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label>Priorità</Label>
-                              <div className="mt-1 p-2 rounded-md">
-                                {renderFieldValue(editedItem.priorita, fieldTypes.priorita || "priority_select")}
-                              </div>
-                            </div>
-                            <div>
-                              <Label>Scadenza</Label>
-                              <div className="mt-1 p-2 rounded-md">{formatDateDisplay(editedItem.scadenza)}</div>
-                            </div>
-                          </div>
-                        )
-                      }
-                      return (
-                        <div key="priority-deadline" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            {renderField(
-                              "priorita",
-                              editedItem.priorita,
-                              fieldTypes.priorita || "priority_select",
-                              readOnlyFields.includes("priorita"),
-                            )}
-                          </div>
-                          <div>
-                            {renderField(
-                              "scadenza",
-                              editedItem.scadenza,
-                              fieldTypes.scadenza || "datetime",
-                              readOnlyFields.includes("scadenza"),
-                            )}
-                          </div>
-                        </div>
-                      )
-                    }
-                    // Gestione speciale per stato e colore sulla stessa riga
+
                     if (
                       field === "stato" &&
                       groupFields.includes("colore") &&
@@ -1271,17 +1188,10 @@ export default function ItemDetailPage() {
                       )
                     }
 
-                    // Evita di renderizzare due volte i campi gestiti in coppia
                     if (
                       field === "data_fine" &&
                       groupFields.includes("data_inizio") &&
                       (allFields.includes("data_inizio") || isNewItem)
-                    )
-                      return null
-                    if (
-                      field === "scadenza" &&
-                      groupFields.includes("priorita") &&
-                      (allFields.includes("priorita") || isNewItem)
                     )
                       return null
                     if (
@@ -1291,7 +1201,6 @@ export default function ItemDetailPage() {
                     )
                       return null
 
-                    // Renderizza il campo singolo se non è parte di una coppia o se la sua controparte non esiste
                     return renderField(field, editedItem[field], fieldType, isReadOnly)
                   })}
                 </div>
@@ -1319,8 +1228,6 @@ export default function ItemDetailPage() {
           </CardHeader>
           <CardContent>
             <Button onClick={() => router.push("/data-explorer")}>
-              {" "}
-              {/* Modificato per tornare a una pagina generica */}
               <ArrowLeft size={16} className="mr-2" /> Torna a Data Explorer
             </Button>
           </CardContent>

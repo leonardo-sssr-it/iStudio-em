@@ -1,28 +1,13 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "@/components/ui/use-toast"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
-import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
-import { TagInput } from "@/components/ui/tag-input"
 import { parseISO, formatISO } from "date-fns"
 import {
-  ArrowLeft,
-  X,
-  AlertCircle,
   CheckCircle2,
   FileText,
   Settings,
@@ -51,38 +36,31 @@ const AVAILABLE_TABLES = [
 function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   const cleaned = { ...data }
 
-  // Rimuovi campi di sola lettura per i nuovi elementi
   readOnlyFields.forEach((field) => {
     if (field !== "id_utente") {
-      // Mantieni id_utente
       delete cleaned[field]
     }
   })
 
-  // Pulisci tutti i campi
   Object.keys(cleaned).forEach((key) => {
     const value = cleaned[key]
 
-    // Rimuovi valori undefined
     if (value === undefined) {
       delete cleaned[key]
       return
     }
 
-    // Rimuovi valori che sono la stringa "undefined"
     if (value === "undefined") {
       delete cleaned[key]
       return
     }
 
-    // Gestisci stringhe vuote
     if (typeof value === "string") {
       if (value.trim() === "") {
         cleaned[key] = null
       }
     }
 
-    // Gestisci numeri NaN
     if (typeof value === "number" && isNaN(value)) {
       delete cleaned[key]
     }
@@ -91,7 +69,7 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// Estendi la configurazione dei campi con più dettagli
+// Configurazione dei campi per ogni tabella (CORRETTA e CONSISTENTE)
 const TABLE_FIELDS = {
   appuntamenti: {
     requiredFields: ["titolo", "data_inizio"],
@@ -101,20 +79,19 @@ const TABLE_FIELDS = {
       attivo: true,
     },
     fieldGroups: {
-      // Aggiunto per il layout a Card
       principale: {
         title: "Informazioni Principali",
-        icon: FileText, // Assicurati che FileText sia importato da lucide-react
+        icon: FileText,
         fields: ["titolo", "descrizione", "stato"],
       },
       date: {
         title: "Date e Orari",
-        icon: Calendar, // Assicurati che Calendar sia importato da lucide-react
+        icon: Calendar,
         fields: ["data_inizio", "data_fine"],
       },
       dettagli: {
         title: "Dettagli Aggiuntivi",
-        icon: Settings, // Assicurati che Settings sia importato da lucide-react
+        icon: Settings,
         fields: ["luogo", "note", "tags"],
       },
     },
@@ -125,6 +102,7 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
+      priorita: "priority_select",
       note: "text",
       luogo: "string",
       tags: "tags",
@@ -182,21 +160,21 @@ const TABLE_FIELDS = {
     },
   },
   scadenze: {
-    requiredFields: ["titolo", "data_scadenza"],
+    requiredFields: ["titolo", "scadenza"],
     autoFields: ["id", "id_utente", "data_creazione", "modifica"],
     defaultValues: {
       stato: "attivo",
-      priorita: 3,
+      privato: false,
     },
-    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "priorita", "note"],
+    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "note"],
     types: {
       id: "number",
       titolo: "string",
       descrizione: "text",
       scadenza: "datetime",
       stato: "select",
-      priorita: "priority_select",
       note: "text",
+      privato: "boolean",
       id_utente: "number",
       data_creazione: "datetime",
       modifica: "datetime",
@@ -210,7 +188,6 @@ const TABLE_FIELDS = {
     },
     validation: {
       titolo: { minLength: 3, maxLength: 100 },
-      priorita: { min: 1, max: 5 },
     },
   },
   todolist: {
@@ -240,7 +217,7 @@ const TABLE_FIELDS = {
     },
   },
   progetti: {
-    requiredFields: ["nome", "data_inizio"],
+    requiredFields: ["titolo", "data_inizio"],
     autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
     defaultValues: {
       stato: "pianificato",
@@ -249,7 +226,7 @@ const TABLE_FIELDS = {
       colore: "#3B82F6",
     },
     fieldOrder: [
-      "nome",
+      "titolo",
       "descrizione",
       "stato",
       "colore",
@@ -262,7 +239,7 @@ const TABLE_FIELDS = {
     ],
     types: {
       id: "number",
-      nome: "string",
+      titolo: "string",
       descrizione: "text",
       stato: "select",
       colore: "color",
@@ -286,7 +263,7 @@ const TABLE_FIELDS = {
       ],
     },
     validation: {
-      nome: { minLength: 3, maxLength: 100 },
+      titolo: { minLength: 3, maxLength: 100 },
       avanzamento: { min: 0, max: 100 },
       budget: { min: 0 },
     },
@@ -366,7 +343,7 @@ const TABLE_FIELDS = {
     requiredFields: ["titolo", "contenuto"],
     autoFields: ["id", "data_creazione", "modifica", "id_utente"],
     defaultValues: {
-      priorita: 2, // Valore di default numerico
+      priorita: 2,
       synced: false,
     },
     fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
@@ -377,7 +354,7 @@ const TABLE_FIELDS = {
       data_creazione: "datetime",
       modifica: "datetime",
       tags: "array",
-      priorita: "priority_select", // Usa priority_select per caricare da configurazione
+      priorita: "priority_select",
       notifica: "datetime",
       notebook_id: "string",
       id_utente: "string",
@@ -435,12 +412,12 @@ export default function NewItemPage() {
   const requiredFields = tableConfig?.requiredFields || []
   const autoFields = tableConfig?.autoFields || []
   const defaultValues = tableConfig?.defaultValues || {}
-  const fieldGroups = tableConfig?.fieldGroups || {} // Modificato da fieldOrder
+  const fieldOrder = tableConfig?.fieldOrder || []
   const fieldTypes = tableConfig?.types || {}
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
-  // Funzione per caricare le opzioni di priorità da Supabase (stessa logica del data-explorer)
+  // Funzione per caricare le opzioni di priorità da Supabase
   const loadPriorityOptions = useCallback(async () => {
     if (!supabase) return
     try {
@@ -498,6 +475,12 @@ export default function NewItemPage() {
         initialData.synced = false
       }
 
+      if (tableName === "scadenze") {
+        initialData.titolo = ""
+        initialData.stato = "attivo"
+        initialData.privato = false
+      }
+
       setFormData(initialData)
     }
   }, [tableConfig, user, tableName])
@@ -510,11 +493,10 @@ export default function NewItemPage() {
       // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
       if (field === "data_inizio" && value) {
         try {
-          const startDate = parseISO(value) // parseISO gestisce stringhe ISO
+          const startDate = parseISO(value)
           if (!newData.data_fine) {
-            // Solo se data_fine non è già impostata
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // Aggiungi 1 ora
-            newData.data_fine = formatISO(endDate) // formatISO per coerenza
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
+            newData.data_fine = formatISO(endDate)
           }
         } catch (e) {
           console.warn("Data inizio non valida per calcolare data fine:", value)
@@ -675,340 +657,4 @@ export default function NewItemPage() {
         description: "Il nuovo elemento è stato salvato nel database",
         action: (
           <div className="flex items-center">
-            <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
-            <span>Creato</span>
-          </div>
-        ),
-      })
-
-      // Reindirizza alla pagina di dettaglio
-      router.push(`/data-explorer/${tableName}/${data[0].id}`)
-    } catch (error: any) {
-      console.error(`Errore nell'inserimento:`, error)
-      toast({
-        title: "Errore durante il salvataggio",
-        description: `Impossibile creare l'elemento: ${error.message}`,
-        variant: "destructive",
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Renderizza un campo in base al tipo
-  const renderField = (field: string, type: string) => {
-    // Salta i campi auto-generati
-    if (autoFields.includes(field)) return null
-
-    const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
-    const value = formData[field]
-    const error = errors[field]
-    const isRequired = requiredFields.includes(field)
-
-    const fieldWrapper = (children: React.ReactNode) => (
-      <div className="space-y-2" key={field}>
-        <Label htmlFor={field} className="flex items-center">
-          {label}
-          {isRequired && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-        {children}
-        {error && (
-          <div className="flex items-center text-sm text-red-500">
-            <AlertCircle size={14} className="mr-1" />
-            {error}
-          </div>
-        )}
-      </div>
-    )
-
-    switch (type) {
-      case "text":
-      case "richtext":
-        return fieldWrapper(
-          <Textarea
-            id={field}
-            value={value || ""}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-            className={cn(error && "border-red-500")}
-            rows={type === "richtext" ? 8 : 4}
-            placeholder={`Inserisci ${label.toLowerCase()}`}
-          />,
-        )
-
-      case "boolean":
-        return fieldWrapper(
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={field}
-              checked={value || false}
-              onCheckedChange={(checked) => handleFieldChange(field, checked)}
-            />
-            <Label htmlFor={field} className="font-normal cursor-pointer">
-              {value ? "Sì" : "No"}
-            </Label>
-          </div>,
-        )
-
-      case "datetime":
-        return fieldWrapper(
-          <EnhancedDatePicker
-            id={field}
-            value={value || ""}
-            onChange={(val) => handleFieldChange(field, val)}
-            placeholder={`Seleziona ${label.toLowerCase()}`}
-            className={cn(error && "border-red-500")}
-          />,
-        )
-
-      case "number":
-        const validationRules = validation[field] || {}
-        return fieldWrapper(
-          <Input
-            id={field}
-            type="number"
-            value={value || ""}
-            onChange={(e) => {
-              const numValue = e.target.value ? Number(e.target.value) : null
-              handleFieldChange(field, numValue)
-            }}
-            className={cn(error && "border-red-500")}
-            min={validationRules.min}
-            max={validationRules.max}
-            placeholder={`Inserisci ${label.toLowerCase()}`}
-          />,
-        )
-
-      case "priority_select":
-        return fieldWrapper(
-          <div>
-            {priorityOptions.length > 0 ? (
-              <Select value={String(value || "")} onValueChange={(val) => handleFieldChange(field, Number(val))}>
-                <SelectTrigger className={cn(error && "border-red-500")}>
-                  <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorityOptions.map((option) => (
-                    <SelectItem key={option.value} value={String(option.value)}>
-                      {option.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
-                </div>
-                <Button variant="outline" size="sm" className="mt-2" onClick={loadPriorityOptions}>
-                  Riprova caricamento
-                </Button>
-              </div>
-            )}
-          </div>,
-        )
-
-      case "select":
-        const options = selectOptions[field] || []
-        return fieldWrapper(
-          <Select value={value || ""} onValueChange={(val) => handleFieldChange(field, val)}>
-            <SelectTrigger className={cn(error && "border-red-500")}>
-              <SelectValue placeholder={`Seleziona ${label.toLowerCase()}`} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((option: any) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>,
-        )
-
-      case "color":
-        return fieldWrapper(<ColorPicker value={value || ""} onChange={(val) => handleFieldChange(field, val)} />)
-
-      case "tags":
-        return fieldWrapper(
-          <TagInput
-            id={field}
-            value={value || []}
-            onChange={(val) => handleFieldChange(field, val)}
-            placeholder={`Aggiungi ${label.toLowerCase()}`}
-          />,
-        )
-
-      case "array":
-        return fieldWrapper(
-          <TagInput
-            id={field}
-            value={value || []}
-            onChange={(val) => handleFieldChange(field, val)}
-            placeholder={`Aggiungi ${label.toLowerCase()}`}
-          />,
-        )
-
-      case "email":
-        return fieldWrapper(
-          <Input
-            id={field}
-            type="email"
-            value={value || ""}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-            className={cn(error && "border-red-500")}
-            placeholder="esempio@email.com"
-          />,
-        )
-
-      case "tel":
-        return fieldWrapper(
-          <Input
-            id={field}
-            type="tel"
-            value={value || ""}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-            className={cn(error && "border-red-500")}
-            placeholder="+39 123 456 7890"
-          />,
-        )
-
-      default:
-        return fieldWrapper(
-          <Input
-            id={field}
-            type="text"
-            value={value || ""}
-            onChange={(e) => handleFieldChange(field, e.target.value)}
-            className={cn(error && "border-red-500")}
-            placeholder={`Inserisci ${label.toLowerCase()}`}
-          />,
-        )
-    }
-  }
-
-  // Ottieni il titolo della tabella
-  const getTableTitle = () => {
-    const table = AVAILABLE_TABLES.find((t) => t.id === tableName)
-    return table ? table.label : "Nuovo elemento"
-  }
-
-  // Se la tabella non è valida, mostra errore
-  if (tableName && !isValidTable) {
-    return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-red-600">Errore</CardTitle>
-            <CardDescription>La tabella "{tableName}" non è disponibile o non esiste.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push("/data-explorer")}>
-              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
-      <Card>
-        <CardHeader>
-          <div className="space-y-4">
-            {/* Pulsante torna indietro sempre in alto */}
-            <Button variant="ghost" onClick={() => router.push(`/data-explorer`)} className="w-fit">
-              <ArrowLeft size={16} className="mr-2" /> Torna alla lista
-            </Button>
-
-            {/* Titolo e descrizione */}
-            <div>
-              <CardTitle className="text-xl sm:text-2xl">Nuovo elemento per il modulo {getTableTitle()}</CardTitle>
-              <CardDescription className="text-sm sm:text-base">
-                Compila i campi per creare un nuovo elemento
-              </CardDescription>
-            </div>
-
-            {/* Pulsanti di azione - migliorati con background azzurro */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 sm:justify-end">
-              <Button
-                onClick={handleSave}
-                disabled={saving}
-                className="w-full sm:w-auto order-1 sm:order-1 bg-blue-600 hover:bg-blue-700 text-white"
-                size="lg"
-              >
-                {saving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Salvataggio...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={16} className="mr-2" />
-                    Crea e Salva
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/data-explorer`)}
-                className="w-full sm:w-auto order-2 sm:order-2"
-              >
-                <X size={16} className="mr-2" /> Annulla
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          {/* Renderizza i campi in base alla configurazione della tabella */}
-          <div className="space-y-6">
-            {Object.keys(fieldTypes)
-              .filter((field) => !autoFields.includes(field))
-              .map((field) => (
-                <div key={field}>{renderField(field, fieldTypes[field])}</div>
-              ))}
-          </div>
-
-          {/* Mostra informazioni sui campi auto-compilati */}
-          <Card className="mt-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Campi compilati automaticamente:
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {autoFields.map((field) => (
-                      <Badge key={field} variant="secondary">
-                        {field}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <AlertCircle size={16} className="mr-2 flex-shrink-0" />
-                  <span>
-                    I campi con <span className="text-red-500 mx-1">*</span> sono obbligatori
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </CardContent>
-
-        <CardFooter className="border-t bg-gray-50 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between w-full text-sm text-gray-600 space-y-2 sm:space-y-0">
-            <div className="flex items-center">
-              <AlertCircle size={16} className="mr-2 flex-shrink-0" />
-              <span>
-                I campi contrassegnati con <span className="text-red-500 mx-1">*</span> sono obbligatori
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">iStudio v0.4 - Sistema di gestione dati</div>
-          </div>
-        </CardFooter>
-      </Card>
-    </div>
-  )
-}
+            <CheckCircle2 className="\
