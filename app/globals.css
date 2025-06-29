@@ -141,6 +141,85 @@
   .toast {
     @apply z-[100] bg-background text-foreground border border-border shadow-lg rounded-md;
   }
+
+  /* STILI SIDEBAR - FORZATI CON !IMPORTANT */
+  .sidebar-container {
+    background-color: hsl(var(--background)) !important;
+    border-right: 1px solid hsl(var(--border)) !important;
+  }
+
+  .sidebar-content {
+    padding: 1rem 0.75rem !important;
+  }
+
+  .sidebar-title {
+    font-size: 0.875rem !important; /* 14px */
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+    padding: 0 0.5rem !important;
+  }
+
+  .sidebar-button {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    height: 2rem !important; /* 32px */
+    padding: 0 0.5rem !important;
+    font-size: 0.75rem !important; /* 12px */
+    white-space: nowrap !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+  }
+
+  .sidebar-button svg {
+    width: 0.875rem !important; /* 14px */
+    height: 0.875rem !important; /* 14px */
+    flex-shrink: 0 !important;
+  }
+
+  .sidebar-button span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .sidebar-section {
+    margin-bottom: 1rem !important;
+    padding: 0 0.75rem !important;
+  }
+
+  .sidebar-section-title {
+    font-size: 0.875rem !important; /* 14px */
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+    padding: 0 0.5rem !important;
+  }
+
+  .sidebar-status {
+    margin-top: 1rem !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important; /* 12px */
+    color: hsl(var(--muted-foreground)) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+  }
+
+  .sidebar-status svg {
+    width: 0.75rem !important; /* 12px */
+    height: 0.75rem !important; /* 12px */
+    flex-shrink: 0 !important;
+  }
+
+  .sidebar-user-info {
+    margin-top: 0.5rem !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.75rem !important; /* 12px */
+    color: hsl(var(--muted-foreground)) !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
 }
 
 /* Rimuovi transizioni eccessive */
