@@ -11,19 +11,17 @@ export default function ShowListPage({ params }: { params: { tableName: string }
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto p-4 md:p-6">
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Lista Elementi - {tableName}</h1>
-            <Link href="/show-list">
-              <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                <ArrowLeft className="h-4 w-4" />
-                Torna all'elenco
-              </Button>
-            </Link>
-          </div>
-          <ShowList tableName={tableName} />
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Lista Elementi - {tableName}</h1>
+          <Link href="/show-list">
+            <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
+              <ArrowLeft className="h-4 w-4" />
+              Torna all'elenco
+            </Button>
+          </Link>
         </div>
+        <ShowList tableName={tableName} />
       </div>
     </ProtectedRoute>
   )
