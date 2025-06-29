@@ -17,10 +17,12 @@ const SummaryCard = ({ type, label, count, icon: Icon, color, textColor }: Summa
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3">
         <CardTitle className={`text-xs font-medium ${textColor} truncate`}>{label}</CardTitle>
-        <Icon className={`h-4 w-4 ${textColor} opacity-80 flex-shrink-0`} />
       </CardHeader>
       <CardContent className="pt-1 p-3">
-        <div className={`text-xl font-bold ${textColor}`}>{count}</div>
+        <div className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+          {count}
+          <Icon className={`h-5 w-5 ${textColor} opacity-80 flex-shrink-0`} />
+        </div>
         <p className={`text-[10px] ${textColor} opacity-70 mt-0.5`}>Elementi totali</p>
       </CardContent>
     </Card>
@@ -91,7 +93,7 @@ export function UserSummary() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+        <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8">
           {Array.from({ length: 8 }).map((_, i) => (
             <Card key={i} className="w-[70%]">
               <CardHeader className="pb-1 p-3">
@@ -147,7 +149,7 @@ export function UserSummary() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+      <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8">
         {dashboardData.summaryCounts.map((summary) => (
           <SummaryCard key={summary.type} {...summary} />
         ))}
