@@ -1,99 +1,65 @@
 "use client"
 
 import { useState, useEffect, type FormEvent } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth } from "@/lib/auth-provider" // Corrected import path
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, UserIcon, Settings } from "lucide-react"
+import { LogOut, UserIcon, Settings, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import { toast } from "@/components/ui/use-toast"
 import type { User } from "@supabase/supabase-js"
 
 export function AuthWidget() {
-  const { user, session, loading, signOut } = useAuth()
+  const { user, session, loading: authLoading, signOut, login, signUp } = useAuth()
   const { isDebug, log } = useDebugConfig()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createClient()
 
   useEffect(() => {
     if (isDebug) {
-      log("AuthWidget: Initializing", { user, session, loading })
+      log("AuthWidget: Initializing", { user, session, authLoading })
     }
-  }, [user, session, loading, isDebug, log])
+  }, [user, session, authLoading, isDebug, log])
 
-  const handleLogin = async (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent, action: "login" | "signUp") => {
     event.preventDefault()
     setIsSubmitting(true)
     setError(null)
-    if (isDebug) log("AuthWidget: Attempting login", { email })
+    if (isDebug) log(`AuthWidget: Attempting ${action}`, { email })
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { error: actionError } = action === "login" ? await login(email, password) : await signUp(email, password)
 
-    if (error) {
-      if (isDebug) log("AuthWidget: Login error", error)
-      setError(error.message)
+    if (actionError) {
+      if (isDebug) log(`AuthWidget: ${action} error`, actionError)
+      setError(actionError.message)
       toast({
-        title: "Errore di accesso",
-        description: error.message,
+        title: `Errore di ${action === "login" ? "accesso" : "registrazione"}`,
+        description: actionError.message,
         variant: "destructive",
       })
     } else {
-      if (isDebug) log("AuthWidget: Login successful")
+      if (isDebug) log(`AuthWidget: ${action} successful`)
       toast({
-        title: "Accesso effettuato",
-        description: "Bentornato!",
-      })
-      // The auth state will be updated by the onAuthStateChange listener in AuthProvider
-    }
-    setIsSubmitting(false)
-  }
-
-  const handleSignUp = async (event: FormEvent) => {
-    event.preventDefault()
-    setIsSubmitting(true)
-    setError(null)
-    if (isDebug) log("AuthWidget: Attempting sign up", { email })
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    })
-
-    if (error) {
-      if (isDebug) log("AuthWidget: Sign up error", error)
-      setError(error.message)
-      toast({
-        title: "Errore di registrazione",
-        description: error.message,
-        variant: "destructive",
-      })
-    } else {
-      if (isDebug) log("AuthWidget: Sign up successful, confirmation email sent")
-      toast({
-        title: "Registrazione quasi completata",
-        description: "Controlla la tua email per confermare la registrazione.",
+        title: action === "login" ? "Accesso effettuato" : "Registrazione quasi completata",
+        description: action === "login" ? "Bentornato!" : "Controlla la tua email per confermare la registrazione.",
       })
     }
     setIsSubmitting(false)
   }
 
-  if (loading) {
-    return <div className="p-4 text-center text-sm text-muted-foreground">Caricamento...</div>
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    )
   }
 
   if (user) {
@@ -108,7 +74,7 @@ export function AuthWidget() {
           <TabsTrigger value="register">Registrati</TabsTrigger>
         </TabsList>
         <TabsContent value="login">
-          <form onSubmit={handleLogin}>
+          <form onSubmit={(e) => handleSubmit(e, "login")}>
             <Card>
               <CardHeader>
                 <CardTitle>Accedi</CardTitle>
@@ -148,7 +114,7 @@ export function AuthWidget() {
           </form>
         </TabsContent>
         <TabsContent value="register">
-          <form onSubmit={handleSignUp}>
+          <form onSubmit={(e) => handleSubmit(e, "signUp")}>
             <Card>
               <CardHeader>
                 <CardTitle>Registrati</CardTitle>
@@ -211,18 +177,18 @@ function AuthenticatedWidget({ user, onSignOut }: { user: User; onSignOut: () =>
         </div>
       </div>
       <div className="space-y-1">
-        <Link href="/profile" passHref>
-          <a className="flex items-center gap-2 w-full text-left text-sm p-2 rounded-md hover:bg-accent">
-            <UserIcon className="h-4 w-4" />
+        <Button variant="ghost" size="sm" asChild className="w-full justify-start">
+          <Link href="/profile">
+            <UserIcon className="mr-2 h-4 w-4" />
             <span>Profilo</span>
-          </a>
-        </Link>
-        <Link href="/admin" passHref>
-          <a className="flex items-center gap-2 w-full text-left text-sm p-2 rounded-md hover:bg-accent">
-            <Settings className="h-4 w-4" />
+          </Link>
+        </Button>
+        <Button variant="ghost" size="sm" asChild className="w-full justify-start">
+          <Link href="/admin">
+            <Settings className="mr-2 h-4 w-4" />
             <span>Impostazioni</span>
-          </a>
-        </Link>
+          </Link>
+        </Button>
       </div>
       <Button variant="ghost" size="sm" onClick={onSignOut} className="w-full justify-start">
         <LogOut className="mr-2 h-4 w-4" />
