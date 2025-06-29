@@ -169,19 +169,44 @@ export default function RecordDetailPage() {
   }
 
   const handleFieldChange = (columnName: string, value: any) => {
+    console.log(`Changing field ${columnName} to:`, value)
     setEditedRecord((prev) => ({
       ...prev,
       [columnName]: value,
     }))
   }
 
-  const isDateTimeField = (dataType: string): boolean => {
-    return (
+  const isDateTimeField = (columnName: string, dataType: string, value: any): boolean => {
+    // Check by column name first (more reliable)
+    const dateFieldNames = [
+      "scadenza",
+      "data_inizio",
+      "data_fine",
+      "data_creazione",
+      "modifica",
+      "notifica",
+      "pubblicato",
+    ]
+    if (dateFieldNames.includes(columnName.toLowerCase())) {
+      return true
+    }
+
+    // Check by data type
+    if (
       dataType.includes("timestamp") ||
       dataType.includes("date") ||
       dataType === "datetime" ||
       dataType.includes("time")
-    )
+    ) {
+      return true
+    }
+
+    // Check by value pattern
+    if (typeof value === "string" && value.match(/^\d{4}-\d{2}-\d{2}/)) {
+      return true
+    }
+
+    return false
   }
 
   const isJsonField = (dataType: string): boolean => {
@@ -205,6 +230,8 @@ export default function RecordDetailPage() {
   const renderField = (column: ColumnInfo, value: any, isEditing: boolean) => {
     const { name: columnName, type: dataType } = column
 
+    console.log(`Rendering field ${columnName} with type ${dataType}, value:`, value, `isEditing: ${isEditing}`)
+
     if (!isEditing) {
       // View mode
       if (value === null || value === undefined) {
@@ -219,7 +246,7 @@ export default function RecordDetailPage() {
         )
       }
 
-      if (isDateTimeField(dataType)) {
+      if (isDateTimeField(columnName, dataType, value)) {
         try {
           const date = new Date(value)
           return <span>{date.toLocaleString("it-IT")}</span>
@@ -267,16 +294,22 @@ export default function RecordDetailPage() {
       )
     }
 
-    if (isDateTimeField(dataType)) {
+    // IMPORTANTE: Controllo specifico per i campi data
+    if (isDateTimeField(columnName, dataType, value)) {
+      console.log(`Rendering EnhancedDatePicker for ${columnName}`)
       return (
-        <EnhancedDatePicker
-          value={value || ""}
-          onChange={(newValue) => handleFieldChange(columnName, newValue)}
-          placeholder="Seleziona data e ora"
-          showTimeSelect={true}
-          dateFormat="dd/MM/yyyy HH:mm"
-          className="w-full"
-        />
+        <div className="w-full">
+          <EnhancedDatePicker
+            value={value || ""}
+            onChange={(newValue) => {
+              console.log(`EnhancedDatePicker onChange for ${columnName}:`, newValue)
+              handleFieldChange(columnName, newValue)
+            }}
+            placeholder="Seleziona data e ora"
+            showCurrentTime={true}
+            className="w-full"
+          />
+        </div>
       )
     }
 
@@ -414,6 +447,19 @@ export default function RecordDetailPage() {
         </div>
       </div>
 
+      {/* Debug Info */}
+      {process.env.NODE_ENV === "development" && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-4">
+            <h3 className="font-semibold text-yellow-800 mb-2">Debug Info</h3>
+            <p className="text-sm text-yellow-700">
+              Editing: {isEditing ? "Yes" : "No"} | Columns: {columns.length} | Record keys:{" "}
+              {Object.keys(record || {}).join(", ")}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Record Details */}
       <Card>
         <CardHeader>
@@ -450,6 +496,11 @@ export default function RecordDetailPage() {
                             Required
                           </Badge>
                         )}
+                        {isDateTimeField(column.name, column.type, value) && (
+                          <Badge variant="default" className="text-xs bg-blue-500">
+                            DATE
+                          </Badge>
+                        )}
                       </div>
                       <div className="min-h-10">{renderField(column, value, isEditing)}</div>
                     </div>
@@ -479,6 +530,11 @@ export default function RecordDetailPage() {
                         {inferredColumn.is_primary && (
                           <Badge variant="secondary" className="text-xs">
                             PK
+                          </Badge>
+                        )}
+                        {isDateTimeField(key, inferredColumn.type, value) && (
+                          <Badge variant="default" className="text-xs bg-blue-500">
+                            DATE
                           </Badge>
                         )}
                       </div>
