@@ -13,7 +13,6 @@ import {
   LogOut,
   LayoutDashboard,
   Settings,
-  User,
   Shield,
   ArrowRight,
   Lock,
@@ -192,11 +191,16 @@ export const AuthWidget = memo(function AuthWidget() {
 
             {/* Pulsanti principali */}
             <div className="space-y-3">
-              <Button variant="outline" className="w-full h-12 flex items-center justify-center gap-2" asChild>
-                <Link href={isAdmin ? "/admin" : "/dashboard"}>
-                  <LayoutDashboard className="h-5 w-5" />
-                  <span>{isAdmin ? "Vai alla Dashboard Admin" : "Vai alla Dashboard"}</span>
-                  <ArrowRight className="h-4 w-4 ml-1" />
+              <Button variant="outline" className="w-full h-12 text-sm bg-transparent" asChild>
+                <Link
+                  href={isAdmin ? "/admin" : "/dashboard"}
+                  className="flex items-center justify-center gap-2 whitespace-nowrap"
+                >
+                  <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+                  <span className="flex-1 text-center">
+                    {isAdmin ? "Vai alla Dashboard Admin" : "Vai alla Dashboard"}
+                  </span>
+                  <ArrowRight className="h-4 w-4 flex-shrink-0" />
                 </Link>
               </Button>
 
@@ -205,20 +209,24 @@ export const AuthWidget = memo(function AuthWidget() {
                 <Link href="/profile" className="block">
                   <Button
                     variant="outline"
-                    className="w-full h-10 flex items-center justify-center gap-1 border-primary/30 hover:bg-primary/10"
+                    className="w-full h-10 text-xs border-primary/30 hover:bg-primary/10 bg-transparent"
                   >
-                    <Settings className="h-4 w-4" />
-                    <span>Profilo</span>
+                    <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                      <Settings className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span>Profilo</span>
+                    </div>
                   </Button>
                 </Link>
 
                 <Button
                   variant="outline"
-                  className="w-full h-10 flex items-center justify-center gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="w-full h-10 text-xs border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive bg-transparent"
                   onClick={handleLogout}
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>Esci</span>
+                  <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                    <LogOut className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Esci</span>
+                  </div>
                 </Button>
               </div>
             </div>
@@ -345,20 +353,22 @@ export const AuthWidget = memo(function AuthWidget() {
             <Button
               type="submit"
               variant="outline"
-              className="w-full h-12 flex items-center justify-center gap-2"
+              className="w-full h-12 text-sm bg-transparent"
               disabled={isSubmitting}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Accesso in corso...</span>
-                </>
-              ) : (
-                <>
-                  <span>Accedi</span>
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </>
-              )}
+              <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                    <span>Accesso in corso...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Accedi</span>
+                    <ArrowRight className="h-4 w-4 flex-shrink-0" />
+                  </>
+                )}
+              </div>
             </Button>
           </CardContent>
         </form>

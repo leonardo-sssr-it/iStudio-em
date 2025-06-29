@@ -109,7 +109,7 @@ function SidebarContent({
   return (
     <div className="space-y-4 py-4 h-full flex flex-col">
       <div className="px-3 py-2">
-        <h2 className="mb-2 px-2 text-base font-semibold tracking-tight">
+        <h2 className="mb-2 px-2 text-sm font-semibold tracking-tight">
           iStudio
           <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
@@ -117,44 +117,44 @@ function SidebarContent({
           <Button
             asChild
             variant={pathname === "/dashboard" ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+            <Link href="/dashboard" className="flex items-center gap-2 whitespace-nowrap">
+              <LayoutDashboard className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Dashboard</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname === "/dashboard-u" ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/dashboard-u" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+            <Link href="/dashboard-u" className="flex items-center gap-2 whitespace-nowrap">
+              <LayoutDashboard className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Dashboard U</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname === "/dashboard-utente" ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/dashboard-utente" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+            <Link href="/dashboard-utente" className="flex items-center gap-2 whitespace-nowrap">
+              <LayoutDashboard className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Dashboard Utente</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname === "/dashboard-mobile" ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/dashboard-mobile" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+            <Link href="/dashboard-mobile" className="flex items-center gap-2 whitespace-nowrap">
+              <LayoutDashboard className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Dashboard Mobile</span>
             </Link>
           </Button>
@@ -162,27 +162,27 @@ function SidebarContent({
       </div>
 
       <div className="px-3 py-2">
-        <h2 className="mb-2 px-2 text-base font-semibold tracking-tight">Gestione</h2>
+        <h2 className="mb-2 px-2 text-sm font-semibold tracking-tight">Gestione</h2>
         <div className="space-y-1">
           <Button
             asChild
             variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/pagine" className="flex items-center gap-2">
-              <FileText className="h-4 w-4 flex-shrink-0" />
+            <Link href="/pagine" className="flex items-center gap-2 whitespace-nowrap">
+              <FileText className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Pagine</span>
             </Link>
           </Button>
           <Button
             asChild
             variant={pathname?.includes("/note") ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/note" className="flex items-center gap-2">
-              <StickyNote className="h-4 w-4 flex-shrink-0" />
+            <Link href="/note" className="flex items-center gap-2 whitespace-nowrap">
+              <StickyNote className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Note</span>
             </Link>
           </Button>
@@ -193,11 +193,11 @@ function SidebarContent({
                 ? "secondary"
                 : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=appuntamenti" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=appuntamenti" className="flex items-center gap-2 whitespace-nowrap">
+              <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Appuntamenti</span>
             </Link>
           </Button>
@@ -206,11 +206,11 @@ function SidebarContent({
             variant={
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita" ? "secondary" : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=attivita" className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=attivita" className="flex items-center gap-2 whitespace-nowrap">
+              <ClipboardList className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Attività</span>
             </Link>
           </Button>
@@ -219,11 +219,11 @@ function SidebarContent({
             variant={
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze" ? "secondary" : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=scadenze" className="flex items-center gap-2">
-              <Clock className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=scadenze" className="flex items-center gap-2 whitespace-nowrap">
+              <Clock className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Scadenze</span>
             </Link>
           </Button>
@@ -232,11 +232,11 @@ function SidebarContent({
             variant={
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist" ? "secondary" : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=todolist" className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=todolist" className="flex items-center gap-2 whitespace-nowrap">
+              <CheckSquare className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">To-Do List</span>
             </Link>
           </Button>
@@ -245,11 +245,11 @@ function SidebarContent({
             variant={
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti" ? "secondary" : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=progetti" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=progetti" className="flex items-center gap-2 whitespace-nowrap">
+              <BarChart3 className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Progetti</span>
             </Link>
           </Button>
@@ -258,11 +258,11 @@ function SidebarContent({
             variant={
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=clienti" className="flex items-center gap-2">
-              <Users className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=clienti" className="flex items-center gap-2 whitespace-nowrap">
+              <Users className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Clienti</span>
             </Link>
           </Button>
@@ -271,11 +271,11 @@ function SidebarContent({
             variant={
               pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine" ? "secondary" : "ghost"
             }
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/data-explorer?table=pagine" className="flex items-center gap-2">
-              <FileText className="h-4 w-4 flex-shrink-0" />
+            <Link href="/data-explorer?table=pagine" className="flex items-center gap-2 whitespace-nowrap">
+              <FileText className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Pagine</span>
             </Link>
           </Button>
@@ -285,60 +285,60 @@ function SidebarContent({
       {/* Sezione Admin */}
       {isAdmin && (
         <div className="px-3 py-2">
-          <h2 className="mb-2 px-2 text-base font-semibold tracking-tight">Amministrazione</h2>
+          <h2 className="mb-2 px-2 text-sm font-semibold tracking-tight">Amministrazione</h2>
           <div className="space-y-1">
             <Button
               asChild
               variant={pathname === "/admin" ? "secondary" : "ghost"}
-              className="w-full justify-start h-9 px-2 text-sm"
+              className="w-full justify-start h-8 px-2 text-xs"
               size="sm"
             >
-              <Link href="/admin" className="flex items-center gap-2">
-                <Settings className="h-4 w-4 flex-shrink-0" />
+              <Link href="/admin" className="flex items-center gap-2 whitespace-nowrap">
+                <Settings className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">Admin Panel</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
-              className="w-full justify-start h-9 px-2 text-sm"
+              className="w-full justify-start h-8 px-2 text-xs"
               size="sm"
             >
-              <Link href="/admin/users" className="flex items-center gap-2">
-                <Users className="h-4 w-4 flex-shrink-0" />
+              <Link href="/admin/users" className="flex items-center gap-2 whitespace-nowrap">
+                <Users className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">Gestione Utenti</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/data-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start h-9 px-2 text-sm"
+              className="w-full justify-start h-8 px-2 text-xs"
               size="sm"
             >
-              <Link href="/data-explorer" className="flex items-center gap-2">
-                <Database className="h-4 w-4 flex-shrink-0" />
+              <Link href="/data-explorer" className="flex items-center gap-2 whitespace-nowrap">
+                <Database className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">Data Explorer</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/table-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start h-9 px-2 text-sm"
+              className="w-full justify-start h-8 px-2 text-xs"
               size="sm"
             >
-              <Link href="/table-explorer" className="flex items-center gap-2">
-                <Layers className="h-4 w-4 flex-shrink-0" />
+              <Link href="/table-explorer" className="flex items-center gap-2 whitespace-nowrap">
+                <Layers className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">Table Explorer</span>
               </Link>
             </Button>
             <Button
               asChild
               variant={pathname?.includes("/debug-scadenze") ? "secondary" : "ghost"}
-              className="w-full justify-start h-9 px-2 text-sm"
+              className="w-full justify-start h-8 px-2 text-xs"
               size="sm"
             >
-              <Link href="/debug-scadenze" className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <Link href="/debug-scadenze" className="flex items-center gap-2 whitespace-nowrap">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">Debug Scadenze</span>
               </Link>
             </Button>
@@ -352,11 +352,11 @@ function SidebarContent({
           <Button
             asChild
             variant={pathname === "/profile" ? "secondary" : "ghost"}
-            className="w-full justify-start h-9 px-2 text-sm"
+            className="w-full justify-start h-8 px-2 text-xs"
             size="sm"
           >
-            <Link href="/profile" className="flex items-center gap-2">
-              <Users className="h-4 w-4 flex-shrink-0" />
+            <Link href="/profile" className="flex items-center gap-2 whitespace-nowrap">
+              <Users className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">Profilo</span>
             </Link>
           </Button>
