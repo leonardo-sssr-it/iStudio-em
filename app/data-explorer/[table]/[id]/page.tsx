@@ -1,6 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
+import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Save, Trash2, Edit, X, AlertCircle } from "lucide-react"
+import { formatValue } from "@/lib/utils-db"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { TagInput } from "@/components/ui/tag-input"
 import { normalizeDate, formatDateDisplay } from "@/lib/date-utils"
@@ -446,19 +450,16 @@ const ProgressBar = ({
             background: `linear-gradient(to right, ${progressColor} 0%, ${progressColor} ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`,
           }}
         />
-        <div className="flex justify#e5e7eb ${percentage}%,#e5e7eb 100%)`,
-          }}
-        />
-        <div className="flex justify-between text-xs text-gray-500 mt-1\">\
-          <span>0%</span> <span>50%</span> <span>100%</span>\
-        </div>\
-      </div>\
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>0%</span> <span>50%</span> <span>100%</span>
+        </div>
+      </div>
     </div>
   )
 }
 
 // Componente principale
-export default function ItemDetailPage() {\
+export default function ItemDetailPage() {
   const { supabase } = useSupabase()
   const { user } = useAuth()
   const router = useRouter()
@@ -472,9 +473,9 @@ export default function ItemDetailPage() {\
   const [deleting, setDeleting] = useState<boolean>(false)
   const [item, setItem] = useState<any>(null)
   const [editedItem, setEditedItem] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<string>("main")\
-  const [validationErrors, setValidationErrors] = useState<string[]>([])\
-  const [priorityOptions, setPriorityOptions] = useState<any[]>([])\
+  const [activeTab, setActiveTab] = useState<string>("main")
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
   const [groupOptions, setGroupOptions] = useState<any[]>([])
 
   const tableName = Array.isArray(params.table) ? params.table[0] : params.table
@@ -490,86 +491,86 @@ export default function ItemDetailPage() {\
   const fieldGroups = tableConfig?.groups || {}
   const selectOptions = tableConfig?.selectOptions || {}
 
-  const loadPriorityOptions = useCallback(async () => {\
+  const loadPriorityOptions = useCallback(async () => {
     if (!supabase) return
-    try {\
+    try {
       const { data, error } = await supabase.from("configurazione").select("priorita").single()
       if (error) throw error
       let priorityArray = null
-      if (data?.priorita) {\
+      if (data?.priorita) {
         if (Array.isArray(data.priorita)) priorityArray = data.priorita
         else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
         else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
       }
       if (!priorityArray || priorityArray.length === 0) {
-        setPriorityOptions([])\
+        setPriorityOptions([])
         return
       }
-      const mappedPriorities = priorityArray.map((item: any) => ({\
+      const mappedPriorities = priorityArray.map((item: any) => ({
         value: item.livello || item.value,
         nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
         descrizione: item.descrizione || item.description || "",
       }))
       setPriorityOptions(mappedPriorities)
     } catch (error: any) {
-      console.error("Errore nel caricamento delle priorità:", error)\
+      console.error("Errore nel caricamento delle priorità:", error)
       setPriorityOptions([])
     }
   }, [supabase])
 
-  const loadGroupOptions = useCallback(async () => {\
+  const loadGroupOptions = useCallback(async () => {
     if (!supabase) return
-    try {\
+    try {
       const { data, error } = await supabase.from("configurazione").select("gruppi").single()
       if (error) throw error
       let groupArray = null
-      if (data?.gruppi) {\
+      if (data?.gruppi) {
         if (Array.isArray(data.gruppi)) groupArray = data.gruppi
         else if (data.gruppi.gruppi && Array.isArray(data.gruppi.gruppi)) groupArray = data.gruppi.gruppi
       }
       if (!groupArray || groupArray.length === 0) {
-        setGroupOptions([])\
+        setGroupOptions([])
         return
       }
-      const mappedGroups = groupArray.map((item: any) => ({\
+      const mappedGroups = groupArray.map((item: any) => ({
         value: item.id || item.value,
         nome: item.gruppo || item.nome || item.label || `Gruppo ${item.id || item.value}`,
         descrizione: item.descrizione || item.description || "",
       }))
       setGroupOptions(mappedGroups)
     } catch (error: any) {
-      console.error("Errore nel caricamento dei gruppi:", error)\
+      console.error("Errore nel caricamento dei gruppi:", error)
       setGroupOptions([])
     }
   }, [supabase])
 
-  useEffect(() => {\
+  useEffect(() => {
     if (supabase) {
-      loadPriorityOptions()\
+      loadPriorityOptions()
       loadGroupOptions()
     }
   }, [supabase, loadPriorityOptions, loadGroupOptions])
 
-  const validateForm = (): string[] => {\
+  const validateForm = (): string[] => {
     const errors: string[] = []
     if (!editedItem) return errors
-    requiredFields.forEach((field) => {\
+    requiredFields.forEach((field) => {
       const value = editedItem[field]
-      if (!value || (typeof value === "string" && value.trim() === "")) {\
+      if (!value || (typeof value === "string" && value.trim() === "")) {
         const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")
         errors.push(`Il campo "${label}" è obbligatorio`)
       }
     })
-    if (tableName === "todolist" && editedItem.descrizione && editedItem.descrizione.trim().length < 3) {\
-      errors.push(\"La descrizione deve contenere almeno 3 caratteri")
+    if (tableName === "todolist" && editedItem.descrizione && editedItem.descrizione.trim().length < 3) {
+      errors.push("La descrizione deve contenere almeno 3 caratteri")
     }
     return errors
   }
 
-  const loadItem = useCallback(async () => {\
+  const loadItem = useCallback(async () => {
     if (!supabase || !tableName || !user?.id || !isValidTable) return
     setLoading(true)
-    try {\
+    try {
       if (isNewItem) {
         const newItem: any = { id_utente: user.id }
         // Imposta valori di default specifici per tabella
