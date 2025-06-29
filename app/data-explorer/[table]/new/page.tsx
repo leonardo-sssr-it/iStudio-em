@@ -173,6 +173,7 @@ const TABLE_FIELDS = {
     defaultValues: {
       stato: "attivo",
       privato: false,
+      attivo: true,
     },
     fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "note"],
     types: {
@@ -183,6 +184,7 @@ const TABLE_FIELDS = {
       stato: "select",
       note: "text",
       privato: "boolean",
+      attivo: "boolean",
       id_utente: "number",
       data_creazione: "datetime",
       modifica: "datetime",
