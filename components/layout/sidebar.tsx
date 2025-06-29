@@ -29,6 +29,8 @@ import {
   Wifi,
   WifiOff,
   StickyNote,
+  Filter,
+  List,
 } from "lucide-react"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -72,7 +74,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
         </Button>
 
         <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
-          <SheetContent side="left" className="w-[280px] p-0 bg-background border-r z-50">
+          <SheetContent side="left" className="w-[220px] p-0 bg-background border-r z-50">
             <ScrollArea className="h-full">
               <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
             </ScrollArea>
@@ -84,7 +86,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
   // Versione desktop della sidebar
   return (
-    <div className={cn("pb-12 w-[240px] flex-shrink-0 sidebar-container", className)} {...props}>
+    <div className={cn("pb-12 w-[200px] flex-shrink-0 sidebar-container", className)} {...props}>
       <ScrollArea className="h-full">
         <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
       </ScrollArea>
@@ -109,11 +111,10 @@ function SidebarContent({
   return (
     <div className="space-y-3 py-3 h-full flex flex-col sidebar-content">
       <div className="sidebar-section">
-        <h2 className="sidebar-title">
-          iStudio
-          <span className="text-xs text-muted-foreground ml-1">v0.4</span>
-        </h2>
-        <div className="space-y-0.5">
+        <div className="bg-primary text-primary-foreground px-3 py-2 mx-2 rounded-md text-center font-bold text-sm">
+          MENU
+        </div>
+        <div className="space-y-0.5 mt-3">
           <Link
             href="/dashboard"
             className={cn(
@@ -279,6 +280,26 @@ function SidebarContent({
             >
               <Users className="h-4 w-4" />
               Gestione Utenti
+            </Link>
+            <Link
+              href="/user-filter"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/user-filter") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
+            >
+              <Filter className="h-4 w-4" />
+              User Filter
+            </Link>
+            <Link
+              href="/show-list"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/show-list") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
+            >
+              <List className="h-4 w-4" />
+              Show List
             </Link>
             <Link
               href="/data-explorer"

@@ -1316,12 +1316,12 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
               <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <div className="flex items-center cursor-pointer hover:text-gray-700">
+                    <button className="flex items-center cursor-pointer hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors">
                       <Info className="h-3 w-3 mr-1" />
                       Elementi visualizzati: {filteredItems.length} di {items.length} totali
-                    </div>
+                    </button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-64">
+                  <PopoverContent className="w-64" side="top" align="start">
                     <div className="space-y-2">
                       <h4 className="font-semibold text-sm">Dettaglio per tipo</h4>
                       <div className="space-y-1 text-xs">
