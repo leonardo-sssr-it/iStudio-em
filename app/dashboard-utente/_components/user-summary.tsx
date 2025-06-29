@@ -13,7 +13,7 @@ import type { LucideIcon } from "lucide-react"
 const SummaryCard = ({ type, label, count, icon: Icon, color, textColor }: SummaryCount) => (
   <Link href={`/data-explorer?table=${type}`} className="block">
     <Card
-      className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color} cursor-pointer transform hover:scale-105 transition-transform`}
+      className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color} cursor-pointer transform hover:scale-105 transition-transform w-[70%]`}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
         <CardTitle className={`text-xs font-medium ${textColor} truncate`}>{label}</CardTitle>
@@ -93,7 +93,7 @@ export function UserSummary() {
       <div className="space-y-6">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="w-[70%]">
               <CardHeader className="pb-1">
                 <Skeleton className="h-4 w-20" />
               </CardHeader>
