@@ -195,7 +195,7 @@ export function Header() {
 
           {/* Centro - Data e Ora (solo desktop) - SENZA grassetto */}
           <div className="hidden md:flex flex-col items-center text-center">
-            <div className="text-sm text-foreground font-normal">{currentTime}</div>
+            <div className="text-xs text-foreground font-normal">{currentTime}</div>
             <div className="text-xs text-muted-foreground font-normal">{currentDate}</div>
           </div>
 
