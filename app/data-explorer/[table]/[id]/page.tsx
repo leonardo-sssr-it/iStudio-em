@@ -15,6 +15,7 @@ import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import { JsonEditor } from "@/components/ui/json-editor"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { TablesRepository, type ColumnInfo } from "@/lib/repositories/tables-repository"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,19 +28,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-interface Column {
-  column_name: string
-  data_type: string
-  is_nullable: string
-  column_default: string | null
-  is_primary_key?: boolean
-}
-
 export default function RecordDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [record, setRecord] = useState<any>(null)
-  const [columns, setColumns] = useState<Column[]>([])
+  const [columns, setColumns] = useState<ColumnInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -60,35 +53,56 @@ export default function RecordDetailPage() {
 
   const fetchColumns = async () => {
     try {
-      const { data, error } = await supabase
-        .from("information_schema.columns")
-        .select("column_name, data_type, is_nullable, column_default")
-        .eq("table_name", tableName)
-        .eq("table_schema", "public")
-        .order("ordinal_position")
+      const tablesRepo = new TablesRepository(supabase)
+      const columnsData = await tablesRepo.getColumns(tableName)
 
-      if (error) throw error
-
-      // Fetch primary key info
-      const { data: pkData } = await supabase
-        .from("information_schema.key_column_usage")
-        .select("column_name")
-        .eq("table_name", tableName)
-        .eq("table_schema", "public")
-
-      const primaryKeys = pkData?.map((pk) => pk.column_name) || []
-
-      const columnsWithPK =
-        data?.map((col) => ({
-          ...col,
-          is_primary_key: primaryKeys.includes(col.column_name),
-        })) || []
-
-      setColumns(columnsWithPK)
+      if (columnsData.length === 0) {
+        // Fallback: try to infer columns from the record data
+        if (record) {
+          const inferredColumns: ColumnInfo[] = Object.keys(record).map((key) => ({
+            name: key,
+            type: inferColumnType(record[key]),
+            is_nullable: true,
+            is_identity: key === "id",
+            is_primary: key === "id",
+          }))
+          setColumns(inferredColumns)
+        }
+      } else {
+        setColumns(columnsData)
+      }
     } catch (error) {
       console.error("Error fetching columns:", error)
-      setError("Errore nel caricamento delle colonne")
+
+      // Fallback: if we have record data, infer columns from it
+      if (record) {
+        const inferredColumns: ColumnInfo[] = Object.keys(record).map((key) => ({
+          name: key,
+          type: inferColumnType(record[key]),
+          is_nullable: true,
+          is_identity: key === "id",
+          is_primary: key === "id",
+        }))
+        setColumns(inferredColumns)
+      } else {
+        setError("Errore nel caricamento delle colonne")
+      }
     }
+  }
+
+  const inferColumnType = (value: any): string => {
+    if (value === null || value === undefined) return "text"
+    if (typeof value === "number") return Number.isInteger(value) ? "integer" : "numeric"
+    if (typeof value === "boolean") return "boolean"
+    if (value instanceof Date) return "timestamp"
+    if (typeof value === "string") {
+      // Check for date patterns
+      if (value.match(/^\d{4}-\d{2}-\d{2}/)) return "timestamp"
+      if (value.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) return "uuid"
+      if (value.length > 100) return "text"
+    }
+    if (typeof value === "object") return "json"
+    return "varchar"
   }
 
   const fetchRecord = async () => {
@@ -100,6 +114,11 @@ export default function RecordDetailPage() {
 
       setRecord(data)
       setEditedRecord(data)
+
+      // If columns haven't been fetched yet, trigger column fetch after we have record data
+      if (columns.length === 0) {
+        setTimeout(() => fetchColumns(), 100)
+      }
     } catch (error) {
       console.error("Error fetching record:", error)
       setError("Errore nel caricamento del record")
@@ -156,8 +175,35 @@ export default function RecordDetailPage() {
     }))
   }
 
-  const renderField = (column: Column, value: any, isEditing: boolean) => {
-    const { column_name, data_type } = column
+  const isDateTimeField = (dataType: string): boolean => {
+    return (
+      dataType.includes("timestamp") ||
+      dataType.includes("date") ||
+      dataType === "datetime" ||
+      dataType.includes("time")
+    )
+  }
+
+  const isJsonField = (dataType: string): boolean => {
+    return dataType.includes("json") || dataType.includes("jsonb")
+  }
+
+  const isNumericField = (dataType: string): boolean => {
+    return (
+      dataType.includes("int") ||
+      dataType.includes("numeric") ||
+      dataType.includes("decimal") ||
+      dataType.includes("float") ||
+      dataType.includes("double")
+    )
+  }
+
+  const isTextAreaField = (dataType: string, value: any): boolean => {
+    return dataType === "text" || (typeof value === "string" && value.length > 100)
+  }
+
+  const renderField = (column: ColumnInfo, value: any, isEditing: boolean) => {
+    const { name: columnName, type: dataType } = column
 
     if (!isEditing) {
       // View mode
@@ -165,87 +211,108 @@ export default function RecordDetailPage() {
         return <span className="text-muted-foreground italic">null</span>
       }
 
-      if (data_type.includes("json") || data_type.includes("jsonb")) {
+      if (isJsonField(dataType)) {
         return (
-          <pre className="bg-muted p-2 rounded text-sm overflow-auto max-h-32">{JSON.stringify(value, null, 2)}</pre>
+          <pre className="bg-muted p-2 rounded text-sm overflow-auto max-h-32 whitespace-pre-wrap">
+            {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}
+          </pre>
         )
       }
 
-      if (data_type.includes("timestamp") || data_type.includes("date")) {
-        return <span>{new Date(value).toLocaleString("it-IT")}</span>
+      if (isDateTimeField(dataType)) {
+        try {
+          const date = new Date(value)
+          return <span>{date.toLocaleString("it-IT")}</span>
+        } catch {
+          return <span>{String(value)}</span>
+        }
       }
 
-      if (data_type === "boolean") {
+      if (dataType === "boolean") {
         return <Badge variant={value ? "default" : "secondary"}>{value ? "Vero" : "Falso"}</Badge>
       }
 
-      if (typeof value === "string" && value.length > 100) {
+      if (isTextAreaField(dataType, value)) {
         return (
           <div className="max-h-32 overflow-auto">
-            <Textarea value={value} readOnly className="min-h-20" />
+            <Textarea value={String(value)} readOnly className="min-h-20 resize-none" />
           </div>
         )
       }
 
-      return <span>{String(value)}</span>
+      return <span className="break-words">{String(value)}</span>
     }
 
     // Edit mode
-    if (column.is_primary_key) {
+    if (column.is_primary || column.is_identity) {
       return <Input value={value || ""} disabled className="bg-muted" />
     }
 
-    if (data_type === "boolean") {
+    if (dataType === "boolean") {
       return (
         <div className="flex items-center space-x-2">
-          <Switch checked={value || false} onCheckedChange={(checked) => handleFieldChange(column_name, checked)} />
-          <Label>{value ? "Vero" : "Falso"}</Label>
+          <Switch checked={Boolean(value)} onCheckedChange={(checked) => handleFieldChange(columnName, checked)} />
+          <Label>{Boolean(value) ? "Vero" : "Falso"}</Label>
         </div>
       )
     }
 
-    if (data_type.includes("json") || data_type.includes("jsonb")) {
+    if (isJsonField(dataType)) {
       return (
         <JsonEditor
           value={value}
-          onChange={(newValue) => handleFieldChange(column_name, newValue)}
+          onChange={(newValue) => handleFieldChange(columnName, newValue)}
           className="min-h-32"
         />
       )
     }
 
-    if (data_type.includes("timestamp") || data_type.includes("date")) {
+    if (isDateTimeField(dataType)) {
       return (
         <EnhancedDatePicker
           value={value || ""}
-          onChange={(newValue) => handleFieldChange(column_name, newValue)}
+          onChange={(newValue) => handleFieldChange(columnName, newValue)}
           placeholder="Seleziona data e ora"
-          showCurrentTime={true}
+          showTimeSelect={true}
+          dateFormat="dd/MM/yyyy HH:mm"
+          className="w-full"
         />
       )
     }
 
-    if (data_type === "text" || (typeof value === "string" && value.length > 100)) {
+    if (isTextAreaField(dataType, value)) {
       return (
         <Textarea
           value={value || ""}
-          onChange={(e) => handleFieldChange(column_name, e.target.value)}
+          onChange={(e) => handleFieldChange(columnName, e.target.value)}
           className="min-h-20"
+          placeholder={`Inserisci ${columnName}`}
         />
       )
     }
 
-    if (data_type.includes("int") || data_type.includes("numeric") || data_type.includes("decimal")) {
+    if (isNumericField(dataType)) {
       return (
         <Input
           type="number"
           value={value || ""}
-          onChange={(e) => handleFieldChange(column_name, e.target.value ? Number(e.target.value) : null)}
+          onChange={(e) => {
+            const numValue = e.target.value ? Number(e.target.value) : null
+            handleFieldChange(columnName, numValue)
+          }}
+          placeholder={`Inserisci ${columnName}`}
         />
       )
     }
 
-    return <Input value={value || ""} onChange={(e) => handleFieldChange(column_name, e.target.value)} />
+    // Default text input
+    return (
+      <Input
+        value={value || ""}
+        onChange={(e) => handleFieldChange(columnName, e.target.value)}
+        placeholder={`Inserisci ${columnName}`}
+      />
+    )
   }
 
   if (loading) {
@@ -288,7 +355,7 @@ export default function RecordDetailPage() {
             Indietro
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{tableName}</h1>
+            <h1 className="text-2xl font-bold capitalize">{tableName}</h1>
             <p className="text-muted-foreground">Record ID: {recordId}</p>
           </div>
         </div>
@@ -356,34 +423,71 @@ export default function RecordDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {columns.map((column, index) => {
-            const value = isEditing ? editedRecord[column.column_name] : record[column.column_name]
+          {columns.length > 0
+            ? columns.map((column, index) => {
+                const value = isEditing ? editedRecord[column.name] : record[column.name]
 
-            return (
-              <div key={column.column_name}>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Label className="font-medium">{column.column_name}</Label>
-                    <Badge variant="outline" className="text-xs">
-                      {column.data_type}
-                    </Badge>
-                    {column.is_primary_key && (
-                      <Badge variant="secondary" className="text-xs">
-                        PK
-                      </Badge>
-                    )}
-                    {column.is_nullable === "NO" && (
-                      <Badge variant="destructive" className="text-xs">
-                        Required
-                      </Badge>
-                    )}
+                return (
+                  <div key={column.name}>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2 flex-wrap">
+                        <Label className="font-medium">{column.name}</Label>
+                        <Badge variant="outline" className="text-xs">
+                          {column.type}
+                        </Badge>
+                        {column.is_primary && (
+                          <Badge variant="secondary" className="text-xs">
+                            PK
+                          </Badge>
+                        )}
+                        {column.is_identity && (
+                          <Badge variant="secondary" className="text-xs">
+                            AUTO
+                          </Badge>
+                        )}
+                        {!column.is_nullable && (
+                          <Badge variant="destructive" className="text-xs">
+                            Required
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="min-h-10">{renderField(column, value, isEditing)}</div>
+                    </div>
+                    {index < columns.length - 1 && <Separator />}
                   </div>
-                  <div className="min-h-10">{renderField(column, value, isEditing)}</div>
-                </div>
-                {index < columns.length - 1 && <Separator />}
-              </div>
-            )
-          })}
+                )
+              })
+            : // Fallback: render all record fields if no column info available
+              Object.keys(record).map((key, index) => {
+                const value = isEditing ? editedRecord[key] : record[key]
+                const inferredColumn: ColumnInfo = {
+                  name: key,
+                  type: inferColumnType(value),
+                  is_nullable: true,
+                  is_identity: key === "id",
+                  is_primary: key === "id",
+                }
+
+                return (
+                  <div key={key}>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Label className="font-medium">{key}</Label>
+                        <Badge variant="outline" className="text-xs">
+                          {inferredColumn.type}
+                        </Badge>
+                        {inferredColumn.is_primary && (
+                          <Badge variant="secondary" className="text-xs">
+                            PK
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="min-h-10">{renderField(inferredColumn, value, isEditing)}</div>
+                    </div>
+                    {index < Object.keys(record).length - 1 && <Separator />}
+                  </div>
+                )
+              })}
         </CardContent>
       </Card>
     </div>
