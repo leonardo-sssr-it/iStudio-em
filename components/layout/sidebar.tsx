@@ -111,7 +111,6 @@ function SidebarContent({
       <div className="sidebar-section">
         <h2 className="sidebar-title">
           iStudio
-          <span className="text-xs text-muted-foreground ml-1">v0.4</span>
         </h2>
         <div className="space-y-1">
           <Button
