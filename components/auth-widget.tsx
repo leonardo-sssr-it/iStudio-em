@@ -1,320 +1,200 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, type FormEvent, useEffect } from "react"
+import { useAuth } from "@/lib/auth-provider"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useAuth } from "@/lib/auth-provider"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { LogIn, LogOut, User, UserPlus, Loader2 } from "lucide-react"
+import Link from "next/link"
 import { useDebugConfig } from "@/hooks/use-debug-config"
-import { LogIn, LogOut, User, Mail, Lock, AlertCircle, Loader2 } from "lucide-react"
 
-export function AuthWidget() {
-  const { user, login, logout, register, loading } = useAuth()
-  const { isDebugEnabled } = useDebugConfig()
+export default function AuthWidget() {
+  const { user, login, signUp, signOut, loading: authLoading, error: authError } = useAuth()
+  const { debug, log: debugLog } = useDebugConfig()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isDebugEnabled) {
-      console.log("AuthWidget: user =", user)
-      console.log("AuthWidget: loading =", loading)
+    if (authError) {
+      setError(authError)
     }
-  }, [user, loading, isDebugEnabled])
+  }, [authError])
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !password) {
-      setError("Email e password sono obbligatori")
-      return
-    }
-
-    setIsLoading(true)
-    setError("")
+  const handleSubmit = async (event: FormEvent, action: "login" | "signUp") => {
+    event.preventDefault()
+    setLoading(true)
+    setError(null)
+    if (debug) debugLog(`AuthWidget: Tentativo di ${action} con email: ${email}`)
 
     try {
-      if (isDebugEnabled) {
-        console.log("AuthWidget: Tentativo di login per", email)
-      }
-
-      const result = await login(email, password)
-
-      if (result?.error) {
-        setError(result.error.message || "Errore durante il login")
-        if (isDebugEnabled) {
-          console.error("AuthWidget: Errore login:", result.error)
-        }
+      if (action === "login") {
+        await login(email, password)
+        if (debug) debugLog("AuthWidget: Login completato con successo.")
       } else {
-        if (isDebugEnabled) {
-          console.log("AuthWidget: Login riuscito")
-        }
-        setEmail("")
-        setPassword("")
+        await signUp(email, password)
+        if (debug)
+          debugLog("AuthWidget: Registrazione completata con successo. Controlla la tua email per la conferma.")
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Errore durante il login"
+    } catch (e: any) {
+      const errorMessage = e.message || "Si è verificato un errore sconosciuto."
+      if (debug) debugLog(`AuthWidget: Errore durante ${action}:`, errorMessage)
       setError(errorMessage)
-      if (isDebugEnabled) {
-        console.error("AuthWidget: Errore login catch:", err)
-      }
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !password || !confirmPassword) {
-      setError("Tutti i campi sono obbligatori")
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setError("Le password non coincidono")
-      return
-    }
-
-    if (password.length < 6) {
-      setError("La password deve essere di almeno 6 caratteri")
-      return
-    }
-
-    setIsLoading(true)
-    setError("")
-
-    try {
-      if (isDebugEnabled) {
-        console.log("AuthWidget: Tentativo di registrazione per", email)
-      }
-
-      const result = await register(email, password)
-
-      if (result?.error) {
-        setError(result.error.message || "Errore durante la registrazione")
-        if (isDebugEnabled) {
-          console.error("AuthWidget: Errore registrazione:", result.error)
-        }
-      } else {
-        if (isDebugEnabled) {
-          console.log("AuthWidget: Registrazione riuscita")
-        }
-        setEmail("")
-        setPassword("")
-        setConfirmPassword("")
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Errore durante la registrazione"
-      setError(errorMessage)
-      if (isDebugEnabled) {
-        console.error("AuthWidget: Errore registrazione catch:", err)
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleLogout = async () => {
-    setIsLoading(true)
-    try {
-      if (isDebugEnabled) {
-        console.log("AuthWidget: Tentativo di logout")
-      }
-
-      await logout()
-
-      if (isDebugEnabled) {
-        console.log("AuthWidget: Logout riuscito")
-      }
-    } catch (err) {
-      if (isDebugEnabled) {
-        console.error("AuthWidget: Errore logout:", err)
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Se l'utente è autenticato, mostra il widget utente
-  if (user) {
+  if (authLoading) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-2 bg-primary/10 rounded-full">
-            <User className="w-6 h-6 text-primary" />
-          </div>
-          <CardTitle className="text-lg">Benvenuto!</CardTitle>
-          <CardDescription>
-            {user.email}
-            {user.user_metadata?.full_name && (
-              <div className="text-sm text-muted-foreground mt-1">{user.user_metadata.full_name}</div>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2">
-            <a
-              href="/profile"
-              className="auth-widget-secondary-button inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
-            >
-              <User />
-              <span>Profilo</span>
-            </a>
-            <Button
-              onClick={handleLogout}
-              disabled={isLoading}
-              variant="outline"
-              className="auth-widget-button bg-transparent"
-            >
-              {isLoading ? <Loader2 className="animate-spin" /> : <LogOut />}
-              <span>{isLoading ? "Disconnessione..." : "Logout"}</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
     )
   }
 
-  // Se l'utente non è autenticato, mostra il form di login/registrazione
-  return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Accesso</CardTitle>
-        <CardDescription>Accedi al tuo account o registrati per iniziare</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Registrati</TabsTrigger>
-          </TabsList>
+  if (user) {
+    return (
+      <div className="p-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-10 w-full justify-start px-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder-user.jpg"} alt={user.email} />
+                <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="ml-2 truncate text-sm font-medium">{user.email}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">Profilo</p>
+                <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="flex items-center cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                <span>Il mio profilo</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={signOut}
+              className="flex items-center cursor-pointer text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-900/50"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Logout</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    )
+  }
 
-          <TabsContent value="login" className="space-y-4">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+  return (
+    <div className="p-4">
+      <Tabs defaultValue="login" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="login">
+            <LogIn className="mr-2 h-4 w-4" /> Login
+          </TabsTrigger>
+          <TabsTrigger value="register">
+            <UserPlus className="mr-2 h-4 w-4" /> Registrati
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="login">
+          <Card>
+            <CardHeader>
+              <CardTitle>Login</CardTitle>
+              <CardDescription>Accedi al tuo account per continuare.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={(e) => handleSubmit(e, "login")} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
                   <Input
                     id="login-email"
                     type="email"
-                    placeholder="la-tua-email@esempio.com"
+                    placeholder="m@example.com"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Password</Label>
                   <Input
                     id="login-password"
                     type="password"
-                    placeholder="La tua password"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
                   />
                 </div>
-              </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full auth-widget-button" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : <LogIn />}
-                <span>{isLoading ? "Accesso..." : "Accedi"}</span>
-              </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="register" className="space-y-4">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="register-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
+                  Accedi
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="register">
+          <Card>
+            <CardHeader>
+              <CardTitle>Registrati</CardTitle>
+              <CardDescription>Crea un nuovo account per iniziare.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={(e) => handleSubmit(e, "signUp")} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">Email</Label>
                   <Input
                     id="register-email"
                     type="email"
-                    placeholder="la-tua-email@esempio.com"
+                    placeholder="m@example.com"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <div className="space-y-2">
+                  <Label htmlFor="register-password">Password</Label>
                   <Input
                     id="register-password"
                     type="password"
-                    placeholder="Almeno 6 caratteri"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
-                    minLength={6}
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Conferma Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="Ripeti la password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10"
-                    disabled={isLoading}
-                    required
-                    minLength={6}
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full auth-widget-button" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : <User />}
-                <span>{isLoading ? "Registrazione..." : "Registrati"}</span>
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                  Crea Account
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
