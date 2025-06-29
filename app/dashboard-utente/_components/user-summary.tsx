@@ -91,7 +91,7 @@ export function UserSummary() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="grid gap-1.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+        <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
           {Array.from({ length: 8 }).map((_, i) => (
             <Card key={i} className="w-[70%]">
               <CardHeader className="pb-1 p-3">
@@ -104,7 +104,7 @@ export function UserSummary() {
             </Card>
           ))}
         </div>
-        <div className="grid gap-1.5 md:grid-cols-2">
+        <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-2">
           <Card>
             <CardHeader className="pb-2 p-3">
               <Skeleton className="h-5 w-28" />
@@ -147,12 +147,12 @@ export function UserSummary() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-1.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+      <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
         {dashboardData.summaryCounts.map((summary) => (
           <SummaryCard key={summary.type} {...summary} />
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-1 gap-y-1.5">
         <UpcomingItemsList title="Elementi di Oggi" items={dashboardData.todaysItems} icon={CalendarClock} />
         <UpcomingItemsList title="Prossima Settimana" items={dashboardData.nextWeekItems} icon={CalendarPlus} />
       </div>
