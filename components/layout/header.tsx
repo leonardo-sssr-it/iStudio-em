@@ -50,8 +50,19 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
   const [currentDate, setCurrentDate] = useState("")
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
-  // Formattazione data su due righe
+  // Debug per capire lo stato dell'utente
+  useEffect(() => {
+    console.log("Header - User state:", {
+      user: user ? { id: user.id, nome: user.nome, username: user.username, email: user.email } : null,
+      isAdmin,
+      mounted,
+    })
+  }, [user, isAdmin, mounted])
+
+  // Formattazione data su due righe SENZA grassetto
   const formatDateTime = useCallback(() => {
     const now = new Date()
 
@@ -94,43 +105,62 @@ export function Header() {
 
   const handleThemeChange = useCallback(
     (themeId: number) => {
+      console.log("Changing theme to:", themeId)
       applyTheme(themeId)
+      setThemeMenuOpen(false)
     },
     [applyTheme],
   )
 
   const handleResetToDefault = useCallback(() => {
+    console.log("Resetting to default theme")
     resetToDefault()
+    setThemeMenuOpen(false)
   }, [resetToDefault])
 
   const handleLayoutChange = useCallback(
     (newLayout: string) => {
+      console.log("Changing layout to:", newLayout)
       setLayout(newLayout as any)
       setIsMenuOpen(false)
+      setUserMenuOpen(false)
     },
     [setLayout],
   )
 
   const handleFontSizeChange = useCallback(
     (size: string) => {
+      console.log("Changing font size to:", size)
       setFontSize(size as any)
       setIsMenuOpen(false)
+      setUserMenuOpen(false)
     },
     [setFontSize],
   )
 
   const handleLogout = useCallback(() => {
+    console.log("Logging out")
     logout()
     setIsMenuOpen(false)
+    setUserMenuOpen(false)
   }, [logout])
 
   // Memoizza i valori per evitare re-render inutili
   const appTitle = useMemo(() => config?.titolo || "iStudio", [config?.titolo])
   const appMotto = useMemo(() => config?.motto || "", [config?.motto])
 
+  // Debug per temi
+  useEffect(() => {
+    console.log("Themes state:", {
+      themes: themes.length,
+      currentTheme: currentTheme?.nome_tema,
+      mounted,
+    })
+  }, [themes, currentTheme, mounted])
+
   if (!mounted) {
     return (
-      <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="h-8 w-32 bg-muted animate-pulse rounded" />
@@ -147,7 +177,7 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo e Titolo/Motto */}
@@ -163,10 +193,10 @@ export function Header() {
             </Link>
           </div>
 
-          {/* Centro - Data e Ora (solo desktop) */}
+          {/* Centro - Data e Ora (solo desktop) - SENZA grassetto */}
           <div className="hidden md:flex flex-col items-center text-center">
-            <div className="text-sm text-foreground">{currentTime}</div>
-            <div className="text-xs text-muted-foreground">{currentDate}</div>
+            <div className="text-sm text-foreground font-normal">{currentTime}</div>
+            <div className="text-xs text-muted-foreground font-normal">{currentDate}</div>
           </div>
 
           {/* Controlli a destra */}
@@ -184,18 +214,27 @@ export function Header() {
 
             {/* Selettore Temi - Solo se loggato */}
             {user && (
-              <DropdownMenu>
+              <DropdownMenu open={themeMenuOpen} onOpenChange={setThemeMenuOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 hover:bg-accent/50 transition-colors"
                     title="Seleziona tema"
+                    onClick={() => {
+                      console.log("Theme button clicked, current state:", themeMenuOpen)
+                      setThemeMenuOpen(!themeMenuOpen)
+                    }}
                   >
                     <Palette className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 max-h-96 overflow-y-auto">
+                <DropdownMenuContent
+                  align="end"
+                  className="w-64 max-h-96 overflow-y-auto dropdown-menu-content"
+                  style={{ zIndex: 9999 }}
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
                   <DropdownMenuLabel className="font-semibold">
                     Temi Disponibili
                     {currentTheme && (
@@ -248,14 +287,26 @@ export function Header() {
 
             {/* Menu Utente - Solo se loggato */}
             {user && (
-              <DropdownMenu>
+              <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-9 px-3 hover:bg-accent/50 transition-colors">
+                  <Button
+                    variant="ghost"
+                    className="h-9 px-3 hover:bg-accent/50 transition-colors"
+                    onClick={() => {
+                      console.log("User button clicked, current state:", userMenuOpen)
+                      setUserMenuOpen(!userMenuOpen)
+                    }}
+                  >
                     <User className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline text-sm">{user.nome || user.username}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent
+                  align="end"
+                  className="w-56 dropdown-menu-content"
+                  style={{ zIndex: 9999 }}
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
                   <DropdownMenuLabel>
                     {user.nome || user.username}
                     <div className="text-xs text-muted-foreground font-normal">{user.email}</div>
@@ -341,10 +392,10 @@ export function Header() {
         {/* Menu Mobile Espanso - Solo se loggato */}
         {isMenuOpen && user && (
           <div className="md:hidden py-4 border-t bg-background/95">
-            {/* Data/Ora Mobile */}
+            {/* Data/Ora Mobile - SENZA grassetto */}
             <div className="flex flex-col items-center space-y-1 mb-4 pb-4 border-b">
-              <div className="text-sm">{currentTime}</div>
-              <div className="text-xs text-muted-foreground">{currentDate}</div>
+              <div className="text-sm font-normal">{currentTime}</div>
+              <div className="text-xs text-muted-foreground font-normal">{currentDate}</div>
             </div>
 
             {/* Titolo/Motto Mobile */}

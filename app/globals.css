@@ -127,123 +127,199 @@
   .theme-transition {
     transition: all 0.3s ease-in-out;
   }
-
-  /* Custom scrollbar */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
-    border-radius: 3px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 3px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
-  }
-
-  /* Focus styles */
-  .focus-visible:focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
-  }
-
-  /* Animation utilities */
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .animate-fade-in {
-    animation: fadeIn 0.2s ease-out;
-  }
-
-  /* Print styles */
-  @media print {
-    .no-print {
-      display: none !important;
-    }
-  }
-
-  /* High contrast mode support */
-  @media (prefers-contrast: high) {
-    :root {
-      --border: 0 0% 20%;
-      --ring: 0 0% 20%;
-    }
-
-    .dark {
-      --border: 0 0% 80%;
-      --ring: 0 0% 80%;
-    }
-  }
-
-  /* Reduced motion support */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
 }
 
-/* Component specific styles */
-@layer components {
-  .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary;
-  }
-
-  .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 focus-visible:ring-secondary;
-  }
-
-  .card-hover {
-    @apply transition-all duration-200 hover:shadow-md hover:scale-[1.02];
-  }
-
-  .input-field {
-    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .dropdown-item {
-    @apply relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50;
-  }
-}
-
-/* Utility classes */
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
 
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+/* Stili personalizzati per la sidebar con !important per forzare le dimensioni */
+.sidebar-container {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  text-decoration: none !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  flex-wrap: nowrap !important;
+  transition: all 0.2s ease !important;
+  min-height: 32px !important;
+  height: 32px !important;
+}
+
+.sidebar-link:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+.sidebar-link.active {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+.sidebar-link svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+}
+
+.sidebar-link span {
+  flex: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.sidebar-section-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+  margin: 16px 0 8px 0 !important;
+  padding: 0 12px !important;
+}
+
+.sidebar-section-title:first-child {
+  margin-top: 8px !important;
+}
+
+/* Stili per auth widget */
+.auth-widget-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  font-size: 14px !important;
+}
+
+.auth-widget-button svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.auth-widget-secondary-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  font-size: 13px !important;
+}
+
+.auth-widget-secondary-button svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Fix per dropdown menu - assicura che siano visibili */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+[data-radix-dropdown-menu-content] {
+  z-index: 9999 !important;
+  background: hsl(var(--popover)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: calc(var(--radius) - 2px) !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+  padding: 4px !important;
+  min-width: 8rem !important;
+  overflow: hidden !important;
+  color: hsl(var(--popover-foreground)) !important;
+  animation: fadeIn 0.2s ease-out !important;
+}
+
+[data-radix-dropdown-menu-item] {
+  position: relative !important;
+  display: flex !important;
+  cursor: default !important;
+  user-select: none !important;
+  align-items: center !important;
+  border-radius: calc(var(--radius) - 4px) !important;
+  padding: 6px 8px !important;
+  font-size: 14px !important;
+  outline: none !important;
+  transition: colors 0.2s !important;
+}
+
+[data-radix-dropdown-menu-item]:focus,
+[data-radix-dropdown-menu-item]:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+[data-radix-dropdown-menu-item][data-disabled] {
+  pointer-events: none !important;
+  opacity: 0.5 !important;
+}
+
+[data-radix-dropdown-menu-label] {
+  padding: 6px 8px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+[data-radix-dropdown-menu-separator] {
+  height: 1px !important;
+  background-color: hsl(var(--border)) !important;
+  margin: 4px 0 !important;
+}
+
+/* Animazione per dropdown */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .sidebar-link {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+    height: 40px !important;
   }
 
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+  .sidebar-link svg {
+    width: 16px !important;
+    height: 16px !important;
   }
+}
 
-  .gradient-text {
-    @apply bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent;
-  }
+/* Assicura che i dropdown siano sempre sopra tutto */
+.dropdown-menu-content {
+  z-index: 9999 !important;
+  position: relative !important;
+}
 
-  .glass-effect {
-    @apply bg-background/80 backdrop-blur-sm border border-border/50;
-  }
+/* Fix per header sticky e dropdown */
+header {
+  z-index: 40 !important;
+}
+
+header [data-radix-popper-content-wrapper] {
+  z-index: 50 !important;
 }
