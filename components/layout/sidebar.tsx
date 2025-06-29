@@ -330,17 +330,6 @@ function SidebarContent({
                 <span>Table Explorer</span>
               </Link>
             </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/debug-scadenze") ? "secondary" : "ghost"}
-              className="sidebar-button"
-              size="sm"
-            >
-              <Link href="/debug-scadenze">
-                <AlertTriangle />
-                <span>Debug Scadenze</span>
-              </Link>
-            </Button>
           </div>
         </div>
       )}
