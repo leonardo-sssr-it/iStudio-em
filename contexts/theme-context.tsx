@@ -1,278 +1,213 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 
-// Tipi per i temi
-interface Theme {
-  id: number
-  nome_tema: string
-  colore_titolo?: string
-  colore_sfondo?: string
-  colore_testo?: string
-  colore_accento?: string
-  isDefault?: boolean
+export type Theme = "light" | "dark" | "system"
+export type Layout = "standard" | "full-width" | "sidebar"
+export type FontSize = "small" | "normal" | "large"
+
+interface CustomTheme {
+  id: string
+  nome: string
+  colore_primario: string
+  colore_secondario: string
+  colore_sfondo: string
+  colore_testo: string
+  colore_accento: string
 }
 
-// Tipi per il context
 interface ThemeContextType {
-  themes: Theme[]
-  currentTheme: Theme | null
-  applyTheme: (themeId: number) => void
-  resetToDefault: () => void
-  layout: "default" | "fullWidth" | "sidebar"
-  setLayout: (layout: "default" | "fullWidth" | "sidebar") => void
-  toggleDarkMode: () => void
-  isDarkMode: boolean
-  fontSize: "small" | "normal" | "large"
-  setFontSize: (size: "small" | "normal" | "large") => void
-  mounted: boolean
+  // Theme management
+  theme: Theme
+  setTheme: (theme: Theme) => void
+
+  // Layout management
+  layout: Layout
+  setLayout: (layout: Layout) => void
+
+  // Font size management
+  fontSize: FontSize
+  setFontSize: (fontSize: FontSize) => void
+
+  // Custom themes
+  customThemes: CustomTheme[]
+  currentCustomTheme: CustomTheme | null
+  setCustomTheme: (theme: CustomTheme | null) => void
+
+  // Loading state
+  isLoading: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-// Hook sicuro per usare il context
-export function useSafeCustomTheme(): ThemeContextType {
-  const context = useContext(ThemeContext)
-  if (!context) {
-    // Fallback sicuro se il context non è disponibile
-    return {
-      themes: [],
-      currentTheme: null,
-      applyTheme: () => {},
-      resetToDefault: () => {},
-      layout: "default",
-      setLayout: () => {},
-      toggleDarkMode: () => {},
-      isDarkMode: false,
-      fontSize: "normal",
-      setFontSize: () => {},
-      mounted: false,
+const DEFAULT_THEME: CustomTheme = {
+  id: "default",
+  nome: "Default",
+  colore_primario: "221.2 83.2% 53.3%",
+  colore_secondario: "210 40% 96%",
+  colore_sfondo: "0 0% 100%",
+  colore_testo: "222.2 84% 4.9%",
+  colore_accento: "210 40% 96%",
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setThemeState] = useState<Theme>("system")
+  const [layout, setLayoutState] = useState<Layout>("sidebar")
+  const [fontSize, setFontSizeState] = useState<FontSize>("normal")
+  const [customThemes, setCustomThemes] = useState<CustomTheme[]>([DEFAULT_THEME])
+  const [currentCustomTheme, setCurrentCustomTheme] = useState<CustomTheme | null>(DEFAULT_THEME)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const { supabase } = useSupabase()
+
+  // Load themes from database
+  const loadCustomThemes = useCallback(async () => {
+    if (!supabase) return
+
+    try {
+      const { data, error } = await supabase.from("temi").select("*").order("nome")
+
+      if (error) {
+        console.warn("Error loading themes:", error)
+        return
+      }
+
+      if (data && data.length > 0) {
+        const themes = data.map((theme) => ({
+          id: theme.id.toString(),
+          nome: theme.nome,
+          colore_primario: theme.colore_primario || DEFAULT_THEME.colore_primario,
+          colore_secondario: theme.colore_secondario || DEFAULT_THEME.colore_secondario,
+          colore_sfondo: theme.colore_sfondo || DEFAULT_THEME.colore_sfondo,
+          colore_testo: theme.colore_testo || DEFAULT_THEME.colore_testo,
+          colore_accento: theme.colore_accento || DEFAULT_THEME.colore_accento,
+        }))
+
+        setCustomThemes([DEFAULT_THEME, ...themes])
+      }
+    } catch (error) {
+      console.warn("Error loading themes:", error)
     }
+  }, [supabase])
+
+  // Load preferences from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as Theme
+    const savedLayout = localStorage.getItem("layout") as Layout
+    const savedFontSize = localStorage.getItem("fontSize") as FontSize
+    const savedCustomTheme = localStorage.getItem("customTheme")
+
+    if (savedTheme) setThemeState(savedTheme)
+    if (savedLayout) setLayoutState(savedLayout)
+    if (savedFontSize) setFontSizeState(savedFontSize)
+
+    if (savedCustomTheme) {
+      try {
+        const parsed = JSON.parse(savedCustomTheme)
+        setCurrentCustomTheme(parsed)
+      } catch (error) {
+        console.warn("Error parsing saved custom theme:", error)
+      }
+    }
+
+    loadCustomThemes().finally(() => setIsLoading(false))
+  }, [loadCustomThemes])
+
+  // Apply theme to document
+  useEffect(() => {
+    const root = window.document.documentElement
+
+    // Remove existing theme classes
+    root.classList.remove("light", "dark", "font-small", "font-normal", "font-large")
+
+    // Apply theme
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      root.classList.add(systemTheme)
+    } else {
+      root.classList.add(theme)
+    }
+
+    // Apply font size
+    root.classList.add(`font-${fontSize}`)
+
+    // Apply custom theme colors
+    if (currentCustomTheme) {
+      root.style.setProperty("--primary", currentCustomTheme.colore_primario)
+      root.style.setProperty("--secondary", currentCustomTheme.colore_secondario)
+      root.style.setProperty("--background", currentCustomTheme.colore_sfondo)
+      root.style.setProperty("--foreground", currentCustomTheme.colore_testo)
+      root.style.setProperty("--accent", currentCustomTheme.colore_accento)
+    }
+  }, [theme, fontSize, currentCustomTheme])
+
+  // Theme setters with persistence
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeState(newTheme)
+    localStorage.setItem("theme", newTheme)
+  }, [])
+
+  const setLayout = useCallback((newLayout: Layout) => {
+    setLayoutState(newLayout)
+    localStorage.setItem("layout", newLayout)
+  }, [])
+
+  const setFontSize = useCallback((newFontSize: FontSize) => {
+    setFontSizeState(newFontSize)
+    localStorage.setItem("fontSize", newFontSize)
+  }, [])
+
+  const setCustomTheme = useCallback((newCustomTheme: CustomTheme | null) => {
+    setCurrentCustomTheme(newCustomTheme)
+    if (newCustomTheme) {
+      localStorage.setItem("customTheme", JSON.stringify(newCustomTheme))
+    } else {
+      localStorage.removeItem("customTheme")
+    }
+  }, [])
+
+  const value: ThemeContextType = {
+    theme,
+    setTheme,
+    layout,
+    setLayout,
+    fontSize,
+    setFontSize,
+    customThemes,
+    currentCustomTheme,
+    setCustomTheme,
+    isLoading,
+  }
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext)
+  if (context === undefined) {
+    throw new Error("useTheme must be used within a ThemeProvider")
   }
   return context
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { supabase, isConnected } = useSupabase()
-  const [themes, setThemes] = useState<Theme[]>([])
-  const [currentTheme, setCurrentTheme] = useState<Theme | null>(null)
-  const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
-  const [mounted, setMounted] = useState(false)
-
-  // Carica le preferenze dal localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedLayout = localStorage.getItem("app-layout") as "default" | "fullWidth" | "sidebar" | null
-      const savedDarkMode = localStorage.getItem("app-dark-mode")
-      const savedFontSize = localStorage.getItem("app-font-size") as "small" | "normal" | "large" | null
-      const savedTheme = localStorage.getItem("app-theme")
-
-      if (savedLayout) setLayoutState(savedLayout)
-      if (savedDarkMode) setIsDarkMode(savedDarkMode === "true")
-      if (savedFontSize) setFontSizeState(savedFontSize)
-
-      setMounted(true)
+// Safe version that doesn't throw
+export function useSafeCustomTheme() {
+  const context = useContext(ThemeContext)
+  if (context === undefined) {
+    return {
+      theme: "system" as Theme,
+      setTheme: () => {},
+      layout: "sidebar" as Layout,
+      setLayout: () => {},
+      fontSize: "normal" as FontSize,
+      setFontSize: () => {},
+      customThemes: [DEFAULT_THEME],
+      currentCustomTheme: DEFAULT_THEME,
+      setCustomTheme: () => {},
+      isLoading: false,
     }
-  }, [])
-
-  // Carica i temi dal database
-  useEffect(() => {
-    const loadThemes = async () => {
-      if (!supabase || !isConnected) return
-
-      try {
-        console.log("Loading themes from database...")
-        const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
-
-        if (error) {
-          console.error("Error loading themes:", error)
-          return
-        }
-
-        const themesWithDefault: Theme[] = [
-          {
-            id: 0,
-            nome_tema: "Sistema",
-            isDefault: true,
-          },
-          ...(data || []),
-        ]
-
-        setThemes(themesWithDefault)
-        console.log("Themes loaded:", themesWithDefault.length)
-
-        // Applica il tema salvato o quello di default
-        const savedThemeId = localStorage.getItem("app-theme")
-        if (savedThemeId) {
-          const savedTheme = themesWithDefault.find((t) => t.id.toString() === savedThemeId)
-          if (savedTheme) {
-            setCurrentTheme(savedTheme)
-            applyThemeStyles(savedTheme)
-          }
-        } else {
-          // Applica il tema di default
-          const defaultTheme = themesWithDefault[0]
-          setCurrentTheme(defaultTheme)
-          applyThemeStyles(defaultTheme)
-        }
-      } catch (error) {
-        console.error("Error in loadThemes:", error)
-      }
-    }
-
-    loadThemes()
-  }, [supabase, isConnected])
-
-  // Applica gli stili del tema
-  const applyThemeStyles = useCallback((theme: Theme) => {
-    if (typeof window === "undefined") return
-
-    const root = document.documentElement
-
-    if (theme.isDefault) {
-      // Rimuovi le variabili custom per usare quelle di default
-      root.style.removeProperty("--color-primary")
-      root.style.removeProperty("--color-background")
-      root.style.removeProperty("--color-foreground")
-      root.style.removeProperty("--color-accent")
-    } else {
-      // Applica i colori del tema
-      if (theme.colore_titolo) {
-        const color = theme.colore_titolo.startsWith("#")
-          ? theme.colore_titolo
-          : theme.colore_titolo.includes("%")
-            ? `hsl(${theme.colore_titolo})`
-            : theme.colore_titolo
-        root.style.setProperty("--color-primary", color)
-      }
-
-      if (theme.colore_sfondo) {
-        const color = theme.colore_sfondo.startsWith("#")
-          ? theme.colore_sfondo
-          : theme.colore_sfondo.includes("%")
-            ? `hsl(${theme.colore_sfondo})`
-            : theme.colore_sfondo
-        root.style.setProperty("--color-background", color)
-      }
-
-      if (theme.colore_testo) {
-        const color = theme.colore_testo.startsWith("#")
-          ? theme.colore_testo
-          : theme.colore_testo.includes("%")
-            ? `hsl(${theme.colore_testo})`
-            : theme.colore_testo
-        root.style.setProperty("--color-foreground", color)
-      }
-
-      if (theme.colore_accento) {
-        const color = theme.colore_accento.startsWith("#")
-          ? theme.colore_accento
-          : theme.colore_accento.includes("%")
-            ? `hsl(${theme.colore_accento})`
-            : theme.colore_accento
-        root.style.setProperty("--color-accent", color)
-      }
-    }
-  }, [])
-
-  // Applica le dimensioni del font
-  const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
-    if (typeof window === "undefined") return
-
-    const root = document.documentElement
-    const sizes = {
-      small: "14px",
-      normal: "16px",
-      large: "18px",
-    }
-
-    root.style.setProperty("--font-size-base", sizes[size])
-    root.classList.remove("font-small", "font-normal", "font-large")
-    root.classList.add(`font-${size}`)
-  }, [])
-
-  // Applica il dark mode
-  const applyDarkMode = useCallback((dark: boolean) => {
-    if (typeof window === "undefined") return
-
-    const root = document.documentElement
-    if (dark) {
-      root.classList.add("dark")
-    } else {
-      root.classList.remove("dark")
-    }
-  }, [])
-
-  // Effetti per applicare le impostazioni quando cambiano
-  useEffect(() => {
-    if (mounted) {
-      applyFontSize(fontSize)
-    }
-  }, [fontSize, mounted, applyFontSize])
-
-  useEffect(() => {
-    if (mounted) {
-      applyDarkMode(isDarkMode)
-    }
-  }, [isDarkMode, mounted, applyDarkMode])
-
-  // Funzioni per cambiare le impostazioni
-  const applyTheme = useCallback(
-    (themeId: number) => {
-      const theme = themes.find((t) => t.id === themeId)
-      if (theme) {
-        setCurrentTheme(theme)
-        applyThemeStyles(theme)
-        localStorage.setItem("app-theme", themeId.toString())
-        console.log("Theme applied:", theme.nome_tema)
-      }
-    },
-    [themes, applyThemeStyles],
-  )
-
-  const resetToDefault = useCallback(() => {
-    const defaultTheme = themes.find((t) => t.isDefault)
-    if (defaultTheme) {
-      applyTheme(defaultTheme.id)
-    }
-  }, [themes, applyTheme])
-
-  const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
-    setLayoutState(newLayout)
-    localStorage.setItem("app-layout", newLayout)
-    console.log("Layout changed to:", newLayout)
-  }, [])
-
-  const toggleDarkMode = useCallback(() => {
-    const newDarkMode = !isDarkMode
-    setIsDarkMode(newDarkMode)
-    localStorage.setItem("app-dark-mode", newDarkMode.toString())
-    console.log("Dark mode toggled:", newDarkMode)
-  }, [isDarkMode])
-
-  const setFontSize = useCallback((size: "small" | "normal" | "large") => {
-    setFontSizeState(size)
-    localStorage.setItem("app-font-size", size)
-    console.log("Font size changed to:", size)
-  }, [])
-
-  const value: ThemeContextType = {
-    themes,
-    currentTheme,
-    applyTheme,
-    resetToDefault,
-    layout,
-    setLayout,
-    toggleDarkMode,
-    isDarkMode,
-    fontSize,
-    setFontSize,
-    mounted,
   }
-
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  return context
 }
