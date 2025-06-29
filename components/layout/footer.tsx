@@ -1,6 +1,12 @@
+"use client"
+
+import Link from "next/link"
+import { useAuth } from "@/lib/auth-provider"
 import { NotesFooterWidget } from "@/components/notes-footer-widget"
 
 export function Footer() {
+  const { user } = useAuth()
+
   return (
     <footer className="bg-background border-t">
       <div className="container mx-auto px-4 py-8">
@@ -10,24 +16,24 @@ export function Footer() {
             <h4 className="font-semibold">iStudio</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="/about" className="hover:text-primary transition-colors">
+                <Link href="/about" className="hover:text-primary transition-colors">
                   Chi siamo
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/features" className="hover:text-primary transition-colors">
+                <Link href="/features" className="hover:text-primary transition-colors">
                   Funzionalità
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/pricing" className="hover:text-primary transition-colors">
+                <Link href="/pricing" className="hover:text-primary transition-colors">
                   Prezzi
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/blog" className="hover:text-primary transition-colors">
+                <Link href="/blog" className="hover:text-primary transition-colors">
                   Blog
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -37,24 +43,24 @@ export function Footer() {
             <h4 className="font-semibold">Link Rapidi</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="/dashboard" className="hover:text-primary transition-colors">
+                <Link href="/dashboard" className="hover:text-primary transition-colors">
                   Dashboard
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/data-explorer" className="hover:text-primary transition-colors">
+                <Link href="/data-explorer" className="hover:text-primary transition-colors">
                   Data Explorer
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/note" className="hover:text-primary transition-colors">
+                <Link href="/note" className="hover:text-primary transition-colors">
                   Note
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/profile" className="hover:text-primary transition-colors">
+                <Link href="/profile" className="hover:text-primary transition-colors">
                   Profilo
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -64,32 +70,34 @@ export function Footer() {
             <h4 className="font-semibold">Supporto</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="/help" className="hover:text-primary transition-colors">
+                <Link href="/help" className="hover:text-primary transition-colors">
                   Centro Assistenza
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/contact" className="hover:text-primary transition-colors">
+                <Link href="/contact" className="hover:text-primary transition-colors">
                   Contattaci
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/privacy" className="hover:text-primary transition-colors">
+                <Link href="/privacy" className="hover:text-primary transition-colors">
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/terms" className="hover:text-primary transition-colors">
+                <Link href="/terms" className="hover:text-primary transition-colors">
                   Termini di Servizio
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
 
-          {/* Widget Note */}
-          <div>
-            <NotesFooterWidget />
-          </div>
+          {/* Widget Note - Solo per utenti autenticati */}
+          {user && (
+            <div>
+              <NotesFooterWidget />
+            </div>
+          )}
         </div>
 
         {/* Copyright */}

@@ -32,11 +32,11 @@ const AdminCard = memo(
     return (
       <Link href={href} prefetch={true}>
         <Card
-          className={`h-full hover:border-primary transition-all duration-300 cursor-pointer transform dashboard-card ${
+          className={`h-full hover:border-primary transition-all duration-300 cursor-pointer transform ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          <CardContent className="p-6 flex flex-col items-center text-center h-full dashboard-content">
+          <CardContent className="p-6 flex flex-col items-center text-center h-full">
             <Icon className="h-12 w-12 mb-4 text-primary" />
             <h3 className="text-lg font-medium mb-2">{title}</h3>
             <p className="text-sm text-muted-foreground flex-grow">{description}</p>
@@ -80,23 +80,6 @@ const useIntersectionObserver = (options = {}) => {
   return [ref, isVisible] as const
 }
 
-// Validatore JSON
-const validateJSON = (value: string): { isValid: boolean; error?: string; parsed?: any } => {
-  if (!value || value.trim() === "") {
-    return { isValid: true, parsed: null }
-  }
-
-  try {
-    const parsed = JSON.parse(value)
-    return { isValid: true, parsed }
-  } catch (error) {
-    return {
-      isValid: false,
-      error: error instanceof Error ? error.message : "JSON non valido",
-    }
-  }
-}
-
 // Componente principale memoizzato
 const AdminDashboardContent = memo(() => {
   const { user } = useAuth()
@@ -112,10 +95,6 @@ const AdminDashboardContent = memo(() => {
   const [configFields, setConfigFields] = useState<Array<{ name: string; type: string; nullable: boolean }>>([])
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [isSavingConfig, setIsSavingConfig] = useState(false)
-  const [/*configErrors*/ /*setConfigErrors*/ ,] = useState<Record<string, string>>({})
-  const [/*jsonValidation*/ /*setJsonValidation*/ ,] = useState<Record<string, { isValid: boolean; error?: string }>>(
-    {},
-  )
 
   // Animazione sequenziale delle card
   useEffect(() => {
@@ -139,13 +118,13 @@ const AdminDashboardContent = memo(() => {
     }
   }, [activeTab, supabase])
 
-  // Funzione semplificata che usa solo la deduzione dai dati esistenti
+  // Funzione per caricare i dati di configurazione dalla tabella "configurazione"
   const loadConfigurationData = async () => {
     if (!supabase) return
 
     setIsLoadingConfig(true)
     try {
-      console.log("Caricamento configurazione...")
+      console.log("Caricamento configurazione dalla tabella 'configurazione'...")
 
       // Carica i dati attuali dalla tabella configurazione
       const { data: configRow, error: configError } = await supabase
@@ -154,7 +133,7 @@ const AdminDashboardContent = memo(() => {
         .limit(1)
         .maybeSingle()
 
-      if (configError) {
+      if (configError && configError.code !== "PGRST116") {
         console.error("Errore nel caricamento dei dati configurazione:", configError)
         throw configError
       }
@@ -163,21 +142,33 @@ const AdminDashboardContent = memo(() => {
         console.log("Nessuna configurazione trovata, creazione campi di default...")
         // Se non ci sono dati, crea una struttura di base
         const defaultFields = [
-          { name: "nome_app", type: "text", nullable: true },
           { name: "versione", type: "text", nullable: true },
+          { name: "nome_app", type: "text", nullable: true },
+          { name: "tema_default", type: "text", nullable: true },
+          { name: "lingua_default", type: "text", nullable: true },
+          { name: "fuso_orario", type: "text", nullable: true },
           { name: "debug", type: "boolean", nullable: true },
           { name: "priorita", type: "json", nullable: true },
-          { name: "feed1", type: "text", nullable: true },
-          { name: "tema_default", type: "text", nullable: true },
+          { name: "stati", type: "json", nullable: true },
+          { name: "categorie", type: "json", nullable: true },
+          { name: "tags_predefiniti", type: "json", nullable: true },
+          { name: "impostazioni_notifiche", type: "json", nullable: true },
         ]
         setConfigFields(defaultFields)
-        setConfigData({})
+        setConfigData({
+          versione: "1.0.0",
+          nome_app: "iStudio",
+          tema_default: "light",
+          lingua_default: "it",
+          fuso_orario: "Europe/Rome",
+          debug: false,
+        })
       } else {
         console.log("Dati configurazione caricati:", configRow)
 
         // Deduce i tipi dai dati esistenti
         const fields = Object.keys(configRow)
-          .filter((key) => key !== "id" && key !== "modifica") // Escludi campi non editabili
+          .filter((key) => key !== "id" && key !== "created_at" && key !== "updated_at") // Escludi campi non editabili
           .map((key) => ({
             name: key,
             type: getFieldType(configRow[key]),
@@ -198,15 +189,24 @@ const AdminDashboardContent = memo(() => {
 
       // Fallback con campi di base
       const fallbackFields = [
-        { name: "nome_app", type: "text", nullable: true },
         { name: "versione", type: "text", nullable: true },
+        { name: "nome_app", type: "text", nullable: true },
+        { name: "tema_default", type: "text", nullable: true },
+        { name: "lingua_default", type: "text", nullable: true },
+        { name: "fuso_orario", type: "text", nullable: true },
         { name: "debug", type: "boolean", nullable: true },
         { name: "priorita", type: "json", nullable: true },
-        { name: "feed1", type: "text", nullable: true },
-        { name: "tema_default", type: "text", nullable: true },
+        { name: "stati", type: "json", nullable: true },
       ]
       setConfigFields(fallbackFields)
-      setConfigData({})
+      setConfigData({
+        versione: "1.0.0",
+        nome_app: "iStudio",
+        tema_default: "light",
+        lingua_default: "it",
+        fuso_orario: "Europe/Rome",
+        debug: false,
+      })
     } finally {
       setIsLoadingConfig(false)
     }
@@ -231,13 +231,13 @@ const AdminDashboardContent = memo(() => {
     }))
   }
 
-  // Salva la configurazione
+  // Salva la configurazione nella tabella "configurazione"
   const saveConfiguration = async () => {
     if (!supabase) return
 
     setIsSavingConfig(true)
     try {
-      console.log("Salvataggio configurazione:", configData)
+      console.log("Salvataggio configurazione nella tabella 'configurazione':", configData)
 
       // I dati sono già nel formato corretto grazie al JsonEditor
       const dataToSave = { ...configData }
@@ -278,7 +278,6 @@ const AdminDashboardContent = memo(() => {
   // Renderizza un campo di input basato sul tipo
   const renderField = (field: { name: string; type: string; nullable: boolean }) => {
     const value = configData[field.name] || ""
-    const hasError = /*configErrors*/ false
 
     switch (field.type) {
       case "boolean":
@@ -288,7 +287,6 @@ const AdminDashboardContent = memo(() => {
               id={field.name}
               checked={Boolean(value)}
               onCheckedChange={(checked) => handleFieldChange(field.name, checked, field.type)}
-              className="admin-checkbox"
             />
             <Label
               htmlFor={field.name}
@@ -346,7 +344,7 @@ const AdminDashboardContent = memo(() => {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6 content-inherit">
+    <div className="container mx-auto py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard Admin</h1>
@@ -356,18 +354,13 @@ const AdminDashboardContent = memo(() => {
 
       {/* Tabs per navigazione */}
       <div className="flex flex-wrap gap-2 border-b">
-        <Button
-          variant={activeTab === "database" ? "default" : "ghost"}
-          onClick={() => setActiveTab("database")}
-          className={activeTab === "database" ? "admin-tab-active" : ""}
-        >
+        <Button variant={activeTab === "database" ? "default" : "ghost"} onClick={() => setActiveTab("database")}>
           <Database className="h-4 w-4 mr-2" />
           Database
         </Button>
         <Button
           variant={activeTab === "configurazione" ? "default" : "ghost"}
           onClick={() => setActiveTab("configurazione")}
-          className={activeTab === "configurazione" ? "admin-tab-active" : ""}
         >
           <User className="h-4 w-4 mr-2" />
           Configurazione
@@ -403,12 +396,12 @@ const AdminDashboardContent = memo(() => {
 
       {/* Contenuto Configurazione */}
       {activeTab === "configurazione" && (
-        <Card className="dashboard-card">
+        <Card>
           <CardHeader>
             <CardTitle>Configurazione Sistema</CardTitle>
             <CardDescription>Modifica le impostazioni globali dell'applicazione</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6 dashboard-content">
+          <CardContent className="space-y-6">
             {isLoadingConfig ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -423,10 +416,7 @@ const AdminDashboardContent = memo(() => {
                 </div>
 
                 <div className="flex justify-end pt-4 border-t">
-                  <Button
-                    onClick={saveConfiguration}
-                    disabled={isSavingConfig /*|| Object.keys(configErrors).length > 0*/}
-                  >
+                  <Button onClick={saveConfiguration} disabled={isSavingConfig}>
                     {isSavingConfig ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

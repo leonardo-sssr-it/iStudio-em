@@ -8,7 +8,7 @@ import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, ChevronUp, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // CONFIGURAZIONE WIDGET - Modifica questi valori per personalizzare il comportamento
@@ -235,10 +235,7 @@ export function NotesFooterWidget() {
                   {/* Titolo della nota - NON cliccabile, solo testo */}
                   <div className="flex items-start justify-between">
                     <div
-                      className={cn(
-                        "text-left text-muted-foreground flex-1 line-clamp-1",
-                        WIDGET_FONT_SIZE,
-                      )}
+                      className={cn("text-left text-muted-foreground flex-1 line-clamp-1", WIDGET_FONT_SIZE)}
                       title={note.titolo || "Nota senza titolo"}
                     >
                       {note.titolo || "Nota senza titolo"}
