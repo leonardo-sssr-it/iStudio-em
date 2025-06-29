@@ -153,42 +153,6 @@ button:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* Rimuovi background fissi dalle dashboard */
-.dashboard-container,
-.dashboard-card,
-.dashboard-content {
-  background: transparent !important;
-}
-
-/* Applica background solo ai contenitori principali */
-.main-container {
-  background-color: hsl(var(--background));
-}
-
-/* Assicura che i contenuti ereditino il tema */
-.content-inherit {
-  color: inherit;
-  background: inherit;
-}
-
-/* Debug: mostra le variabili CSS applicate */
-.debug-theme::before {
-  content: "BG: " attr(data-bg) " | FG: " attr(data-fg);
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  background: red;
-  color: white;
-  padding: 5px;
-  font-size: 12px;
-  z-index: 9999;
-}
-
-/* Transizioni per il cambio tema */
-.theme-transition {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-
 /* Stili personalizzati per l'applicazione */
 .container {
   @apply mx-auto px-4 sm:px-6 lg:px-8;
@@ -233,17 +197,31 @@ button:focus:not(:focus-visible) {
   @apply pt-4;
 }
 
-/* Stili per la sidebar */
+/* Stili per la sidebar - CORREZIONE PER IL LAYOUT */
 .sidebar {
   @apply bg-card border-r border-border;
 }
 
 .sidebar-item {
   @apply flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors;
+  /* Assicura che gli elementi rimangano sulla stessa riga */
+  white-space: nowrap;
+  flex-wrap: nowrap;
 }
 
 .sidebar-item.active {
   @apply bg-primary text-primary-foreground;
+}
+
+/* Correzione specifica per i button della sidebar */
+.sidebar button {
+  @apply flex items-center;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+.sidebar button > * {
+  flex-shrink: 0;
 }
 
 /* Stili per l'header */
