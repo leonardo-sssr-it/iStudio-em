@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
-import { parseISO, formatISO } from "date-fns"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
+import { formatDateDisplay } from "@/lib/date-utils"
 import {
   CheckCircle2,
   FileText,
@@ -94,7 +95,7 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// Configurazione dei campi per ogni tabella (COPIATA ESATTAMENTE DAL NEW PAGE)
+// Configurazione dei campi per ogni tabella
 const TABLE_FIELDS = {
   appuntamenti: {
     requiredFields: ["titolo", "data_inizio"],
@@ -524,21 +525,39 @@ export default function ItemDetailPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
+    console.log(`Campo ${field} cambiato a:`, value)
+
     setFormData((prev: any) => {
       const newData = { ...prev, [field]: value }
 
-      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
-      if (field === "data_inizio" && value) {
+      // Se cambia data_inizio, aggiorna automaticamente data_fine con +1 ora
+      if (
+        field === "data_inizio" &&
+        value &&
+        (tableName === "appuntamenti" || tableName === "attivita" || tableName === "progetti")
+      ) {
         try {
-          const startDate = parseISO(value)
-          if (!newData.data_fine) {
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
-            newData.data_fine = formatISO(endDate)
-          }
+          // Crea una nuova data aggiungendo 1 ora
+          const startDate = new Date(value)
+          const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // +1 ora
+
+          // Formatta come stringa ISO locale (senza conversione timezone)
+          const year = endDate.getFullYear()
+          const month = String(endDate.getMonth() + 1).padStart(2, "0")
+          const day = String(endDate.getDate()).padStart(2, "0")
+          const hour = String(endDate.getHours()).padStart(2, "0")
+          const minute = String(endDate.getMinutes()).padStart(2, "0")
+          const second = String(endDate.getSeconds()).padStart(2, "0")
+
+          const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+          newData.data_fine = localISOString
+
+          console.log(`Auto-aggiornamento data_fine: ${localISOString}`)
         } catch (e) {
-          console.warn("Data inizio non valida per calcolare data fine:", value)
+          console.warn("Errore nell'aggiornamento automatico di data_fine:", e)
         }
       }
+
       return newData
     })
 
@@ -751,7 +770,7 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Renderizza un campo del form - COPIATO ESATTAMENTE DAL NEW PAGE
+  // Renderizza un campo del form
   const renderField = (field: string) => {
     const fieldType = fieldTypes[field]
     const fieldValue = formData[field]
@@ -772,7 +791,7 @@ export default function ItemDetailPage() {
     if (!isEditMode) {
       let displayValue = fieldValue
       if (fieldType === "datetime" && fieldValue) {
-        displayValue = new Date(fieldValue).toLocaleString("it-IT")
+        displayValue = formatDateDisplay(fieldValue)
       } else if (fieldType === "boolean") {
         displayValue = fieldValue ? "Sì" : "No"
       } else if (fieldType === "priority_select") {
@@ -839,17 +858,23 @@ export default function ItemDetailPage() {
         )
 
       case "datetime":
+        console.log(`Rendering EnhancedDatePicker for ${field} with value:`, fieldValue)
         return (
           <div key={field} className="space-y-2">
             <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <Input
-              {...commonProps}
-              type="datetime-local"
-              value={fieldValue ? new Date(fieldValue).toISOString().slice(0, 16) : ""}
-              onChange={(e) => handleFieldChange(field, e.target.value ? new Date(e.target.value).toISOString() : "")}
+            <EnhancedDatePicker
+              id={field}
+              value={fieldValue || ""}
+              onChange={(newValue) => {
+                console.log(`EnhancedDatePicker onChange for ${field}:`, newValue)
+                handleFieldChange(field, newValue)
+              }}
+              placeholder={`Seleziona ${field.replace(/_/g, " ").toLowerCase()}`}
+              className={hasError ? "border-red-500" : ""}
+              showCurrentTime={true}
             />
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
