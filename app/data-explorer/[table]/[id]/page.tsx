@@ -186,11 +186,11 @@ const TABLE_FIELDS = {
       "Informazioni principali": [
         "titolo",
         "descrizione",
-        "completato",
+        "scadenza",
         "stato",
         "priorita",
-        "scadenza",
         "note",
+        "completato",
         "notifica",
       ],
       "Informazioni di sistema": ["id", "id_utente", "modifica"],
