@@ -3,312 +3,212 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/auth-provider"
-import { useSupabase } from "@/lib/supabase-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { toast } from "@/components/ui/use-toast"
-import { User, LogOut, LayoutDashboard } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Loader2, User, LogOut, AlertCircle, Home } from "lucide-react"
+import { useAuth } from "@/lib/auth-provider"
+import { useDebugConfig } from "@/hooks/use-debug-config"
 import Link from "next/link"
 
-interface UserProfile {
-  id: string
-  username?: string
-  email?: string
-  nome?: string
-  cognome?: string
-  ruolo?: string
-  ultimo_accesso?: string
-}
-
 export function AuthWidget() {
-  const { user, login, signUp, logout } = useAuth()
-  const { supabase } = useSupabase()
-  const [loading, setLoading] = useState(false)
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [loginData, setLoginData] = useState({
-    email: "",
-    password: "",
-  })
-  const [signUpData, setSignUpData] = useState({
-    email: "",
-    password: "",
-    username: "",
-    nome: "",
-    cognome: "",
-  })
+  const { user, login, signUp, logout, isLoading } = useAuth()
+  const { isDebugEnabled } = useDebugConfig()
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Carica il profilo utente da Supabase
+  // Debug condizionale
   useEffect(() => {
-    const loadUserProfile = async () => {
-      if (!user?.id || !supabase) return
+    if (isDebugEnabled) {
+      console.log("AuthWidget: user =", user)
+      console.log("AuthWidget: isLoading =", isLoading)
+    }
+  }, [user, isLoading, isDebugEnabled])
 
-      try {
-        const { data, error } = await supabase
-          .from("utenti")
-          .select("id, username, email, nome, cognome, ruolo, ultimo_accesso")
-          .eq("id", user.id)
-          .single()
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsSubmitting(true)
 
-        if (error) {
-          console.error("Errore nel caricamento del profilo:", error)
+    try {
+      if (isSignUp) {
+        if (password !== confirmPassword) {
+          setError("Le password non corrispondono")
           return
         }
-
-        setUserProfile(data)
-      } catch (error) {
-        console.error("Errore nel caricamento del profilo:", error)
+        if (password.length < 6) {
+          setError("La password deve essere di almeno 6 caratteri")
+          return
+        }
+        await signUp(email, password)
+      } else {
+        await login(email, password)
       }
-    }
-
-    if (user) {
-      loadUserProfile()
-    }
-  }, [user, supabase])
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      await login(loginData.email, loginData.password)
-      toast({
-        title: "Login effettuato con successo!",
-        description: "Benvenuto nell'applicazione",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Errore di login",
-        description: error.message || "Credenziali non valide",
-        variant: "destructive",
-      })
+    } catch (err: any) {
+      setError(err.message || "Si è verificato un errore")
+      if (isDebugEnabled) {
+        console.error("AuthWidget error:", err)
+      }
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      await signUp(signUpData.email, signUpData.password, {
-        username: signUpData.username,
-        nome: signUpData.nome,
-        cognome: signUpData.cognome,
-      })
-      toast({
-        title: "Registrazione completata!",
-        description: "Controlla la tua email per confermare l'account",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Errore di registrazione",
-        description: error.message || "Si è verificato un errore",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   const handleLogout = async () => {
     try {
       await logout()
-      setUserProfile(null)
-      toast({
-        title: "Logout effettuato",
-        description: "Arrivederci!",
-      })
-    } catch (error: any) {
-      toast({
-        title: "Errore di logout",
-        description: error.message || "Si è verificato un errore",
-        variant: "destructive",
-      })
+    } catch (err: any) {
+      setError(err.message || "Errore durante il logout")
+      if (isDebugEnabled) {
+        console.error("AuthWidget logout error:", err)
+      }
     }
   }
 
-  const getDashboardUrl = () => {
-    if (!userProfile?.ruolo) return "/dashboard"
-
-    switch (userProfile.ruolo) {
-      case "admin":
-        return "/admin"
-      case "user":
-        return "/dashboard-utente"
-      default:
-        return "/dashboard"
-    }
+  // Funzione per determinare la dashboard appropriata
+  const getDashboardLink = () => {
+    // Qui puoi aggiungere logica per determinare il tipo di utente
+    // Per ora uso una dashboard generica, ma puoi personalizzare in base al ruolo
+    return "/dashboard"
   }
 
-  const getUserDisplayName = () => {
-    if (userProfile?.nome && userProfile?.cognome) {
-      return `${userProfile.nome} ${userProfile.cognome}`
-    }
-    if (userProfile?.username) {
-      return userProfile.username
-    }
-    if (userProfile?.email) {
-      return userProfile.email
-    }
-    return "Utente"
-  }
-
-  const getUserInitials = () => {
-    if (userProfile?.nome && userProfile?.cognome) {
-      return `${userProfile.nome.charAt(0)}${userProfile.cognome.charAt(0)}`.toUpperCase()
-    }
-    if (userProfile?.username) {
-      return userProfile.username.substring(0, 2).toUpperCase()
-    }
-    return "U"
-  }
-
-  // Se l'utente è loggato, mostra il profilo
-  if (user) {
+  if (isLoading) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center space-x-3">
-            <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>{getUserInitials()}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
-              <p className="text-xs text-muted-foreground truncate">{userProfile?.email}</p>
-            </div>
-          </div>
-          {userProfile?.ruolo && (
-            <Badge variant="secondary" className="w-fit">
-              {userProfile.ruolo === "admin" ? "Amministratore" : "Utente"}
-            </Badge>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Link href={getDashboardUrl()}>
-            <Button variant="outline" className="w-full justify-start bg-transparent">
-              <LayoutDashboard className="w-4 h-4 mr-2" />
-              Dashboard
-            </Button>
-          </Link>
-          <Link href="/profile">
-            <Button variant="outline" className="w-full justify-start bg-transparent">
-              <User className="w-4 h-4 mr-2" />
-              Profilo
-            </Button>
-          </Link>
-          <Button onClick={handleLogout} variant="outline" className="w-full justify-start bg-transparent">
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
+      <Card className="w-full max-w-md mx-auto">
+        <CardContent className="flex items-center justify-center p-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="ml-2">Caricamento...</span>
         </CardContent>
       </Card>
     )
   }
 
-  // Se l'utente non è loggato, mostra il form di login/registrazione
+  if (user) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Benvenuto
+          </CardTitle>
+          <CardDescription>Sei connesso come {user.email}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2">
+            <Link
+              href={getDashboardLink()}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Vai alla Dashboard
+            </Link>
+            <Link
+              href="/profile"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Profilo
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </button>
+          </div>
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Accesso</CardTitle>
+        <CardTitle>{isSignUp ? "Registrazione" : "Accesso"}</CardTitle>
+        <CardDescription>
+          {isSignUp
+            ? "Crea un nuovo account per accedere all'applicazione"
+            : "Inserisci le tue credenziali per accedere"}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="signup">Registrati</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="login">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <Input
-                  id="login-email"
-                  type="email"
-                  value={loginData.email}
-                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
-                <Input
-                  id="login-password"
-                  type="password"
-                  value={loginData.password}
-                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Accesso in corso..." : "Accedi"}
-              </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="signup">
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-nome">Nome</Label>
-                  <Input
-                    id="signup-nome"
-                    value={signUpData.nome}
-                    onChange={(e) => setSignUpData({ ...signUpData, nome: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-cognome">Cognome</Label>
-                  <Input
-                    id="signup-cognome"
-                    value={signUpData.cognome}
-                    onChange={(e) => setSignUpData({ ...signUpData, cognome: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-username">Username</Label>
-                <Input
-                  id="signup-username"
-                  value={signUpData.username}
-                  onChange={(e) => setSignUpData({ ...signUpData, username: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  value={signUpData.email}
-                  onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-password">Password</Label>
-                <Input
-                  id="signup-password"
-                  type="password"
-                  value={signUpData.password}
-                  onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Registrazione in corso..." : "Registrati"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isSubmitting}
+              minLength={6}
+            />
+          </div>
+          {isSignUp && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Conferma Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                disabled={isSubmitting}
+                minLength={6}
+              />
+            </div>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSignUp ? "Registrati" : "Accedi"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setIsSignUp(!isSignUp)
+              setError("")
+              setEmail("")
+              setPassword("")
+              setConfirmPassword("")
+            }}
+            disabled={isSubmitting}
+          >
+            {isSignUp ? "Hai già un account? Accedi" : "Non hai un account? Registrati"}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   )
