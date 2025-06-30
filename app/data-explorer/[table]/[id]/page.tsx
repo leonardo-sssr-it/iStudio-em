@@ -95,7 +95,7 @@ const TABLE_FIELDS = {
   },
   attivita: {
     listFields: ["id", "titolo", "data_inizio", "stato", "priorita", "attivo"],
-    readOnlyFields: ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+    readOnlyFields: ["id", "id_utente", "modifica", "id_pro", "id_app", "id_cli"],
     requiredFields: ["titolo"],
     defaultSort: "data_inizio",
     types: {
@@ -120,14 +120,14 @@ const TABLE_FIELDS = {
     },
     groups: {
       "Informazioni principali": ["titolo", "descrizione", "stato", "priorita", "data_inizio", "data_fine"],
-      "Note e dettagli": ["note", "luogo", "tags", "notifica"],
-      "Informazioni di sistema": ["id", "id_utente", "modifica", "attivo", "id_pro", "id_app", "id_cli"],
+      "Note e dettagli": ["note", "luogo", "attivo", "tags", "notifica"],
+      "Informazioni di sistema": ["id", "id_utente", "modifica", "id_pro", "id_app", "id_cli"],
     },
   },
   scadenze: {
     listFields: ["id", "titolo", "scadenza", "stato", "privato"],
     readOnlyFields: ["id", "id_utente", "modifica"],
-    requiredFields: ["titolo"],
+    requiredFields: ["titolo", "scadenza"],
     defaultSort: "scadenza",
     types: {
       id: "number",
