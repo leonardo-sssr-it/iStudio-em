@@ -16,7 +16,8 @@ import { Eye, EyeOff, LogIn, UserPlus, User, Home, LogOut, AlertCircle } from "l
 import Link from "next/link"
 
 export function AuthWidget() {
-  const { user, signIn, signUp, signOut } = useAuth()
+  // ✅ USO LE FUNZIONI CORRETTE: login, signUp, logout (non signIn, signOut)
+  const { user, login, signUp, logout } = useAuth()
   const { supabase } = useSupabase()
 
   const [email, setEmail] = useState("")
@@ -66,7 +67,7 @@ export function AuthWidget() {
     }
   }
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) {
       setError("Email e password sono obbligatori")
@@ -77,7 +78,8 @@ export function AuthWidget() {
     setError("")
 
     try {
-      await signIn(email, password)
+      // ✅ USO login (non signIn)
+      await login(email, password)
       toast({
         title: "Accesso effettuato",
         description: "Benvenuto!",
@@ -117,6 +119,7 @@ export function AuthWidget() {
     setError("")
 
     try {
+      // ✅ USO signUp (questa dovrebbe essere corretta)
       await signUp(email, password, {
         username,
         nome,
@@ -144,9 +147,10 @@ export function AuthWidget() {
     }
   }
 
-  const handleSignOut = async () => {
+  const handleLogout = async () => {
     try {
-      await signOut()
+      // ✅ USO logout (non signOut)
+      await logout()
       setUserProfile(null)
       toast({
         title: "Disconnesso",
@@ -210,7 +214,7 @@ export function AuthWidget() {
             </Button>
           </Link>
 
-          <Button onClick={handleSignOut} variant="destructive" className="w-full">
+          <Button onClick={handleLogout} variant="destructive" className="w-full">
             <LogOut className="h-4 w-4 mr-2" />
             Logout
           </Button>
@@ -241,7 +245,7 @@ export function AuthWidget() {
               </Alert>
             )}
 
-            <form onSubmit={handleSignIn} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="signin-email">Email</Label>
                 <Input
