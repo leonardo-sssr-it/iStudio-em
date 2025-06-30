@@ -26,7 +26,7 @@ interface UserProfile {
   ultimo_accesso?: string
 }
 
-export default function AuthWidget() {
+export function AuthWidget() {
   const { user, login, signUp, logout } = useAuth()
   const { supabase } = useSupabase()
   const [loading, setLoading] = useState(false)
