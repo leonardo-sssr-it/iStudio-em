@@ -23,17 +23,15 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.75rem;
+    --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Variabili personalizzate per admin */
-    --admin-tab-active-bg: 142 71% 45%;
-    --admin-tab-active-fg: 210 40% 98%;
-    --admin-checkbox-checked: 142 71% 45%;
+    /* Font size variables */
+    --font-size-base: 16px;
   }
 
   .dark {
@@ -61,11 +59,6 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-
-    /* Variabili personalizzate per admin in dark mode */
-    --admin-tab-active-bg: 142 71% 55%;
-    --admin-tab-active-fg: 222.2 84% 4.9%;
-    --admin-checkbox-checked: 142 71% 55%;
   }
 }
 
@@ -75,308 +68,234 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-size: var(--font-size-base);
   }
 }
 
-/* Nasconde la X di default del DialogContent di shadcn/ui */
-.custom-feed-modal-dialog-content > button[class*="absolute"][class*="right-4"][class*="top-4"] {
-  display: none !important;
+/* Font size classes */
+.font-small {
+  --font-size-base: 14px;
 }
 
-/* Stili per tab attivi nella pagina admin */
-@layer components {
-  .admin-tab-active {
-    background-color: hsl(var(--admin-tab-active-bg)) !important;
-    color: hsl(var(--admin-tab-active-fg)) !important;
-    font-weight: 600;
-  }
-
-  /* Migliora la visibilità dei checkbox */
-  .admin-checkbox[data-state="checked"] {
-    background-color: hsl(var(--admin-checkbox-checked)) !important;
-    border-color: hsl(var(--admin-checkbox-checked)) !important;
-  }
-
-  .admin-checkbox[data-state="checked"] svg {
-    color: white !important;
-    stroke-width: 3px;
-  }
-
-  /* Outline per checkbox non selezionati */
-  .admin-checkbox {
-    border: 2px solid hsl(var(--admin-checkbox-checked));
-  }
-
-  /* Rimuovi effetti di focus persistenti */
-  .focus-visible:focus-visible {
-    outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
-  }
-
-  /* Semplifica gli effetti hover */
-  .hover-simple:hover {
-    background-color: hsl(var(--accent) / 0.5);
-  }
-
-  /* Stili per i popup e dropdown */
-  .popup-layer {
-    @apply z-50;
-  }
-
-  .dropdown-layer {
-    @apply z-40;
-  }
-
-  /* Precaricamento per dropdown e popup */
-  .preload-dropdown {
-    opacity: 0;
-    pointer-events: none;
-    position: absolute;
-    transform: translateY(-10px);
-    transition: none;
-  }
-
-  /* Stili per i toast */
-  .toast {
-    @apply z-[100] bg-background text-foreground border border-border shadow-lg rounded-md;
-  }
+.font-normal {
+  --font-size-base: 16px;
 }
 
-/* Rimuovi transizioni eccessive */
-* {
-  transition-duration: 200ms;
+.font-large {
+  --font-size-base: 18px;
 }
 
-/* Rimuovi focus ring persistenti */
-button:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* Rimuovi background fissi dalle dashboard */
-.dashboard-container,
-.dashboard-card,
-.dashboard-content {
-  background: transparent !important;
-}
-
-/* Applica background solo ai contenitori principali */
-.main-container {
-  background-color: hsl(var(--background));
-}
-
-/* Assicura che i contenuti ereditino il tema */
-.content-inherit {
-  color: inherit;
-  background: inherit;
-}
-
-/* Debug: mostra le variabili CSS applicate */
-.debug-theme::before {
-  content: "BG: " attr(data-bg) " | FG: " attr(data-fg);
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  background: red;
-  color: white;
-  padding: 5px;
-  font-size: 12px;
-  z-index: 9999;
-}
-
-/* Transizioni per il cambio tema */
+/* Theme transition */
 .theme-transition {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: all 0.3s ease-in-out;
 }
 
-/* Stili personalizzati per l'applicazione */
-.container {
-  @apply mx-auto px-4 sm:px-6 lg:px-8;
+/* Stili personalizzati per la sidebar con !important per forzare le dimensioni */
+.sidebar-container {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
 }
 
-/* Stili per le tabelle */
-.table-container {
-  @apply overflow-x-auto rounded-lg border border-border;
+.sidebar-link {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  text-decoration: none !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  flex-wrap: nowrap !important;
+  transition: all 0.2s ease !important;
+  min-height: 32px !important;
+  height: 32px !important;
 }
 
-.table-header {
-  @apply bg-muted/50 text-muted-foreground;
+.sidebar-link:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
 }
 
-.table-row {
-  @apply border-b border-border hover:bg-muted/50 transition-colors;
+.sidebar-link.active {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
-.table-cell {
-  @apply px-4 py-2 text-sm;
+.sidebar-link svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
 }
 
-/* Stili per i form */
-.form-group {
-  @apply space-y-2;
+.sidebar-link span {
+  flex: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
-.form-label {
-  @apply text-sm font-medium text-foreground;
+.sidebar-section-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: hsl(var(--foreground)) !important;
+  margin: 16px 0 8px 0 !important;
+  padding: 0 12px !important;
 }
 
-.form-input {
-  @apply w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+.sidebar-section-title:first-child {
+  margin-top: 8px !important;
 }
 
-/* Stili per le card */
-.card-header {
-  @apply border-b border-border pb-4;
+/* Stili per auth widget */
+.auth-widget-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  font-size: 14px !important;
 }
 
-.card-content {
-  @apply pt-4;
+.auth-widget-button svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
 }
 
-/* Stili per la sidebar */
-.sidebar {
-  @apply bg-card border-r border-border;
+.auth-widget-secondary-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  white-space: nowrap !important;
+  font-size: 13px !important;
 }
 
-.sidebar-item {
-  @apply flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors;
+.auth-widget-secondary-button svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
 }
 
-.sidebar-item.active {
-  @apply bg-primary text-primary-foreground;
-}
-
-/* Stili per l'header */
-.header {
-  @apply sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60;
-}
-
-/* Stili per i dropdown */
-.dropdown-content {
-  @apply bg-popover text-popover-foreground border border-border shadow-lg rounded-md z-50;
-}
-
-.dropdown-item {
-  @apply px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors;
-}
-
-/* Stili per i toast */
-.toast {
-  @apply bg-background text-foreground border border-border shadow-lg rounded-md;
-}
-
-.toast.success {
-  @apply border-green-500 bg-green-50 text-green-900 dark:bg-green-900/20 dark:text-green-100;
-}
-
-.toast.error {
-  @apply border-red-500 bg-red-50 text-red-900 dark:bg-red-900/20 dark:text-red-100;
-}
-
-.toast.warning {
-  @apply border-yellow-500 bg-yellow-50 text-yellow-900 dark:bg-yellow-900/20 dark:text-yellow-400;
-}
-
-/* Stili per i loading spinner */
-.spinner {
-  @apply animate-spin rounded-full border-2 border-muted border-t-primary;
-}
-
-/* Stili per i badge */
-.badge {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-}
-
-.badge.primary {
-  @apply bg-primary text-primary-foreground;
-}
-
-.badge.secondary {
-  @apply bg-secondary text-secondary-foreground;
-}
-
-.badge.success {
-  @apply bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400;
-}
-
-.badge.error {
-  @apply bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400;
-}
-
-.badge.warning {
-  @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400;
-}
-
-/* Stili per i focus ring */
-.focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
-}
-
-/* Stili per le animazioni */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
+/* Responsive design */
+@media (max-width: 768px) {
+  .sidebar-link {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+    height: 40px !important;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  .sidebar-link svg {
+    width: 16px !important;
+    height: 16px !important;
   }
 }
 
-.fade-in {
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-.slide-in {
-  animation: slideIn 0.3s ease-out;
-}
-
-/* Stili per il responsive design */
+/* Responsive font scaling */
 @media (max-width: 640px) {
-  .container {
-    @apply px-2;
+  .font-small {
+    --font-size-base: 13px;
   }
 
-  .table-cell {
-    @apply px-2 py-1 text-xs;
+  .font-normal {
+    --font-size-base: 15px;
+  }
+
+  .font-large {
+    --font-size-base: 17px;
   }
 }
 
-/* Stili per la stampa */
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Custom scrollbar for dropdown menus */
+.dropdown-menu-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-menu-content::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.dropdown-menu-content::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 3px;
+}
+
+.dropdown-menu-content::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground));
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 0 0% 0%;
+    --input: 0 0% 0%;
+  }
+
+  .dark {
+    --border: 0 0% 100%;
+    --input: 0 0% 100%;
+  }
+}
+
+/* Focus visible improvements */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Button hover states */
+button:hover {
+  transition: all 0.2s ease;
+}
+
+/* Card hover effects */
+.card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+/* Loading states */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Print styles */
 @media print {
   .no-print {
     display: none !important;
   }
 
-  .print-only {
-    display: block !important;
+  * {
+    background: white !important;
+    color: black !important;
   }
-}
-
-/* Fix per i popup e dropdown che appaiono sotto altri elementi */
-.popover-content,
-.dropdown-menu-content,
-.dialog-content,
-.select-content,
-.command-dialog,
-.tooltip-content {
-  z-index: 999 !important;
-}
-
-/* Precaricamento per migliorare la reattività dei componenti UI */
-.preload-ui {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-9999px);
 }

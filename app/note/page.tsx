@@ -82,7 +82,7 @@ export default function NoteListPage() {
 
     // Filtro per priorità
     if (priorityFilter !== "all") {
-      filtered = filtered.filter((nota) => nota.priorita === priorityFilter)
+      filtered = filtered.filter((nota) => String(nota.priorita) === priorityFilter)
     }
 
     // Filtro per notifiche
@@ -115,25 +115,42 @@ export default function NoteListPage() {
   }
 
   // Ottieni il colore della priorità
-  const getPriorityColor = (priorita: string | null) => {
+  const getPriorityColor = (priorita: string | number | null) => {
     if (!priorita) return "bg-gray-100 text-gray-800"
 
-    const priority = priorityOptions.find((p) => p.value === priorita)
+    // Converti sempre a stringa per la ricerca
+    const prioritaStr = String(priorita)
+
+    const priority = priorityOptions.find((p) => String(p.value) === prioritaStr)
     if (priority?.color) {
       return `bg-${priority.color}-100 text-${priority.color}-800`
     }
 
-    // Fallback colors
-    switch (priorita.toLowerCase()) {
+    // Fallback colors basati sul valore
+    const prioritaLower = prioritaStr.toLowerCase()
+    switch (prioritaLower) {
       case "alta":
+      case "3":
         return "bg-red-100 text-red-800"
       case "media":
+      case "2":
         return "bg-yellow-100 text-yellow-800"
       case "bassa":
+      case "1":
         return "bg-green-100 text-green-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  // Ottieni il label della priorità
+  const getPriorityLabel = (priorita: string | number | null) => {
+    if (!priorita) return ""
+
+    const prioritaStr = String(priorita)
+    const priority = priorityOptions.find((p) => String(p.value) === prioritaStr)
+
+    return priority?.label || prioritaStr
   }
 
   if (loading) {
@@ -202,7 +219,7 @@ export default function NoteListPage() {
           <SelectContent>
             <SelectItem value="all">Tutte le priorità</SelectItem>
             {priorityOptions.map((priority) => (
-              <SelectItem key={priority.value} value={priority.value}>
+              <SelectItem key={priority.value} value={String(priority.value)}>
                 {priority.label}
               </SelectItem>
             ))}
@@ -259,9 +276,7 @@ export default function NoteListPage() {
 
                       <div className="flex flex-wrap gap-2 mb-2">
                         {nota.priorita && (
-                          <Badge className={getPriorityColor(nota.priorita)}>
-                            {priorityOptions.find((p) => p.value === nota.priorita)?.label || nota.priorita}
-                          </Badge>
+                          <Badge className={getPriorityColor(nota.priorita)}>{getPriorityLabel(nota.priorita)}</Badge>
                         )}
 
                         {nota.notifica ? (

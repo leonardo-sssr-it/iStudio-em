@@ -13,14 +13,16 @@ import type { LucideIcon } from "lucide-react"
 const SummaryCard = ({ type, label, count, icon: Icon, color, textColor }: SummaryCount) => (
   <Link href={`/data-explorer?table=${type}`} className="block">
     <Card
-      className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color} cursor-pointer transform hover:scale-105 transition-transform`}
+      className={`shadow-lg hover:shadow-xl transition-shadow duration-300 ${color} cursor-pointer transform hover:scale-105 transition-transform w-[70%]`}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3">
         <CardTitle className={`text-xs font-medium ${textColor} truncate`}>{label}</CardTitle>
-        <Icon className={`h-4 w-4 ${textColor} opacity-80 flex-shrink-0`} />
       </CardHeader>
-      <CardContent className="pt-1">
-        <div className={`text-xl font-bold ${textColor}`}>{count}</div>
+      <CardContent className="pt-1 p-3">
+        <div className={`text-xl font-bold ${textColor} flex items-center gap-2`}>
+          {count}
+          <Icon className={`h-5 w-5 ${textColor} opacity-80 flex-shrink-0`} />
+        </div>
         <p className={`text-[10px] ${textColor} opacity-70 mt-0.5`}>Elementi totali</p>
       </CardContent>
     </Card>
@@ -35,13 +37,13 @@ const UpcomingItemsList = ({
   if (!items.length) {
     return (
       <Card className="col-span-1">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 p-3">
           <CardTitle className="text-base flex items-center">
             <Icon className="h-4 w-4 mr-2 text-gray-500" />
             {title}
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 p-3">
           <p className="text-xs text-gray-500">Nessun elemento imminente.</p>
         </CardContent>
       </Card>
@@ -50,14 +52,14 @@ const UpcomingItemsList = ({
 
   return (
     <Card className="col-span-1 shadow-md">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 p-3">
         <CardTitle className="text-base flex items-center">
           <Icon className="h-4 w-4 mr-2 text-primary" />
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <ul className="space-y-1.5">
+      <CardContent className="pt-0 p-3">
+        <ul className="space-y-1">
           {items.map((item) => (
             <li key={`${item.tabella_origine}-${item.id_origine}`} className="text-xs border-b pb-1 last:border-b-0">
               <Link
@@ -90,34 +92,34 @@ export function UserSummary() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+      <div className="space-y-4">
+        <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-1">
+            <Card key={i} className="w-[70%]">
+              <CardHeader className="pb-1 p-3">
                 <Skeleton className="h-4 w-20" />
               </CardHeader>
-              <CardContent className="pt-1">
+              <CardContent className="pt-1 p-3">
                 <Skeleton className="h-6 w-10" />
                 <Skeleton className="h-3 w-16 mt-0.5" />
               </CardContent>
             </Card>
           ))}
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-2">
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 p-3">
               <Skeleton className="h-5 w-28" />
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 p-3">
               <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 p-3">
               <Skeleton className="h-5 w-28" />
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 p-3">
               <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
@@ -129,11 +131,11 @@ export function UserSummary() {
   if (error) {
     return (
       <Card className="bg-destructive/10 border-destructive">
-        <CardHeader className="flex flex-row items-center space-x-2 pb-2">
+        <CardHeader className="flex flex-row items-center space-x-2 pb-2 p-3">
           <AlertCircle className="h-4 w-4 text-destructive" />
           <CardTitle className="text-destructive text-base">Errore nel caricamento del riepilogo</CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-0 p-3">
           <p className="text-xs text-destructive">{error}</p>
           <p className="text-xs text-destructive-foreground/80 mt-1">Prova a ricaricare la pagina.</p>
         </CardContent>
@@ -146,13 +148,13 @@ export function UserSummary() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
+    <div className="space-y-4">
+      <div className="grid gap-x-1 gap-y-1.5 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8">
         {dashboardData.summaryCounts.map((summary) => (
           <SummaryCard key={summary.type} {...summary} />
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-1 gap-y-1.5">
         <UpcomingItemsList title="Elementi di Oggi" items={dashboardData.todaysItems} icon={CalendarClock} />
         <UpcomingItemsList title="Prossima Settimana" items={dashboardData.nextWeekItems} icon={CalendarPlus} />
       </div>

@@ -703,7 +703,7 @@ export function KanbanWidget() {
         <CardContent>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex-shrink-0 w-72 md:w-80 bg-muted/50 rounded-lg p-4">
+              <div key={i} className="flex-shrink-0 w-64 md:w-72 bg-muted/50 rounded-lg p-4">
                 <div className="h-10 bg-muted rounded mb-4" />
                 <div className="space-y-3">
                   <div className="h-28 bg-muted rounded" />
@@ -858,10 +858,10 @@ export function KanbanWidget() {
           <div className="relative">
             {/* Container principale con scorrimento orizzontale */}
             <div
-              className="flex gap-3 md:gap-4 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
+              className="flex gap-2 md:gap-3 overflow-x-auto p-3 md:p-4 min-h-[calc(100vh-250px)] md:min-h-[500px] scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
               style={{
                 // Calcola la larghezza minima in base al numero di colonne
-                minWidth: `${columns.length * (288 + 16)}px`, // 288px (w-72) + 16px gap
+                minWidth: `${columns.length * (256 + 12)}px`, // 256px (w-64) + 12px gap
               }}
             >
               {columns.map((column, index) => (
@@ -874,13 +874,13 @@ export function KanbanWidget() {
                         "flex-shrink-0 rounded-lg p-1 flex flex-col",
                         // Larghezza dinamica basata sul numero di colonne e spazio disponibile
                         columns.length <= 3
-                          ? "flex-1 min-w-[280px] max-w-[400px]" // Se poche colonne, espandi
-                          : "w-72 md:w-80", // Se molte colonne, mantieni larghezza fissa
+                          ? "flex-1 min-w-[250px] max-w-[350px]" // Se poche colonne, espandi
+                          : "w-64 md:w-72", // Se molte colonne, mantieni larghezza fissa ridotta
                         snapshot.isDraggingOver ? "bg-primary/10 dark:bg-primary/20" : "bg-muted/50 dark:bg-muted/30",
                       )}
                       style={{
                         // Assicura che ogni colonna sia sempre visibile
-                        minWidth: columns.length <= 3 ? "280px" : "288px",
+                        minWidth: columns.length <= 3 ? "250px" : "256px",
                       }}
                     >
                       <div

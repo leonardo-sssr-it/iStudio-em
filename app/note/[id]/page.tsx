@@ -136,13 +136,16 @@ export default function NotaDetailPage() {
   const getPriorityColor = (priorita: string | null) => {
     if (!priorita) return "bg-gray-100 text-gray-800"
 
-    const priority = priorityOptions.find((p) => p.value === priorita)
+    // Assicurati che priorita sia una stringa prima di chiamare toLowerCase
+    const prioritaString = typeof priorita === "string" ? priorita : String(priorita)
+
+    const priority = priorityOptions.find((p) => p.value === prioritaString)
     if (priority?.color) {
       return `bg-${priority.color}-100 text-${priority.color}-800`
     }
 
     // Fallback colors
-    switch (priorita.toLowerCase()) {
+    switch (prioritaString.toLowerCase()) {
       case "alta":
         return "bg-red-100 text-red-800"
       case "media":
