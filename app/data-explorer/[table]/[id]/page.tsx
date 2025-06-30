@@ -395,14 +395,28 @@ export default function DataExplorerDetailPage() {
     // ✅ CAMPI DATETIME - COPIATO ESATTAMENTE DALLA PAGINA NEW
     if (
       fieldName.includes("data") &&
-      (column.data_type === "timestamp with time zone" || column.data_type === "timestamp without time zone")
+      (column.data_type === "timestamp with time zone" ||
+        column.data_type === "timestamp without time zone" ||
+        column.data_type === "datetime")
     ) {
+      console.log(`Rendering EnhancedDatePicker for ${fieldName} with value:`, fieldValue)
       return (
-        <EnhancedDatePicker
-          value={fieldValue || ""}
-          onChange={(newValue) => handleFieldChange(fieldName, newValue)}
-          showCurrentTime={true}
-        />
+        <div key={fieldName} className="space-y-2">
+          <Label htmlFor={fieldName} className="text-sm font-medium">
+            {fieldLabel}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+          <EnhancedDatePicker
+            id={fieldName}
+            value={fieldValue || ""}
+            onChange={(newValue) => {
+              console.log(`EnhancedDatePicker onChange for ${fieldName}:`, newValue)
+              handleFieldChange(fieldName, newValue)
+            }}
+            placeholder={`Seleziona ${fieldLabel.toLowerCase()}`}
+            showCurrentTime={true}
+          />
+        </div>
       )
     }
 
