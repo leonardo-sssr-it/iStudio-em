@@ -611,7 +611,7 @@ export default function ItemDetailPage() {
     if (supabase && tableName && isValidTable) loadItem()
   }, [supabase, loadItem, tableName, isValidTable])
 
-  // Gestisce il cambio di un campo
+  // Gestisce il cambio di un campo - COPIATO DALLA PAGINA NEW
   const handleFieldChange = (field: string, value: any) => {
     console.log(`Campo ${field} cambiato a:`, value)
     setEditedItem((prev: any) => {
@@ -742,7 +742,7 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Renderizza un campo del form - QUESTA È LA PARTE CORRETTA DAL NEW PAGE
+  // ✅ RENDERIZZA UN CAMPO - COPIATO DALLA PAGINA NEW E MIGLIORATO
   const renderField = (field: string) => {
     const fieldType = fieldTypes[field]
     const fieldValue = editedItem[field]
@@ -761,7 +761,7 @@ export default function ItemDetailPage() {
 
     console.log(`Rendering field: ${field}, type: ${fieldType}, isEditMode: ${isEditMode}`)
 
-    // MODALITÀ VISUALIZZAZIONE
+    // ✅ MODALITÀ VISUALIZZAZIONE
     if (!isEditMode) {
       let displayValue = fieldValue
       if (fieldType === "datetime") {
@@ -771,6 +771,10 @@ export default function ItemDetailPage() {
       } else if (fieldType === "priority_select") {
         const priorityOption = priorityOptions.find((option) => option.value === fieldValue)
         displayValue = priorityOption ? priorityOption.nome : fieldValue
+      } else if (fieldType === "select") {
+        const options = selectOptions[field] || []
+        const selectedOption = options.find((option) => option.value === fieldValue)
+        displayValue = selectedOption ? selectedOption.label : fieldValue
       } else {
         displayValue = formatValue(fieldValue)
       }
@@ -785,7 +789,7 @@ export default function ItemDetailPage() {
       )
     }
 
-    // MODALITÀ MODIFICA
+    // ✅ MODALITÀ MODIFICA - COPIATO DALLA PAGINA NEW
     switch (fieldType) {
       case "string":
       case "email":
@@ -831,6 +835,7 @@ export default function ItemDetailPage() {
         )
 
       case "datetime":
+        // ✅ USARE ENHANCED DATE PICKER COME NELLA PAGINA NEW
         console.log(`Rendering EnhancedDatePicker for ${field} with value:`, fieldValue)
         return (
           <div key={field} className="space-y-2">
