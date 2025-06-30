@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider"
 import { useColumns } from "@/hooks/use-columns"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { ArrowLeft, Edit, Save, X, Trash2 } from "lucide-react"
 import Link from "next/link"
@@ -26,10 +27,33 @@ interface SelectOption {
   label: string
 }
 
+// Componente per il color picker
+const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+      <Input
+        type="color"
+        value={value || "#000000"}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full sm:w-20 h-10 p-1 cursor-pointer"
+      />
+      <Input
+        type="text"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="#000000"
+        className="w-full sm:flex-1"
+        pattern="^#[0-9A-Fa-f]{6}$"
+      />
+    </div>
+  )
+}
+
 export default function DataExplorerDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { supabase } = useSupabase()
+  const { user } = useAuth()
   const tableName = params.table as string
   const recordId = params.id as string
 
@@ -42,6 +66,39 @@ export default function DataExplorerDetailPage() {
   const [priorityOptions, setPriorityOptions] = useState<SelectOption[]>([])
 
   const { data: columns, loading: columnsLoading } = useColumns(tableName)
+
+  // ✅ CARICAMENTO PRIORITÀ CORRETTO - COPIATO DALLA PAGINA NEW
+  const loadPriorityOptions = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const { data, error } = await supabase.from("configurazione").select("priorita").single()
+      if (error) throw error
+      let priorityArray = null
+      if (data?.priorita) {
+        if (Array.isArray(data.priorita)) priorityArray = data.priorita
+        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
+        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
+      }
+      if (!priorityArray || priorityArray.length === 0) {
+        setPriorityOptions([])
+        return
+      }
+      const mappedPriorities = priorityArray.map((item: any) => ({
+        value: item.livello || item.value,
+        nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
+        descrizione: item.descrizione || item.description || "",
+      }))
+      setPriorityOptions(mappedPriorities.map((p) => ({ value: p.value.toString(), label: p.nome })))
+    } catch (error: any) {
+      console.error("Errore nel caricamento delle priorità:", error)
+      setPriorityOptions([
+        { value: "1", label: "Bassa" },
+        { value: "2", label: "Media" },
+        { value: "3", label: "Alta" },
+        { value: "4", label: "Urgente" },
+      ])
+    }
+  }, [supabase])
 
   // Carica le opzioni per le select
   useEffect(() => {
@@ -58,8 +115,8 @@ export default function DataExplorerDetailPage() {
         ) {
           if (tableName === "appuntamenti") {
             options["stato"] = [
-              { value: "programmato", label: "Programmato" },
-              { value: "confermato", label: "Confermato" },
+              { value: "pianificato", label: "Pianificato" },
+              { value: "in_corso", label: "In corso" },
               { value: "completato", label: "Completato" },
               { value: "annullato", label: "Annullato" },
             ]
@@ -67,12 +124,12 @@ export default function DataExplorerDetailPage() {
             options["stato"] = [
               { value: "da_fare", label: "Da fare" },
               { value: "in_corso", label: "In corso" },
-              { value: "completata", label: "Completata" },
-              { value: "sospesa", label: "Sospesa" },
+              { value: "completato", label: "Completato" },
+              { value: "sospeso", label: "Sospeso" },
             ]
           } else if (tableName === "progetti") {
             options["stato"] = [
-              { value: "pianificazione", label: "Pianificazione" },
+              { value: "pianificato", label: "Pianificato" },
               { value: "in_corso", label: "In corso" },
               { value: "completato", label: "Completato" },
               { value: "sospeso", label: "Sospeso" },
@@ -103,46 +160,8 @@ export default function DataExplorerDetailPage() {
     }
 
     loadSelectOptions()
-  }, [supabase, columns, tableName])
-
-  // Carica opzioni priorità da Supabase
-  useEffect(() => {
-    const loadPriorityOptions = async () => {
-      if (!supabase) return
-
-      try {
-        const { data: priorities, error } = await supabase.from("priorita").select("id, nome").order("nome")
-
-        if (error) {
-          console.error("Errore nel caricamento delle priorità:", error)
-          // Fallback alle priorità di default
-          setPriorityOptions([
-            { value: "1", label: "Bassa" },
-            { value: "2", label: "Media" },
-            { value: "3", label: "Alta" },
-            { value: "4", label: "Urgente" },
-          ])
-        } else {
-          setPriorityOptions(
-            priorities.map((p) => ({
-              value: p.id.toString(),
-              label: p.nome,
-            })),
-          )
-        }
-      } catch (error) {
-        console.error("Errore nel caricamento delle priorità:", error)
-        setPriorityOptions([
-          { value: "1", label: "Bassa" },
-          { value: "2", label: "Media" },
-          { value: "3", label: "Alta" },
-          { value: "4", label: "Urgente" },
-        ])
-      }
-    }
-
     loadPriorityOptions()
-  }, [supabase])
+  }, [supabase, columns, tableName, loadPriorityOptions])
 
   const fetchData = useCallback(async () => {
     if (!supabase || !tableName || !recordId) return
@@ -180,32 +199,39 @@ export default function DataExplorerDetailPage() {
   }, [fetchData])
 
   const handleFieldChange = (field: string, value: any) => {
+    console.log(`Campo ${field} cambiato a:`, value)
     const newData = { ...editData, [field]: value }
 
-    // Auto-aggiornamento data_fine quando cambia data_inizio
+    // ✅ Auto-aggiornamento data_fine quando cambia data_inizio - COPIATO DALLA PAGINA NEW
     if (
       field === "data_inizio" &&
       value &&
       (tableName === "appuntamenti" || tableName === "attivita" || tableName === "progetti")
     ) {
-      const startDate = new Date(value)
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // +1 ora
+      try {
+        const startDate = new Date(value)
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // +1 ora
 
-      // Formatta come ISO locale senza conversione timezone
-      const year = endDate.getFullYear()
-      const month = String(endDate.getMonth() + 1).padStart(2, "0")
-      const day = String(endDate.getDate()).padStart(2, "0")
-      const hour = String(endDate.getHours()).padStart(2, "0")
-      const minute = String(endDate.getMinutes()).padStart(2, "0")
-      const second = String(endDate.getSeconds()).padStart(2, "0")
+        // Formatta come stringa ISO locale (senza conversione timezone)
+        const year = endDate.getFullYear()
+        const month = String(endDate.getMonth() + 1).padStart(2, "0")
+        const day = String(endDate.getDate()).padStart(2, "0")
+        const hour = String(endDate.getHours()).padStart(2, "0")
+        const minute = String(endDate.getMinutes()).padStart(2, "0")
+        const second = String(endDate.getSeconds()).padStart(2, "0")
 
-      const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
-      newData.data_fine = localISOString
+        const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+        newData.data_fine = localISOString
 
-      toast({
-        title: "Data fine aggiornata",
-        description: "Data fine impostata automaticamente a +1 ora dalla data inizio",
-      })
+        console.log(`Auto-aggiornamento data_fine: ${localISOString}`)
+
+        toast({
+          title: "Data fine aggiornata",
+          description: "Data fine impostata automaticamente a +1 ora dalla data inizio",
+        })
+      } catch (e) {
+        console.warn("Errore nell'aggiornamento automatico di data_fine:", e)
+      }
     }
 
     setEditData(newData)
@@ -280,16 +306,18 @@ export default function DataExplorerDetailPage() {
     }
   }
 
+  // ✅ RENDER FIELD - COPIATO DALLA PAGINA NEW PER I CAMPI DATETIME
   const renderField = (column: any, value: any, isEditing: boolean) => {
     const fieldName = column.column_name
     const fieldValue = isEditing ? editData[fieldName] : value
 
     // Non mostrare campi di sistema
-    if (["id", "created_at", "updated_at"].includes(fieldName)) {
+    if (["id", "created_at", "updated_at", "data_creazione", "modifica"].includes(fieldName)) {
       return null
     }
 
     const fieldLabel = fieldName.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+    const isRequired = ["titolo", "nome", "email", "username"].includes(fieldName)
 
     if (!isEditing) {
       // Modalità visualizzazione
@@ -298,7 +326,7 @@ export default function DataExplorerDetailPage() {
       if (fieldValue === null || fieldValue === undefined) {
         displayValue = "-"
       } else if (typeof fieldValue === "boolean") {
-        displayValue = fieldValue ? "Sì" : "No"
+        displayValue = fieldValue ? "✓" : "✗"
       } else if (fieldName.includes("data") && fieldValue) {
         displayValue = new Date(fieldValue).toLocaleString("it-IT")
       } else if (fieldName === "stato" && selectOptions[fieldName]) {
@@ -310,7 +338,7 @@ export default function DataExplorerDetailPage() {
       } else if (fieldName === "categoria" && selectOptions[fieldName]) {
         const option = selectOptions[fieldName].find((opt) => opt.value === fieldValue)
         displayValue = option ? option.label : fieldValue
-      } else if (fieldName === "priorita_id" && priorityOptions.length > 0) {
+      } else if (fieldName === "priorita" && priorityOptions.length > 0) {
         const option = priorityOptions.find((opt) => opt.value === fieldValue?.toString())
         displayValue = option ? option.label : fieldValue
       }
@@ -332,21 +360,16 @@ export default function DataExplorerDetailPage() {
       )
     }
 
-    // Modalità modifica
+    // ✅ MODALITÀ MODIFICA - COPIATO DALLA PAGINA NEW
     if (column.data_type === "boolean") {
       return (
-        <div key={fieldName} className="space-y-2">
-          <Label htmlFor={fieldName} className="text-sm font-medium">
-            {fieldLabel}
-          </Label>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id={fieldName}
-              checked={fieldValue || false}
-              onCheckedChange={(checked) => handleFieldChange(fieldName, checked)}
-            />
-            <span className="text-sm text-gray-600">{fieldValue ? "Sì" : "No"}</span>
-          </div>
+        <div key={fieldName} className="flex items-center space-x-2">
+          <Checkbox
+            id={fieldName}
+            checked={!!fieldValue}
+            onCheckedChange={(checked) => handleFieldChange(fieldName, checked)}
+          />
+          <Label htmlFor={fieldName}>{fieldLabel}</Label>
         </div>
       )
     }
@@ -356,6 +379,7 @@ export default function DataExplorerDetailPage() {
         <div key={fieldName} className="space-y-2">
           <Label htmlFor={fieldName} className="text-sm font-medium">
             {fieldLabel}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Textarea
             id={fieldName}
@@ -368,19 +392,27 @@ export default function DataExplorerDetailPage() {
       )
     }
 
+    // ✅ CAMPI DATETIME - COPIATO ESATTAMENTE DALLA PAGINA NEW
     if (
       fieldName.includes("data") &&
-      (column.data_type === "timestamp with time zone" || column.data_type === "timestamp without time zone")
+      (column.data_type === "timestamp with time zone" ||
+        column.data_type === "timestamp without time zone" ||
+        column.data_type === "datetime")
     ) {
+      console.log(`Rendering EnhancedDatePicker for ${fieldName} with value:`, fieldValue)
       return (
         <div key={fieldName} className="space-y-2">
           <Label htmlFor={fieldName} className="text-sm font-medium">
             {fieldLabel}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <EnhancedDatePicker
             id={fieldName}
             value={fieldValue || ""}
-            onChange={(newValue) => handleFieldChange(fieldName, newValue)}
+            onChange={(newValue) => {
+              console.log(`EnhancedDatePicker onChange for ${fieldName}:`, newValue)
+              handleFieldChange(fieldName, newValue)
+            }}
             placeholder={`Seleziona ${fieldLabel.toLowerCase()}`}
             showCurrentTime={true}
           />
@@ -393,6 +425,7 @@ export default function DataExplorerDetailPage() {
         <div key={fieldName} className="space-y-2">
           <Label htmlFor={fieldName} className="text-sm font-medium">
             {fieldLabel}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Select value={fieldValue || ""} onValueChange={(value) => handleFieldChange(fieldName, value)}>
             <SelectTrigger>
@@ -454,7 +487,8 @@ export default function DataExplorerDetailPage() {
       )
     }
 
-    if (fieldName === "priorita_id" && priorityOptions.length > 0) {
+    // ✅ PRIORITÀ - COPIATO DALLA PAGINA NEW
+    if (fieldName === "priorita" && priorityOptions.length > 0) {
       return (
         <div key={fieldName} className="space-y-2">
           <Label htmlFor={fieldName} className="text-sm font-medium">
@@ -479,28 +513,14 @@ export default function DataExplorerDetailPage() {
       )
     }
 
+    // ✅ COLORE - COPIATO DALLA PAGINA NEW
     if (fieldName === "colore") {
       return (
         <div key={fieldName} className="space-y-2">
           <Label htmlFor={fieldName} className="text-sm font-medium">
             {fieldLabel}
           </Label>
-          <div className="flex items-center gap-2">
-            <Input
-              id={fieldName}
-              type="color"
-              value={fieldValue || "#000000"}
-              onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-              className="w-16 h-10 p-1 border rounded"
-            />
-            <Input
-              type="text"
-              value={fieldValue || ""}
-              onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-              placeholder="#000000"
-              className="flex-1"
-            />
-          </div>
+          <ColorPicker value={fieldValue || ""} onChange={(value) => handleFieldChange(fieldName, value)} />
         </div>
       )
     }
@@ -510,6 +530,7 @@ export default function DataExplorerDetailPage() {
         <div key={fieldName} className="space-y-2">
           <Label htmlFor={fieldName} className="text-sm font-medium">
             {fieldLabel}
+            {isRequired && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Input
             id={fieldName}
@@ -545,6 +566,7 @@ export default function DataExplorerDetailPage() {
       <div key={fieldName} className="space-y-2">
         <Label htmlFor={fieldName} className="text-sm font-medium">
           {fieldLabel}
+          {isRequired && <span className="text-red-500 ml-1">*</span>}
         </Label>
         <Input
           id={fieldName}
