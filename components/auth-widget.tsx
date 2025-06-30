@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, User, LogOut, AlertCircle } from "lucide-react"
+import { Loader2, User, LogOut, AlertCircle, Home } from "lucide-react"
 import { useAuth } from "@/lib/auth-provider"
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import Link from "next/link"
@@ -71,6 +71,13 @@ export function AuthWidget() {
     }
   }
 
+  // Funzione per determinare la dashboard appropriata
+  const getDashboardLink = () => {
+    // Qui puoi aggiungere logica per determinare il tipo di utente
+    // Per ora uso una dashboard generica, ma puoi personalizzare in base al ruolo
+    return "/dashboard"
+  }
+
   if (isLoading) {
     return (
       <Card className="w-full max-w-md mx-auto">
@@ -95,11 +102,18 @@ export function AuthWidget() {
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2">
             <Link
-              href="/profile"
+              href={getDashboardLink()}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
             >
+              <Home className="h-4 w-4 mr-2" />
+              Vai alla Dashboard
+            </Link>
+            <Link
+              href="/profile"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+            >
               <User className="h-4 w-4 mr-2" />
-              Vai al Profilo
+              Profilo
             </Link>
             <button
               onClick={handleLogout}
