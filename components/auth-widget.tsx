@@ -4,18 +4,15 @@ import type React from "react"
 
 import { useState } from "react"
 import { useAuth } from "@/lib/auth-provider"
-import { useSupabase } from "@/lib/supabase-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
-import { LogIn, LogOut, UserPlus, Eye, EyeOff } from "lucide-react"
+import { LogIn, LogOut, Eye, EyeOff } from "lucide-react"
 
 export function AuthWidget() {
-  const { user, signIn, signUp, signOut } = useAuth()
-  const { supabase } = useSupabase()
+  const { user, login, logout } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -36,11 +33,13 @@ export function AuthWidget() {
 
     setLoading(true)
     try {
-      await signIn(email, password)
-      toast({
-        title: "Accesso effettuato",
-        description: "Benvenuto!",
-      })
+      const success = await login(email, password)
+      if (success) {
+        toast({
+          title: "Accesso effettuato",
+          description: "Benvenuto!",
+        })
+      }
     } catch (error: any) {
       toast({
         title: "Errore di accesso",
@@ -83,10 +82,11 @@ export function AuthWidget() {
 
     setLoading(true)
     try {
-      await signUp(email, password)
+      // Per ora uso login dato che non abbiamo signUp nel auth-provider
       toast({
-        title: "Registrazione completata",
-        description: "Controlla la tua email per confermare l'account",
+        title: "Registrazione non disponibile",
+        description: "Contatta l'amministratore per creare un account",
+        variant: "destructive",
       })
     } catch (error: any) {
       toast({
@@ -102,7 +102,7 @@ export function AuthWidget() {
   const handleSignOut = async () => {
     setLoading(true)
     try {
-      await signOut()
+      await logout()
       toast({
         title: "Disconnesso",
         description: "Arrivederci!",
@@ -126,17 +126,23 @@ export function AuthWidget() {
             <LogOut className="h-5 w-5" />
             Profilo Utente
           </CardTitle>
-          <CardDescription>Sei connesso come {user.email}</CardDescription>
+          <CardDescription>Sei connesso come {user.username || user.email}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label>Email</Label>
-              <div className="mt-1 p-2 bg-gray-50 rounded-md text-sm">{user.email}</div>
+              <Label>Username</Label>
+              <div className="mt-1 p-2 bg-gray-50 rounded-md text-sm">{user.username}</div>
             </div>
+            {user.email && (
+              <div>
+                <Label>Email</Label>
+                <div className="mt-1 p-2 bg-gray-50 rounded-md text-sm">{user.email}</div>
+              </div>
+            )}
             <div>
-              <Label>ID Utente</Label>
-              <div className="mt-1 p-2 bg-gray-50 rounded-md text-sm font-mono">{user.id}</div>
+              <Label>Ruolo</Label>
+              <div className="mt-1 p-2 bg-gray-50 rounded-md text-sm">{user.ruolo}</div>
             </div>
             <Button onClick={handleSignOut} disabled={loading} className="w-full bg-transparent" variant="outline">
               <LogOut className="h-4 w-4 mr-2" />
@@ -155,121 +161,48 @@ export function AuthWidget() {
           <LogIn className="h-5 w-5" />
           Autenticazione
         </CardTitle>
-        <CardDescription>Accedi o registrati per continuare</CardDescription>
+        <CardDescription>Accedi per continuare</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Accedi</TabsTrigger>
-            <TabsTrigger value="signup">Registrati</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="signin" className="space-y-4">
-            <form onSubmit={handleSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="signin-email">Email</Label>
-                <Input
-                  id="signin-email"
-                  type="email"
-                  placeholder="tua@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signin-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="signin-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="La tua password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <Button type="submit" disabled={loading} className="w-full">
-                <LogIn className="h-4 w-4 mr-2" />
-                {loading ? "Accesso..." : "Accedi"}
+        <form onSubmit={handleSignIn} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="signin-email">Username o Email</Label>
+            <Input
+              id="signin-email"
+              type="text"
+              placeholder="username o email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="signin-password">Password</Label>
+            <div className="relative">
+              <Input
+                id="signin-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="La tua password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="signup" className="space-y-4">
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  placeholder="tua@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="signup-password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Almeno 6 caratteri"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-confirm-password">Conferma Password</Label>
-                <div className="relative">
-                  <Input
-                    id="signup-confirm-password"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Ripeti la password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-              <Button type="submit" disabled={loading} className="w-full">
-                <UserPlus className="h-4 w-4 mr-2" />
-                {loading ? "Registrazione..." : "Registrati"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+            </div>
+          </div>
+          <Button type="submit" disabled={loading} className="w-full">
+            <LogIn className="h-4 w-4 mr-2" />
+            {loading ? "Accesso..." : "Accedi"}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   )
