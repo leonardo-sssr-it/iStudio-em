@@ -6,12 +6,18 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  Search,
   SortAsc,
   SortDesc,
+  Plus,
+  RefreshCw,
   Calendar,
   CheckSquare,
   Clock,
@@ -20,8 +26,12 @@ import {
   Users,
   FilePlus,
   FileText,
+  Grid3X3,
+  List,
   StickyNote,
+  Filter,
 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 
 // Definizione delle tabelle disponibili
@@ -270,7 +280,7 @@ export default function DataExplorerPage() {
   useEffect(() => {
     const tableParam = searchParams.get("table")
     console.log(`[DataExplorerPage] Parametro table dalla URL: ${tableParam}`)
-    
+
     if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam)) {
       console.log(`[DataExplorerPage] Impostazione tabella selezionata: ${tableParam}`)
       setSelectedTable(tableParam)
@@ -643,5 +653,271 @@ export default function DataExplorerPage() {
       case "text":
         return <span className="text-xs">{value.length > 30 ? value.substring(0, 30) + "..." : value}</span>
       case "json":
+        return <span className="text-xs text-blue-600">{Array.isArray(value) ? `[${value.length}]` : "{...}"}</span>
+      case "array":
+        return <span className="text-xs text-blue-600">[{Array.isArray(value) ? value.length : 0}]</span>
+      default:
         return (
-          <span className="text-xs text-blue-600">{Array
+          <span className="text-xs">{String(value).length > 30 ? String(value).substring(0, 30) + "..." : value}</span>
+        )
+    }
+  }
+
+  // Renderizza la vista griglia
+  const renderGridView = () => {
+    if (loading) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, index) => (
+            <Card key={index} className="p-4">
+              <Skeleton className="h-6 w-3/4 mb-2" />
+              <Skeleton className="h-4 w-full mb-1" />
+              <Skeleton className="h-4 w-2/3" />
+            </Card>
+          ))}
+        </div>
+      )
+    }
+
+    if (filteredData.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <p className="text-gray-500 mb-4">
+            {searchTerm || (hasCompletedField() && completedFilter !== "tutti")
+              ? "Nessun risultato trovato"
+              : "Nessun dato disponibile"}
+          </p>
+          <Button variant="outline" onClick={handleCreateNew}>
+            <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
+          </Button>
+        </div>
+      )
+    }
+
+    const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
+    const fields = tableConfig?.listFields || []
+    const types = tableConfig?.types || {}
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredData.map((item) => (
+          <Card
+            key={item.id}
+            className={`cursor-pointer hover:shadow-md transition-shadow ${
+              hasCompletedField() && item.completato ? "opacity-60" : ""
+            }`}
+            onClick={() => handleRowClick(item.id)}
+          >
+            <CardContent className="p-4">
+              <div className="space-y-2">
+                {fields.slice(0, 4).map((field) => (
+                  <div key={field} className="flex justify-between items-start">
+                    <span className="text-xs text-gray-500 capitalize">{field.replace("_", " ")}:</span>
+                    <span className="text-sm font-medium text-right">
+                      {renderCellValue(item[field], types[field as keyof typeof types])}
+                    </span>
+                  </div>
+                ))}
+                {shouldShowCompleteButton(item) && (
+                  <div className="pt-2 border-t">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                      onClick={(e) => handleMarkCompleted(item.id, e)}
+                    >
+                      ✓ Completato
+                    </Button>
+                  </div>
+                )}
+                {hasCompletedField() && item.completato && (
+                  <div className="pt-2 border-t text-center">
+                    <span className="text-xs text-green-600 font-medium">✓ Completato</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  // Ottieni informazioni sulla tabella selezionata
+  const selectedTableInfo = AVAILABLE_TABLES.find((table) => table.id === selectedTable)
+  const Icon = selectedTableInfo?.icon || Grid3X3
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Grid3X3 className="w-8 h-8 text-blue-600" />
+          <h1 className="text-3xl font-bold">Data Explorer</h1>
+        </div>
+        <p className="text-gray-600">Esplora e gestisci i dati delle tue tabelle</p>
+      </div>
+
+      <div className="space-y-6">
+        {/* Selezione tabella */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Grid3X3 className="w-5 h-5" />
+              <span>Seleziona Tabella</span>
+            </CardTitle>
+            <CardDescription>Scegli la tabella da esplorare</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTable} onValueChange={setSelectedTable}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleziona una tabella..." />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_TABLES.map((table) => {
+                  const TableIcon = table.icon
+                  return (
+                    <SelectItem key={table.id} value={table.id}>
+                      <div className="flex items-center space-x-2">
+                        <TableIcon className="w-4 h-4" />
+                        <span>{table.label}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {/* Contenuto principale */}
+        {selectedTable && (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                <div className="flex items-center space-x-3">
+                  <Icon className="w-6 h-6 text-blue-600" />
+                  <div>
+                    <CardTitle>{selectedTableInfo?.label}</CardTitle>
+                    <CardDescription>
+                      {loading
+                        ? "Caricamento..."
+                        : `${filteredData.length} di ${data.length} elementi${
+                            searchTerm || (hasCompletedField() && completedFilter !== "tutti") ? " (filtrati)" : ""
+                          }`}
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button variant="outline" size="sm" onClick={loadTableData} disabled={loading}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                    Aggiorna
+                  </Button>
+                  <Button onClick={handleCreateNew} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuovo
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "columns" | "filters")}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="columns">Colonne</TabsTrigger>
+                  <TabsTrigger value="filters">Filtri</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="columns" className="space-y-4">
+                  {/* Controlli di ricerca e vista */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder="Cerca in tutti i campi..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant={view === "list" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setView("list")}
+                      >
+                        <List className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={view === "grid" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setView("grid")}
+                      >
+                        <Grid3X3 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Contenuto tabella/griglia */}
+                  <div className="border rounded-lg">
+                    {view === "list" ? (
+                      <Table>
+                        {renderTableHeader()}
+                        {renderTableBody()}
+                      </Table>
+                    ) : (
+                      <div className="p-4">{renderGridView()}</div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="filters" className="space-y-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium">Filtri Avanzati</span>
+                  </div>
+
+                  {/* Filtro per completato (se disponibile) */}
+                  {hasCompletedField() && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Stato Completamento</label>
+                      <Select value={completedFilter} onValueChange={setCompletedFilter}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="non-completati">Solo non completati</SelectItem>
+                          <SelectItem value="completati">Solo completati</SelectItem>
+                          <SelectItem value="tutti">Tutti</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Informazioni sui filtri attivi */}
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      <strong>Filtri attivi:</strong>
+                    </p>
+                    <ul className="text-sm text-blue-600 mt-1 space-y-1">
+                      {searchTerm && <li>• Ricerca: "{searchTerm}"</li>}
+                      {hasCompletedField() && completedFilter !== "tutti" && (
+                        <li>
+                          • Completamento:{" "}
+                          {completedFilter === "completati" ? "Solo completati" : "Solo non completati"}
+                        </li>
+                      )}
+                      {!searchTerm && (!hasCompletedField() || completedFilter === "tutti") && (
+                        <li>• Nessun filtro attivo</li>
+                      )}
+                    </ul>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}
