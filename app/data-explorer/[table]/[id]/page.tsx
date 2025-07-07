@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import {
   CheckCircle2,
   FileText,
@@ -450,6 +451,12 @@ export default function ItemDetailPage() {
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
+  // CORREZIONE NAVIGAZIONE: Funzione per tornare alla lista
+  const handleBackToList = useCallback(() => {
+    console.log(`[ItemDetailPage] Navigazione verso: /data-explorer?table=${tableName}`)
+    router.push(`/data-explorer?table=${tableName}`)
+  }, [router, tableName])
+
   // Funzione per caricare le opzioni di priorità da Supabase
   const loadPriorityOptions = useCallback(async () => {
     if (!supabase) return
@@ -510,11 +517,11 @@ export default function ItemDetailPage() {
         description: `Impossibile caricare l'elemento: ${error.message}`,
         variant: "destructive",
       })
-      router.push(`/data-explorer/${tableName}`)
+      handleBackToList()
     } finally {
       setLoading(false)
     }
-  }, [supabase, tableName, itemId, user?.id, isValidTable, router])
+  }, [supabase, tableName, itemId, user?.id, isValidTable, handleBackToList])
 
   useEffect(() => {
     if (supabase && tableName && itemId && isValidTable) {
@@ -524,6 +531,8 @@ export default function ItemDetailPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
+    console.log(`[ItemDetailPage] Campo ${field} modificato:`, value)
+
     setFormData((prev: any) => {
       const newData = { ...prev, [field]: value }
 
@@ -738,7 +747,7 @@ export default function ItemDetailPage() {
         description: "L'elemento è stato rimosso dal database",
       })
 
-      router.push(`/data-explorer/${tableName}`)
+      handleBackToList()
     } catch (error: any) {
       console.error("Errore durante l'eliminazione:", error)
       toast({
@@ -751,7 +760,7 @@ export default function ItemDetailPage() {
     }
   }
 
-  // Renderizza un campo del form - COPIATO ESATTAMENTE DAL NEW PAGE
+  // Renderizza un campo del form
   const renderField = (field: string) => {
     const fieldType = fieldTypes[field]
     const fieldValue = formData[field]
@@ -845,11 +854,14 @@ export default function ItemDetailPage() {
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <Input
-              {...commonProps}
-              type="datetime-local"
-              value={fieldValue ? new Date(fieldValue).toISOString().slice(0, 16) : ""}
-              onChange={(e) => handleFieldChange(field, e.target.value ? new Date(e.target.value).toISOString() : "")}
+            <EnhancedDatePicker
+              value={fieldValue || ""}
+              onChange={(value) => handleFieldChange(field, value)}
+              placeholder={`Seleziona ${field.replace(/_/g, " ")}`}
+              disabled={false}
+              className={hasError ? "border-red-500" : ""}
+              id={field}
+              showCurrentTime={field === "data_inizio" && !fieldValue}
             />
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
@@ -1033,7 +1045,7 @@ export default function ItemDetailPage() {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline" className="mb-4">
+        <Button onClick={handleBackToList} variant="outline" className="mb-4 bg-transparent">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Torna alla lista
         </Button>

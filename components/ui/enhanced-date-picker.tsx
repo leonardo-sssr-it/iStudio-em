@@ -173,6 +173,8 @@ export function EnhancedDatePicker({
   const confirmSelection = () => {
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
+
+      // CORREZIONE TIMEZONE: Crea una nuova data senza conversione timezone
       const finalDate = new Date(tempDate)
       finalDate.setHours(hours)
       finalDate.setMinutes(minutes)
@@ -181,7 +183,7 @@ export function EnhancedDatePicker({
 
       setSelectedDate(finalDate)
 
-      // Formatta la data senza conversione timezone
+      // CORREZIONE TIMEZONE: Formatta la data manualmente senza conversione timezone
       const year = finalDate.getFullYear()
       const month = String(finalDate.getMonth() + 1).padStart(2, "0")
       const day = String(finalDate.getDate()).padStart(2, "0")
@@ -189,7 +191,10 @@ export function EnhancedDatePicker({
       const minute = String(finalDate.getMinutes()).padStart(2, "0")
       const second = String(finalDate.getSeconds()).padStart(2, "0")
 
+      // Formato ISO locale senza timezone (YYYY-MM-DDTHH:mm:ss)
       const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+
+      console.log(`[EnhancedDatePicker] Data selezionata: ${localISOString}`)
       onChange(localISOString)
     } else if (!tempDate && !tempTime) {
       setSelectedDate(undefined)
@@ -293,7 +298,11 @@ export function EnhancedDatePicker({
                   onChange={(e) => {
                     const hours = e.target.value
                     const minutes = tempTime.split(":")[1] || "00"
-                    setTempTime(`${hours}:${minutes}`)
+                    // Assicurati che i minuti siano sempre multipli di 5
+                    const roundedMinutes = roundToNearestFiveMinutes(Number.parseInt(minutes))
+                      .toString()
+                      .padStart(2, "0")
+                    setTempTime(`${hours}:${roundedMinutes}`)
                   }}
                   className="px-2 py-1 border rounded text-sm"
                   disabled={disabled || !tempDate}
@@ -324,16 +333,16 @@ export function EnhancedDatePicker({
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1">
+              <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1 bg-transparent">
                 <Clock className="mr-2 h-4 w-4" />
                 Ora
               </Button>
-              <Button variant="outline" size="sm" onClick={clearDateTime} className="flex-1">
+              <Button variant="outline" size="sm" onClick={clearDateTime} className="flex-1 bg-transparent">
                 Cancella
               </Button>
             </div>
             <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1">
+              <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1 bg-transparent">
                 Annulla
               </Button>
               <Button size="sm" onClick={confirmSelection} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">

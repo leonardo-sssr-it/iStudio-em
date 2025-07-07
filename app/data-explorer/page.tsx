@@ -2,38 +2,26 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-  Search,
   SortAsc,
   SortDesc,
-  Plus,
-  RefreshCw,
   Calendar,
   CheckSquare,
   Clock,
   ListTodo,
   Briefcase,
   Users,
-  FolderKanban,
   FilePlus,
   FileText,
-  Grid3X3,
-  List,
   StickyNote,
-  Filter,
 } from "lucide-react"
-import { formatValue } from "@/lib/utils-db"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 
 // Definizione delle tabelle disponibili
@@ -278,13 +266,18 @@ export default function DataExplorerPage() {
   const [activeTab, setActiveTab] = useState<"columns" | "filters">("columns")
   const [completedFilter, setCompletedFilter] = useState<"non-completati" | "completati" | "tutti">("non-completati")
 
-  // Leggi il parametro 'table' dalla query string all'inizializzazione
+  // CORREZIONE NAVIGAZIONE: Leggi il parametro 'table' dalla query string all'inizializzazione
   useEffect(() => {
     const tableParam = searchParams.get("table")
-    if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam) && !selectedTable) {
+    console.log(`[DataExplorerPage] Parametro table dalla URL: ${tableParam}`)
+    
+    if (tableParam && AVAILABLE_TABLES.some((t) => t.id === tableParam)) {
+      console.log(`[DataExplorerPage] Impostazione tabella selezionata: ${tableParam}`)
       setSelectedTable(tableParam)
+    } else if (!selectedTable) {
+      console.log(`[DataExplorerPage] Nessuna tabella valida trovata nei parametri URL`)
     }
-  }, [searchParams])
+  }, [searchParams, selectedTable])
 
   // Carica i dati quando cambia la tabella selezionata
   useEffect(() => {
@@ -651,316 +644,4 @@ export default function DataExplorerPage() {
         return <span className="text-xs">{value.length > 30 ? value.substring(0, 30) + "..." : value}</span>
       case "json":
         return (
-          <span className="text-xs text-blue-600">{Array.isArray(value) ? `${value.length} elementi` : "JSON"}</span>
-        )
-      case "array":
-        return (
-          <span className="text-xs text-purple-600">{Array.isArray(value) ? `${value.length} elementi` : "-"}</span>
-        )
-      case "time":
-        return <span className="text-xs font-mono">{value ? String(value).substring(0, 8) : "-"}</span>
-      default:
-        return <span className="text-xs">{formatValue(value)}</span>
-    }
-  }
-
-  // Renderizza la vista a griglia
-  const renderGridView = () => {
-    if (loading) {
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, index) => (
-            <Card key={index} className="h-48">
-              <CardContent className="p-4 flex flex-col space-y-2">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-1/3" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )
-    }
-
-    if (filteredData.length === 0) {
-      return (
-        <div className="flex flex-col justify-center items-center h-64 space-y-4">
-          <p className="text-gray-500 text-center">
-            {searchTerm || (hasCompletedField() && completedFilter !== "tutti")
-              ? "Nessun risultato trovato"
-              : "Nessun dato disponibile"}
-          </p>
-          <Button variant="outline" onClick={handleCreateNew}>
-            <FilePlus className="h-4 w-4 mr-2" /> Crea nuovo
-          </Button>
-        </div>
-      )
-    }
-
-    const tableConfig = TABLE_FIELDS[selectedTable as keyof typeof TABLE_FIELDS]
-    const fields = tableConfig?.listFields || []
-    const types = tableConfig?.types || {}
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredData.map((item) => (
-          <Card
-            key={item.id}
-            className={`cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-border/50 group relative ${
-              hasCompletedField() && item.completato ? "opacity-60" : ""
-            }`}
-            onClick={() => handleRowClick(item.id)}
-          >
-            <CardContent className="p-4">
-              {/* Pulsante completato in alto a destra */}
-              {shouldShowCompleteButton(item) && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="absolute top-2 right-2 h-6 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => handleMarkCompleted(item.id, e)}
-                >
-                  ✓
-                </Button>
-              )}
-
-              {/* Indicatore completato */}
-              {hasCompletedField() && item.completato && (
-                <div className="absolute top-2 right-2 text-green-600 text-xs font-medium">✓ Completato</div>
-              )}
-
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="font-semibold text-sm line-clamp-2 flex-1 pr-8">
-                  {item.titolo || item.nome || item.descrizione || `ID: ${item.id}`}
-                </h3>
-              </div>
-
-              <div className="space-y-2">
-                {fields.slice(1, 4).map((field) => (
-                  <div key={field} className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground font-medium min-w-0 flex-shrink-0 mr-2">
-                      {field.charAt(0).toUpperCase() + field.slice(1).replace("_", " ")}:
-                    </span>
-                    <span className="text-right min-w-0 flex-1 truncate">
-                      {renderCellValue(item[field], types[field as keyof typeof types])}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex justify-between items-center mt-4 pt-3 border-t border-border/50">
-                <span className="text-xs text-muted-foreground">ID: {item.id}</span>
-                <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                  Clicca per dettagli →
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
-  }
-
-  // Ottieni l'icona per la tabella selezionata
-  const getTableIcon = (tableId: string) => {
-    const table = AVAILABLE_TABLES.find((t) => t.id === tableId)
-    if (!table) return <FolderKanban className="h-5 w-5" />
-
-    const Icon = table.icon
-    return <Icon className="h-5 w-5" />
-  }
-
-  // Gestisce la selezione di una tabella
-  const handleTableSelect = useCallback((tableName: string) => {
-    console.log(`[DataExplorer] Selezione tabella: ${tableName}`)
-    setSelectedTable(tableName)
-    setActiveTab("columns")
-  }, [])
-
-  return (
-    <div className="w-full max-w-none space-y-6">
-      <Card className="border-border/50">
-        <CardHeader className="pb-4">
-          <div className="flex items-center space-x-3">
-            {selectedTable && getTableIcon(selectedTable)}
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg sm:text-xl">
-                {selectedTable
-                  ? AVAILABLE_TABLES.find((t) => t.id === selectedTable)?.label || "Esploratore Dati"
-                  : "Esploratore Dati"}
-              </CardTitle>
-              <CardDescription className="text-sm">Visualizza e gestisci i tuoi dati personali</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* Controlli superiori */}
-          <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:space-x-4">
-            {/* Selezione tabella */}
-            <div className="w-full lg:w-1/4">
-              <Select
-                value={selectedTable}
-                onValueChange={(value) => {
-                  console.log(`[DataExplorer] Select onChange: ${value}`)
-                  setSelectedTable(value)
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleziona una tabella" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AVAILABLE_TABLES.map((table) => (
-                    <SelectItem key={table.id} value={table.id}>
-                      <div className="flex items-center space-x-2">
-                        <table.icon className="h-4 w-4" />
-                        <span>{table.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Filtro completato (solo se la tabella ha il campo) */}
-            {selectedTable && hasCompletedField() && (
-              <div className="w-full lg:w-1/4">
-                <Select value={completedFilter} onValueChange={(value) => setCompletedFilter(value as any)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="non-completati">
-                      <div className="flex items-center space-x-2">
-                        <Filter className="h-4 w-4" />
-                        <span>Non completati</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="completati">
-                      <div className="flex items-center space-x-2">
-                        <CheckSquare className="h-4 w-4" />
-                        <span>Completati</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="tutti">
-                      <div className="flex items-center space-x-2">
-                        <List className="h-4 w-4" />
-                        <span>Tutti</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Controlli azioni */}
-            <div className={`w-full flex flex-col sm:flex-row gap-2 ${hasCompletedField() ? "lg:flex-1" : "lg:w-3/4"}`}>
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cerca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setView(view === "list" ? "grid" : "list")}
-                  className="shrink-0"
-                >
-                  {view === "list" ? <Grid3X3 className="h-4 w-4" /> : <List className="h-4 w-4" />}
-                </Button>
-                <Button variant="outline" size="icon" onClick={loadTableData} className="shrink-0 bg-transparent">
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleCreateNew}
-                  disabled={!selectedTable}
-                  className="shrink-0 bg-transparent"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Nuovo</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Contenuto principale */}
-          {selectedTable ? (
-            <div className="space-y-4">
-              <Tabs value={view} onValueChange={(v) => setView(v as "list" | "grid")} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:grid-cols-2">
-                  <TabsTrigger value="list" className="flex items-center space-x-2">
-                    <List className="h-4 w-4" />
-                    <span>Lista</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="grid" className="flex items-center space-x-2">
-                    <Grid3X3 className="h-4 w-4" />
-                    <span>Griglia</span>
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="list" className="mt-4">
-                  <div className="rounded-lg border border-border/50 overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        {renderTableHeader()}
-                        {renderTableBody()}
-                      </Table>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="grid" className="mt-4">
-                  {renderGridView()}
-                </TabsContent>
-              </Tabs>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center space-y-6">
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Seleziona una tabella</h3>
-                <p className="text-muted-foreground">Scegli una tabella per visualizzare e gestire i tuoi dati</p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 w-full max-w-2xl">
-                {AVAILABLE_TABLES.map((table) => (
-                  <Button
-                    key={table.id}
-                    variant="outline"
-                    className="h-20 flex flex-col items-center justify-center space-y-2 hover:bg-muted/50 transition-colors bg-transparent"
-                    onClick={() => handleTableSelect(table.id)}
-                  >
-                    <table.icon className="h-6 w-6" />
-                    <span className="text-xs font-medium">{table.label}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Statistiche */}
-          {selectedTable && filteredData.length > 0 && (
-            <div className="flex justify-between items-center pt-4 border-t border-border/50 text-sm text-muted-foreground">
-              <span>
-                Visualizzazione di {filteredData.length} elementi su {data.length} totali
-              </span>
-              <div className="flex space-x-4">
-                {searchTerm && <span>Filtrato per: "{searchTerm}"</span>}
-                {hasCompletedField() && completedFilter !== "tutti" && (
-                  <span>Filtro: {completedFilter === "completati" ? "Solo completati" : "Solo non completati"}</span>
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+          <span className="text-xs text-blue-600">{Array
