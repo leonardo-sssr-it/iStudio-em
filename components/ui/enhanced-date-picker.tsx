@@ -30,21 +30,30 @@ export function EnhancedDatePicker({
   showCurrentTime = false,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
   const [timeValue, setTimeValue] = React.useState("")
-
-  const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
+  const [tempDate, setTempDate] = React.useState<Date | undefined>()
   const [tempTime, setTempTime] = React.useState("")
 
+  // Inizializza i valori quando cambia il value prop
   React.useEffect(() => {
     if (value) {
-      const date = parseISO(value)
-      setSelectedDate(date)
-      setTempDate(date)
-      const hours = date.getHours().toString().padStart(2, "0")
-      const minutes = date.getMinutes().toString().padStart(2, "0")
-      setTimeValue(`${hours}:${minutes}`)
-      setTempTime(`${hours}:${minutes}`)
+      try {
+        const date = parseISO(value)
+        setSelectedDate(date)
+        setTempDate(date)
+        const hours = date.getHours().toString().padStart(2, "0")
+        const minutes = date.getMinutes().toString().padStart(2, "0")
+        const timeStr = `${hours}:${minutes}`
+        setTimeValue(timeStr)
+        setTempTime(timeStr)
+      } catch (error) {
+        console.error("Errore nel parsing della data:", error)
+        setSelectedDate(undefined)
+        setTempDate(undefined)
+        setTimeValue("")
+        setTempTime("")
+      }
     } else {
       setSelectedDate(undefined)
       setTempDate(undefined)
@@ -52,16 +61,6 @@ export function EnhancedDatePicker({
       setTempTime("")
     }
   }, [value])
-
-  React.useEffect(() => {
-    if (selectedDate) {
-      const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
-      setTimeValue(`${hours}:${minutes}`)
-    } else {
-      setTimeValue("")
-    }
-  }, [selectedDate])
 
   // Funzione per arrotondare i minuti ai multipli di 5
   const roundToNearestFiveMinutes = (minutes: number): number => {
@@ -80,78 +79,39 @@ export function EnhancedDatePicker({
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
       let currentHours, currentMinutes
+
       if (showCurrentTime && !value) {
+        // Se showCurrentTime è true e non c'è un valore, usa l'ora corrente
         const now = new Date()
         currentHours = now.getHours()
         currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
+      } else if (tempDate) {
+        // Se c'è già una data temporanea, mantieni l'ora
+        currentHours = tempDate.getHours()
+        currentMinutes = tempDate.getMinutes()
       } else {
-        currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
-        currentMinutes = tempDate
-          ? roundToNearestFiveMinutes(tempDate.getMinutes())
-          : roundToNearestFiveMinutes(new Date().getMinutes())
+        // Altrimenti usa l'ora corrente
+        const now = new Date()
+        currentHours = now.getHours()
+        currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
       }
 
-      date.setHours(currentHours)
-      date.setMinutes(currentMinutes)
-      date.setSeconds(0)
-      date.setMilliseconds(0)
-      setTempDate(date)
+      const newDate = new Date(date)
+      newDate.setHours(currentHours)
+      newDate.setMinutes(currentMinutes)
+      newDate.setSeconds(0)
+      newDate.setMilliseconds(0)
 
-      if (!tempTime || (showCurrentTime && !value)) {
-        const hours = date.getHours().toString().padStart(2, "0")
-        const minutes = date.getMinutes().toString().padStart(2, "0")
+      setTempDate(newDate)
+
+      // Aggiorna anche il tempo temporaneo se non è già impostato
+      if (!tempTime) {
+        const hours = newDate.getHours().toString().padStart(2, "0")
+        const minutes = newDate.getMinutes().toString().padStart(2, "0")
         setTempTime(`${hours}:${minutes}`)
       }
     } else {
       setTempDate(undefined)
-    }
-  }
-
-  const handleTimeChange = (timeString: string) => {
-    if (timeString && timeString.includes(":")) {
-      const [hours, minutes] = timeString.split(":").map(Number)
-      const roundedMinutes = roundToNearestFiveMinutes(minutes)
-      const adjustedTimeString = `${hours.toString().padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`
-      setTempTime(adjustedTimeString)
-    } else {
-      setTempTime(timeString)
-    }
-  }
-
-  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget
-    const [hours, minutes] = tempTime.split(":").map(Number)
-
-    if (e.key === "Enter") {
-      e.preventDefault()
-      confirmSelection()
-      return
-    }
-
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault()
-
-      const increment = e.key === "ArrowUp" ? 5 : -5
-      const cursorPosition = input.selectionStart || 0
-
-      let newHours = hours
-      let newMinutes = minutes
-
-      if (cursorPosition <= 2) {
-        newHours = Math.max(0, Math.min(23, hours + (increment > 0 ? 1 : -1)))
-      } else {
-        newMinutes = minutes + increment
-        if (newMinutes >= 60) {
-          newMinutes = 0
-          newHours = Math.min(23, hours + 1)
-        } else if (newMinutes < 0) {
-          newMinutes = 55
-          newHours = Math.max(0, hours - 1)
-        }
-      }
-
-      const newTimeString = `${newHours.toString().padStart(2, "0")}:${newMinutes.toString().padStart(2, "0")}`
-      setTempTime(newTimeString)
     }
   }
 
@@ -174,7 +134,7 @@ export function EnhancedDatePicker({
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
 
-      // CORREZIONE TIMEZONE: Crea una nuova data senza conversione timezone
+      // Crea una nuova data senza conversione timezone
       const finalDate = new Date(tempDate)
       finalDate.setHours(hours)
       finalDate.setMinutes(minutes)
@@ -183,7 +143,7 @@ export function EnhancedDatePicker({
 
       setSelectedDate(finalDate)
 
-      // CORREZIONE TIMEZONE: Formatta la data manualmente senza conversione timezone
+      // Formatta la data manualmente senza conversione timezone
       const year = finalDate.getFullYear()
       const month = String(finalDate.getMonth() + 1).padStart(2, "0")
       const day = String(finalDate.getDate()).padStart(2, "0")
@@ -194,7 +154,7 @@ export function EnhancedDatePicker({
       // Formato ISO locale senza timezone (YYYY-MM-DDTHH:mm:ss)
       const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
 
-      console.log(`[EnhancedDatePicker] Data selezionata: ${localISOString}`)
+      console.log(`[EnhancedDatePicker] Data confermata: ${localISOString}`)
       onChange(localISOString)
     } else if (!tempDate && !tempTime) {
       setSelectedDate(undefined)
@@ -204,6 +164,7 @@ export function EnhancedDatePicker({
   }
 
   const cancelSelection = () => {
+    // Ripristina i valori originali
     setTempDate(selectedDate)
     if (selectedDate) {
       const hours = selectedDate.getHours().toString().padStart(2, "0")
@@ -222,14 +183,21 @@ export function EnhancedDatePicker({
     }
   }
 
+  // Inizializza tempDate e tempTime quando si apre il popover
   React.useEffect(() => {
-    if (showCurrentTime && !value && open && !tempDate) {
-      setCurrentDateTime()
+    if (open) {
+      if (selectedDate) {
+        setTempDate(selectedDate)
+        const hours = selectedDate.getHours().toString().padStart(2, "0")
+        const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
+        setTempTime(`${hours}:${minutes}`)
+      } else if (showCurrentTime) {
+        setCurrentDateTime()
+      }
     }
-  }, [showCurrentTime, value, open, tempDate])
+  }, [open, selectedDate, showCurrentTime])
 
   const modifiers = React.useMemo(() => {
-    const today = new Date()
     return {
       today: (date: Date) => isToday(date),
       selected: (date: Date) => (tempDate ? isSameDay(date, tempDate) : false),

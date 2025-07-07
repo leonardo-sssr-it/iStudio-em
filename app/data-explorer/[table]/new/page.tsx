@@ -769,7 +769,10 @@ export default function NewItemPage() {
             </Label>
             <EnhancedDatePicker
               value={fieldValue || ""}
-              onChange={(value) => handleFieldChange(field, value)}
+              onChange={(value) => {
+                console.log(`[NewItemPage] EnhancedDatePicker onChange per ${field}:`, value)
+                handleFieldChange(field, value)
+              }}
               placeholder={`Seleziona ${field.replace(/_/g, " ")}`}
               disabled={false}
               className={hasError ? "border-red-500" : ""}

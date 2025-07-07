@@ -95,7 +95,7 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// Configurazione dei campi per ogni tabella (COPIATA ESATTAMENTE DAL NEW PAGE)
+// Configurazione dei campi per ogni tabella
 const TABLE_FIELDS = {
   appuntamenti: {
     requiredFields: ["titolo", "data_inizio"],
@@ -856,12 +856,15 @@ export default function ItemDetailPage() {
             </Label>
             <EnhancedDatePicker
               value={fieldValue || ""}
-              onChange={(value) => handleFieldChange(field, value)}
+              onChange={(value) => {
+                console.log(`[ItemDetailPage] EnhancedDatePicker onChange per ${field}:`, value)
+                handleFieldChange(field, value)
+              }}
               placeholder={`Seleziona ${field.replace(/_/g, " ")}`}
               disabled={false}
               className={hasError ? "border-red-500" : ""}
               id={field}
-              showCurrentTime={field === "data_inizio" && !fieldValue}
+              showCurrentTime={false}
             />
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
