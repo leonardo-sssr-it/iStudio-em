@@ -856,15 +856,12 @@ export default function ItemDetailPage() {
             </Label>
             <EnhancedDatePicker
               value={fieldValue || ""}
-              onChange={(value) => {
-                console.log(`[ItemDetailPage] EnhancedDatePicker onChange per ${field}:`, value)
-                handleFieldChange(field, value)
-              }}
+              onChange={(value) => handleFieldChange(field, value)}
               placeholder={`Seleziona ${field.replace(/_/g, " ")}`}
               disabled={false}
               className={hasError ? "border-red-500" : ""}
               id={field}
-              showCurrentTime={false}
+              showCurrentTime={field === "data_inizio" && !fieldValue}
             />
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
