@@ -27,6 +27,7 @@ import {
   ArrowLeft,
   Save,
 } from "lucide-react"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -332,37 +333,21 @@ const TABLE_FIELDS = {
       ],
     },
     validation: {
-      titolo: { minLength: 3, maxLength:
-],\
+      titolo: { minLength: 3, maxLength: 100 },
+      avanzamento: { min: 0, max: 100 },
+      budget: { min: 0 },
     },
-    validation:
-{
-  \
-      titolo:
-  minLength: 3, maxLength
-  : 100
-  ,\
-      avanzamento:
-  min: 0, max
-  : 100
-  ,\
-      budget:
-  min: 0
-  ,\
-}
-,\
   },
-  clienti:
-{
-  requiredFields: ["nome", "cognome"], autoFields
-  : [\"id", "id_utente", "data_creazione", "modifica"],
-    defaultValues:
-  attivo: true,
-  ,\
+  clienti: {
+    requiredFields: ["nome", "cognome"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      attivo: true,
+    },
     fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
-    types:
-  id: "number", nome
-  : \"string",
+    types: {
+      id: "number",
+      nome: "string",
       cognome: "string",
       email: "email",
       telefono: "tel",
@@ -376,48 +361,29 @@ const TABLE_FIELDS = {
       id_utente: "number",
       data_creazione: "datetime",
       modifica: "datetime",
-  ,\
-    validation:
-  \
-      nome:
-  minLength: 2, maxLength
-  : 50
-  ,\
-      cognome:
-  minLength: 2, maxLength
-  : 50
-  ,\
-      email:
-  pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
-  ,\
-      telefono:
-  pattern: "^[+]?[0-9\\s-()]+$"
-  ,\
-      cap:
-  pattern: "^[0-9]{5}$"
-  ,\
-      piva:
-  pattern: "^[0-9]{11}$"
-  ,\
-      codfisc:
-  pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
-  ,\
-  ,\
-}
-,\
-  pagine:
-{
-  requiredFields: ["titolo", "slug"], autoFields
-  : [\"id", "id_utente", "data_creazione", "modifica"],
-    defaultValues:
-  stato: "bozza",\
-  privato: false,\
-  attivo: true,
-  ,\
+    },
+    validation: {
+      nome: { minLength: 2, maxLength: 50 },
+      cognome: { minLength: 2, maxLength: 50 },
+      email: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
+      telefono: { pattern: "^[+]?[0-9\\s-()]+$" },
+      cap: { pattern: "^[0-9]{5}$" },
+      piva: { pattern: "^[0-9]{11}$" },
+      codfisc: { pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$" },
+    },
+  },
+  pagine: {
+    requiredFields: ["titolo", "slug"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "bozza",
+      privato: false,
+      attivo: true,
+    },
     fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
-    types:
-  id: "number", titolo
-  : \"string",
+    types: {
+      id: "number",
+      titolo: "string",
       slug: "string",
       contenuto: "richtext",
       stato: "select",
@@ -428,42 +394,32 @@ const TABLE_FIELDS = {
       id_utente: "number",
       data_creazione: "datetime",
       modifica: "datetime",
-  ,\
-    selectOptions:
-  stato: [
+    },
+    selectOptions: {
+      stato: [
         { value: "bozza", label: "Bozza" },
         { value: "pubblicato", label: "Pubblicato" },
         { value: "archiviato", label: "Archiviato" },
       ],
-  ,\
-    validation:
-  \
-      titolo:
-  minLength: 3, maxLength
-  : 100
-  ,\
-      slug:
-  pattern:
-  "^[a-z0-9-]+$\", minLength: 3, maxLength: 100 },
-      meta_title:
-  maxLength: 60
-  ,
-      meta_description:
-  maxLength: 160
-  ,
-  ,
-  ,
-  note:
-  requiredFields: ["titolo", "contenuto"], autoFields
-  : ["id", "data_creazione", "modifica", "id_utente"],
-    defaultValues:
-  priorita: 2, synced
-  : false,
-  ,
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      slug: { pattern: "^[a-z0-9-]+$", minLength: 3, maxLength: 100 },
+      meta_title: { maxLength: 60 },
+      meta_description: { maxLength: 160 },
+    },
+  },
+  note: {
+    requiredFields: ["titolo", "contenuto"],
+    autoFields: ["id", "data_creazione", "modifica", "id_utente"],
+    defaultValues: {
+      priorita: 2,
+      synced: false,
+    },
     fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
-    types:
-  id: "number", titolo
-  : "string",
+    types: {
+      id: "number",
+      titolo: "string",
       contenuto: "text",
       data_creazione: "datetime",
       modifica: "datetime",
@@ -473,17 +429,12 @@ const TABLE_FIELDS = {
       notebook_id: "string",
       id_utente: "string",
       synced: "boolean",
-  ,
-    validation:
-  minLength: 3, maxLength
-  : 100
-  ,
-      contenuto:
-  minLength: 1, maxLength
-  : 10000
-  ,
-  ,
-  ,
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      contenuto: { minLength: 1, maxLength: 10000 },
+    },
+  },
 }
 
 // Componente per il color picker
@@ -873,22 +824,25 @@ export default function NewItemPage() {
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <div className="relative">
-              <Input
-                id={field}
-                type="datetime-local"
-                value={formatDateTimeForInput(fieldValue)}
-                onChange={(e) => {
-                  const isoString = parseDateTimeFromInput(e.target.value)
-                  handleFieldChange(field, isoString)
-                }}
-                className={hasError ? "border-red-500" : ""}
-                step="300" // 5 minuti in secondi
-              />
-              <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            </div>
+            <EnhancedDatePicker
+              id={field}
+              value={fieldValue || ""}
+              onChange={(value) => handleFieldChange(field, value)}
+              showCurrentTime={field === "data_inizio" && !fieldValue}
+              onDateTimeSet={
+                field === "data_inizio"
+                  ? (endDateTime) => {
+                      // Imposta automaticamente data_fine se è vuota
+                      if (!formData.data_fine) {
+                        handleFieldChange("data_fine", endDateTime)
+                      }
+                    }
+                  : undefined
+              }
+            />
             <p className="text-xs text-gray-500">
-              ⏰ Minuti automaticamente arrotondati ai multipli di 5 (00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+              ⏰ Orario locale senza timezone. Minuti in multipli di 5.
+              {field === "data_inizio" && " Data fine verrà impostata automaticamente (+1 ora)."}
             </p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>

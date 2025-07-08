@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -931,22 +932,26 @@ export default function ItemDetailPage() {
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <div className="relative">
-              <Input
-                id={field}
-                type="datetime-local"
-                value={formatDateTimeForInput(fieldValue)}
-                onChange={(e) => {
-                  const isoString = parseDateTimeFromInput(e.target.value)
-                  handleFieldChange(field, isoString)
-                }}
-                className={hasError ? "border-red-500" : ""}
-                step="300" // 5 minuti in secondi
-              />
-              <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-            </div>
+            <EnhancedDatePicker
+              id={field}
+              value={fieldValue || ""}
+              onChange={(value) => handleFieldChange(field, value)}
+              disabled={!isEditMode}
+              showCurrentTime={field === "data_inizio" && !fieldValue}
+              onDateTimeSet={
+                field === "data_inizio"
+                  ? (endDateTime) => {
+                      // Imposta automaticamente data_fine se è vuota
+                      if (!formData.data_fine) {
+                        handleFieldChange("data_fine", endDateTime)
+                      }
+                    }
+                  : undefined
+              }
+            />
             <p className="text-xs text-gray-500">
-              ⏰ Minuti automaticamente arrotondati ai multipli di 5 (00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+              ⏰ Orario locale senza timezone. Minuti in multipli di 5.
+              {field === "data_inizio" && " Data fine verrà impostata automaticamente (+1 ora)."}
             </p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
