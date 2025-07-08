@@ -1040,7 +1040,7 @@ export default function ItemDetailPage() {
   const getItemTitle = () => {
     if (formData.titolo) return formData.titolo
     if (formData.username) return formData.username
-    if (formData.nome) return formData.cognome ? `${formData.nome} ${formData.cognome}` : formData.nome
+    if (formData.nome) return formData.nome
     return `ID: ${itemId}`
   }
 
@@ -1126,18 +1126,20 @@ export default function ItemDetailPage() {
             <span>Dettagli {tableInfo?.label}</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
+        <CardContent className="space-y-6 relative">
+          <div className="space-y-6">
             <SimpleDateTest />
             <NativePopoverTest />
 
-            <div className="p-4 border-2 border-blue-500 rounded-lg bg-blue-50">
-              <h3 className="text-sm font-bold text-blue-700 mb-2">TEST 3: Enhanced Date Picker</h3>
-              <EnhancedDatePicker
-                value=""
-                onChange={(value) => console.log("[TEST] Date picker changed:", value)}
-                placeholder="Seleziona data e ora di test"
-              />
+            <div className="p-4 border-2 border-blue-500 rounded-lg bg-blue-50 relative">
+              <h3 className="text-sm font-bold text-blue-700 mb-2">TEST 3: Enhanced Date Picker (NATIVO)</h3>
+              <div className="relative z-10">
+                <EnhancedDatePicker
+                  value=""
+                  onChange={(value) => console.log("[TEST] Date picker changed:", value)}
+                  placeholder="Seleziona data e ora di test"
+                />
+              </div>
             </div>
 
             <div className="p-4 border-2 border-purple-500 rounded-lg bg-purple-50">
