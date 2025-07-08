@@ -1,14 +1,12 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,19 +14,50 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
-import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import {
+  CheckCircle2,
+  FileText,
+  Settings,
+  Calendar,
+  CheckSquare,
+  Clock,
+  ListTodo,
+  Briefcase,
+  Users,
+  StickyNote,
+  ArrowLeft,
+  Save,
+  Edit,
+  X,
+  Trash2,
+  AlertCircle,
+} from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Edit, Trash2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 import { SimpleDateTest } from "@/components/ui/simple-date-test"
 import { NativePopoverTest } from "@/components/ui/native-popover-test"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
-  { id: "appuntamenti", label: "Appuntamenti", icon: ArrowLeft },
-  { id: "attivita", label: "Attività", icon: Edit },
-  { id: "scadenze", label: "Scadenze", icon: Trash2 },
-  // altre tabelle...
+  { id: "appuntamenti", label: "Appuntamenti", icon: Calendar },
+  { id: "attivita", label: "Attività", icon: CheckSquare },
+  { id: "scadenze", label: "Scadenze", icon: Clock },
+  { id: "todolist", label: "To-Do List", icon: ListTodo },
+  { id: "progetti", label: "Progetti", icon: Briefcase },
+  { id: "clienti", label: "Clienti", icon: Users },
+  { id: "pagine", label: "Pagine", icon: FileText },
+  { id: "note", label: "Note", icon: StickyNote },
 ]
 
 // Funzione per pulire i dati prima del salvataggio
@@ -80,17 +109,17 @@ const TABLE_FIELDS = {
     fieldGroups: {
       principale: {
         title: "Informazioni Principali",
-        icon: ArrowLeft,
+        icon: FileText,
         fields: ["titolo", "descrizione", "stato"],
       },
       date: {
         title: "Date e Orari",
-        icon: Edit,
+        icon: Calendar,
         fields: ["data_inizio", "data_fine"],
       },
       dettagli: {
         title: "Dettagli Aggiuntivi",
-        icon: Trash2,
+        icon: Settings,
         fields: ["luogo", "note", "tags"],
       },
     },
@@ -122,7 +151,250 @@ const TABLE_FIELDS = {
       titolo: { minLength: 3, maxLength: 100 },
     },
   },
-  // configurazioni per altre tabelle...
+  attivita: {
+    requiredFields: ["titolo", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "da_fare",
+      priorita: 3,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "note"],
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      data_inizio: "datetime",
+      data_fine: "datetime",
+      stato: "select",
+      priorita: "priority_select",
+      note: "text",
+      attivo: "boolean",
+      id_utente: "number",
+      data_creazione: "datetime",
+      modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "da_fare", label: "Da fare" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "sospeso", label: "Sospeso" },
+      ],
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      priorita: { min: 1, max: 5 },
+    },
+  },
+  scadenze: {
+    requiredFields: ["titolo", "scadenza"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "attivo",
+      privato: false,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "note"],
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      scadenza: "datetime",
+      stato: "select",
+      note: "text",
+      privato: "boolean",
+      attivo: "boolean",
+      id_utente: "number",
+      data_creazione: "datetime",
+      modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "attivo", label: "Attivo" },
+        { value: "completato", label: "Completato" },
+        { value: "scaduto", label: "Scaduto" },
+      ],
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+    },
+  },
+  todolist: {
+    requiredFields: ["titolo", "descrizione"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      completato: false,
+      priorita: 3,
+    },
+    fieldOrder: ["titolo", "descrizione", "scadenza", "priorita", "completato", "note"],
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      completato: "boolean",
+      priorita: "priority_select",
+      scadenza: "datetime",
+      note: "text",
+      id_utente: "number",
+      data_creazione: "datetime",
+      modifica: "datetime",
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      descrizione: { minLength: 3, maxLength: 500 },
+      priorita: { min: 1, max: 5 },
+    },
+  },
+  progetti: {
+    requiredFields: ["titolo", "data_inizio"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
+    defaultValues: {
+      stato: "pianificato",
+      attivo: true,
+      avanzamento: 0,
+      colore: "#3B82F6",
+    },
+    fieldOrder: [
+      "titolo",
+      "descrizione",
+      "stato",
+      "colore",
+      "gruppo",
+      "budget",
+      "data_inizio",
+      "data_fine",
+      "avanzamento",
+      "note",
+    ],
+    types: {
+      id: "number",
+      titolo: "string",
+      descrizione: "text",
+      stato: "select",
+      colore: "color",
+      gruppo: "string",
+      budget: "number",
+      data_inizio: "datetime",
+      data_fine: "datetime",
+      avanzamento: "number",
+      note: "text",
+      attivo: "boolean",
+      id_utente: "number",
+      data_creazione: "datetime",
+      modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "pianificato", label: "Pianificato" },
+        { value: "in_corso", label: "In corso" },
+        { value: "completato", label: "Completato" },
+        { value: "sospeso", label: "Sospeso" },
+      ],
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      avanzamento: { min: 0, max: 100 },
+      budget: { min: 0 },
+    },
+  },
+  clienti: {
+    requiredFields: ["nome", "cognome"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      attivo: true,
+    },
+    fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
+    types: {
+      id: "number",
+      nome: "string",
+      cognome: "string",
+      email: "email",
+      telefono: "tel",
+      citta: "string",
+      indirizzo: "string",
+      cap: "string",
+      piva: "string",
+      codfisc: "string",
+      note: "text",
+      attivo: "boolean",
+      id_utente: "number",
+      data_creazione: "datetime",
+      modifica: "datetime",
+    },
+    validation: {
+      nome: { minLength: 2, maxLength: 50 },
+      cognome: { minLength: 2, maxLength: 50 },
+      email: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
+      telefono: { pattern: "^[+]?[0-9\\s-()]+$" },
+      cap: { pattern: "^[0-9]{5}$" },
+      piva: { pattern: "^[0-9]{11}$" },
+      codfisc: { pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$" },
+    },
+  },
+  pagine: {
+    requiredFields: ["titolo", "slug"],
+    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
+    defaultValues: {
+      stato: "bozza",
+      privato: false,
+      attivo: true,
+    },
+    fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
+    types: {
+      id: "number",
+      titolo: "string",
+      slug: "string",
+      contenuto: "richtext",
+      stato: "select",
+      privato: "boolean",
+      attivo: "boolean",
+      meta_title: "string",
+      meta_description: "text",
+      id_utente: "number",
+      data_creazione: "datetime",
+      modifica: "datetime",
+    },
+    selectOptions: {
+      stato: [
+        { value: "bozza", label: "Bozza" },
+        { value: "pubblicato", label: "Pubblicato" },
+        { value: "archiviato", label: "Archiviato" },
+      ],
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      slug: { pattern: "^[a-z0-9-]+$", minLength: 3, maxLength: 100 },
+      meta_title: { maxLength: 60 },
+      meta_description: { maxLength: 160 },
+    },
+  },
+  note: {
+    requiredFields: ["titolo", "contenuto"],
+    autoFields: ["id", "data_creazione", "modifica", "id_utente"],
+    defaultValues: {
+      priorita: 2,
+      synced: false,
+    },
+    fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
+    types: {
+      id: "number",
+      titolo: "string",
+      contenuto: "text",
+      data_creazione: "datetime",
+      modifica: "datetime",
+      tags: "array",
+      priorita: "priority_select",
+      notifica: "datetime",
+      notebook_id: "string",
+      id_utente: "string",
+      synced: "boolean",
+    },
+    validation: {
+      titolo: { minLength: 3, maxLength: 100 },
+      contenuto: { minLength: 1, maxLength: 10000 },
+    },
+  },
 }
 
 // Componente per il color picker
@@ -147,72 +419,13 @@ const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: str
   )
 }
 
-async function getRecord(table: string, id: string) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase.from(table).select("*").eq("id", id).single()
-
-  if (error) {
-    console.error("Error fetching record:", error)
-    return null
-  }
-
-  return data
-}
-
-async function getTableColumns(table: string) {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from("information_schema.columns")
-    .select("column_name, data_type, is_nullable")
-    .eq("table_name", table)
-    .eq("table_schema", "public")
-
-  if (error) {
-    console.error("Error fetching columns:", error)
-    return []
-  }
-
-  return data || []
-}
-
-function formatValue(value: any, dataType: string): React.ReactNode {
-  if (value === null || value === undefined) {
-    return <span className="text-muted-foreground italic">null</span>
-  }
-
-  if (typeof value === "boolean") {
-    return <Badge variant={value ? "default" : "secondary"}>{value.toString()}</Badge>
-  }
-
-  if (dataType.includes("timestamp") || dataType.includes("date")) {
-    try {
-      const date = new Date(value)
-      return date.toLocaleString("it-IT")
-    } catch {
-      return value.toString()
-    }
-  }
-
-  if (typeof value === "object") {
-    return <pre className="text-xs bg-muted p-2 rounded">{JSON.stringify(value, null, 2)}</pre>
-  }
-
-  return value.toString()
-}
-
-export default async function RecordDetailPage({ params }: any) {
+// Componente principale
+export default function ItemDetailPage() {
   const { supabase } = useSupabase()
   const { user } = useAuth()
   const router = useRouter()
-  const { table, id } = params
-
-  const [record, columns] = await Promise.all([getRecord(table, id), getTableColumns(table)])
-
-  if (!record) {
-    notFound()
-  }
+  const params = useParams()
+  const searchParams = useSearchParams()
 
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -221,13 +434,16 @@ export default async function RecordDetailPage({ params }: any) {
   const [originalData, setOriginalData] = useState<any>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [priorityOptions, setPriorityOptions] = useState<any[]>([])
-  const [isEditMode, setIsEditMode] = useState<boolean>(false)
+  const [isEditMode, setIsEditMode] = useState<boolean>(searchParams.get("edit") === "true")
 
-  const tableName = table
-  const itemId = id
+  // Estrai il nome della tabella e l'ID
+  const tableName = Array.isArray(params.table) ? params.table[0] : params.table
+  const itemId = Array.isArray(params.id) ? params.id[0] : params.id
 
-  const isValidTable = AVAILABLE_TABLES.some((t) => t.id === tableName)
+  // Verifica che la tabella sia valida
+  const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
 
+  // Ottieni la configurazione della tabella
   const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
   const requiredFields = tableConfig?.requiredFields || []
   const autoFields = tableConfig?.autoFields || []
@@ -237,11 +453,13 @@ export default async function RecordDetailPage({ params }: any) {
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
+  // CORREZIONE NAVIGAZIONE: Funzione per tornare alla lista
   const handleBackToList = useCallback(() => {
-    console.log(`[RecordDetailPage] Navigazione verso: /data-explorer/${tableName}`)
-    router.push(`/data-explorer/${tableName}`)
+    console.log(`[ItemDetailPage] Navigazione verso: /data-explorer?table=${tableName}`)
+    router.push(`/data-explorer?table=${tableName}`)
   }, [router, tableName])
 
+  // Funzione per caricare le opzioni di priorità da Supabase
   const loadPriorityOptions = useCallback(async () => {
     if (!supabase) return
     try {
@@ -269,12 +487,14 @@ export default async function RecordDetailPage({ params }: any) {
     }
   }, [supabase])
 
+  // Carica le opzioni di priorità all'avvio
   useEffect(() => {
     if (supabase) {
       loadPriorityOptions()
     }
   }, [supabase, loadPriorityOptions])
 
+  // Carica i dati dell'elemento
   const loadItem = useCallback(async () => {
     if (!supabase || !tableName || !itemId || !isValidTable) return
 
@@ -311,12 +531,14 @@ export default async function RecordDetailPage({ params }: any) {
     }
   }, [supabase, loadItem, tableName, itemId, isValidTable])
 
+  // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
-    console.log(`[RecordDetailPage] Campo ${field} modificato:`, value)
+    console.log(`[ItemDetailPage] Campo ${field} modificato:`, value)
 
     setFormData((prev: any) => {
       const newData = { ...prev, [field]: value }
 
+      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
       if (field === "data_inizio" && value) {
         try {
           const startDate = parseISO(value)
@@ -331,6 +553,7 @@ export default async function RecordDetailPage({ params }: any) {
       return newData
     })
 
+    // Rimuovi l'errore quando il campo viene modificato
     if (errors[field]) {
       setErrors((prevErrors) => {
         const newErrors = { ...prevErrors }
@@ -339,31 +562,38 @@ export default async function RecordDetailPage({ params }: any) {
       })
     }
 
+    // Validazione in tempo reale per alcuni campi
     validateField(field, value)
   }
 
+  // Valida un singolo campo
   const validateField = (field: string, value: any): boolean => {
     const rules = validation[field]
     if (!rules) return true
 
     let error = ""
 
+    // Validazione lunghezza minima
     if (rules.minLength && (!value || value.length < rules.minLength)) {
       error = `Minimo ${rules.minLength} caratteri`
     }
 
+    // Validazione lunghezza massima
     if (rules.maxLength && value && value.length > rules.maxLength) {
       error = `Massimo ${rules.maxLength} caratteri`
     }
 
+    // Validazione valore minimo
     if (rules.min !== undefined && value < rules.min) {
       error = `Valore minimo: ${rules.min}`
     }
 
+    // Validazione valore massimo
     if (rules.max !== undefined && value > rules.max) {
       error = `Valore massimo: ${rules.max}`
     }
 
+    // Validazione pattern
     if (rules.pattern && value) {
       const regex = new RegExp(rules.pattern)
       if (!regex.test(value)) {
@@ -379,6 +609,7 @@ export default async function RecordDetailPage({ params }: any) {
     return true
   }
 
+  // Ottieni il messaggio di errore per il pattern
   const getPatternErrorMessage = (field: string, type: string): string => {
     switch (type) {
       case "email":
@@ -396,20 +627,25 @@ export default async function RecordDetailPage({ params }: any) {
     }
   }
 
+  // Valida tutti i campi
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
+    // Controlla i campi richiesti
     requiredFields.forEach((field) => {
       if (!formData[field] || (typeof formData[field] === "string" && !formData[field].trim())) {
         newErrors[field] = "Campo obbligatorio"
       }
     })
 
+    // Valida tutti i campi con regole
     Object.keys(formData).forEach((field) => {
       if (!autoFields.includes(field) && !validateField(field, formData[field])) {
+        // L'errore è già stato impostato da validateField
       }
     })
 
+    // Validazioni speciali
     if (tableName === "appuntamenti" || tableName === "attivita" || tableName === "progetti") {
       if (formData.data_fine && formData.data_inizio && new Date(formData.data_fine) < new Date(formData.data_inizio)) {
         newErrors.data_fine = "La data di fine deve essere successiva alla data di inizio"
@@ -420,9 +656,11 @@ export default async function RecordDetailPage({ params }: any) {
     return Object.keys(newErrors).length === 0
   }
 
+  // Salva le modifiche
   const handleSave = async () => {
     if (!supabase || !tableName || !user?.id || !isValidTable) return
 
+    // Valida il form
     if (!validateForm()) {
       toast({
         title: "Errore di validazione",
@@ -434,17 +672,21 @@ export default async function RecordDetailPage({ params }: any) {
 
     setSaving(true)
     try {
+      // Prepara i dati da salvare usando la funzione di pulizia
       const dataToSave = cleanDataForSave(formData, autoFields)
 
+      // Aggiorna i campi di sistema
       dataToSave.modifica = new Date().toISOString()
 
       console.log(`Aggiornamento elemento in tabella: ${tableName}`, dataToSave)
 
+      // Aggiorna nel database
       const { data, error } = await supabase.from(tableName).update(dataToSave).eq("id", itemId).select()
 
       if (error) {
         console.error("Errore aggiornamento:", error)
 
+        // Gestisci errori specifici del database
         let errorMessage = error.message
         if (error.message.includes("check constraint")) {
           if (error.message.includes("descrizione_check")) {
@@ -461,11 +703,12 @@ export default async function RecordDetailPage({ params }: any) {
         description: "Le modifiche sono state salvate nel database",
         action: (
           <div className="flex items-center">
-            <ArrowLeft className="w-4 h-4 text-green-500" />
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
           </div>
         ),
       })
 
+      // Aggiorna i dati locali
       if (data && data[0]) {
         setFormData(data[0])
         setOriginalData(data[0])
@@ -484,12 +727,14 @@ export default async function RecordDetailPage({ params }: any) {
     }
   }
 
+  // Annulla le modifiche
   const handleCancelEdit = () => {
     setFormData(originalData)
     setIsEditMode(false)
     setErrors({})
   }
 
+  // Elimina l'elemento
   const handleDelete = async () => {
     if (!supabase || !tableName || !itemId || !isValidTable) return
 
@@ -517,12 +762,14 @@ export default async function RecordDetailPage({ params }: any) {
     }
   }
 
+  // Renderizza un campo del form
   const renderField = (field: string) => {
     const fieldType = fieldTypes[field]
     const fieldValue = formData[field]
     const hasError = !!errors[field]
     const isRequired = requiredFields.includes(field)
 
+    // Non renderizzare i campi automatici
     if (autoFields.includes(field)) return null
 
     const commonProps = {
@@ -532,6 +779,7 @@ export default async function RecordDetailPage({ params }: any) {
       className: hasError ? "border-red-500" : "",
     }
 
+    // Se non siamo in modalità modifica, mostra solo il valore
     if (!isEditMode) {
       let displayValue = fieldValue
       if (fieldType === "datetime" && fieldValue) {
@@ -687,7 +935,7 @@ export default async function RecordDetailPage({ params }: any) {
             ) : (
               <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
                 <div className="flex items-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
+                  <AlertCircle className="h-4 w-4" />
                   <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
                 </div>
                 <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={loadPriorityOptions}>
@@ -725,6 +973,7 @@ export default async function RecordDetailPage({ params }: any) {
     }
   }
 
+  // Se la tabella non è valida, mostra un errore
   if (!isValidTable) {
     return (
       <div className="container mx-auto p-6">
@@ -744,6 +993,7 @@ export default async function RecordDetailPage({ params }: any) {
     )
   }
 
+  // Se non c'è configurazione per la tabella
   if (!tableConfig) {
     return (
       <div className="container mx-auto p-6">
@@ -768,15 +1018,15 @@ export default async function RecordDetailPage({ params }: any) {
       <div className="container mx-auto p-6">
         <Card>
           <CardHeader>
-            <div className="h-8 w-64 bg-gray-200 rounded animate-pulse" />
-            <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-32" />
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
-              <div className="h-24 w-full bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
             </div>
           </CardContent>
         </Card>
@@ -784,8 +1034,8 @@ export default async function RecordDetailPage({ params }: any) {
     )
   }
 
-  const tableInfo = AVAILABLE_TABLES.find((t) => t.id === tableName)
-  const Icon = tableInfo?.icon || ArrowLeft
+  const tableInfo = AVAILABLE_TABLES.find((table) => table.id === tableName)
+  const Icon = tableInfo?.icon || FileText
 
   const getItemTitle = () => {
     if (formData.titolo) return formData.titolo
@@ -825,13 +1075,13 @@ export default async function RecordDetailPage({ params }: any) {
                     </>
                   ) : (
                     <>
-                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      <Save className="w-4 h-4 mr-2" />
                       Salva
                     </>
                   )}
                 </Button>
                 <Button onClick={handleCancelEdit} variant="outline">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <X className="w-4 h-4 mr-2" />
                   Annulla
                 </Button>
               </>
@@ -841,10 +1091,28 @@ export default async function RecordDetailPage({ params }: any) {
                   <Edit className="w-4 h-4 mr-2" />
                   Modifica
                 </Button>
-                <Button onClick={handleDelete} variant="destructive">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Elimina
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive">
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Elimina
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                        {deleting ? "Eliminazione..." : "Elimina"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </>
             )}
           </div>
@@ -857,7 +1125,6 @@ export default async function RecordDetailPage({ params }: any) {
             <Icon className="w-5 h-5" />
             <span>Dettagli {tableInfo?.label}</span>
           </CardTitle>
-          <CardDescription>Visualizzazione completa del record selezionato</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
