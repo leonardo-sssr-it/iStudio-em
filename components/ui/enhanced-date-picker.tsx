@@ -30,38 +30,32 @@ export function EnhancedDatePicker({
   showCurrentTime = false,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
   const [timeValue, setTimeValue] = React.useState("")
 
-  const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
+  // Stati temporanei per il popover
+  const [tempDate, setTempDate] = React.useState<Date | undefined>()
   const [tempTime, setTempTime] = React.useState("")
 
+  // Inizializza i valori dal prop value
   React.useEffect(() => {
     if (value) {
-      const date = parseISO(value)
-      setSelectedDate(date)
-      setTempDate(date)
-      const hours = date.getHours().toString().padStart(2, "0")
-      const minutes = date.getMinutes().toString().padStart(2, "0")
-      setTimeValue(`${hours}:${minutes}`)
-      setTempTime(`${hours}:${minutes}`)
+      try {
+        const date = parseISO(value)
+        setSelectedDate(date)
+        const hours = date.getHours().toString().padStart(2, "0")
+        const minutes = date.getMinutes().toString().padStart(2, "0")
+        setTimeValue(`${hours}:${minutes}`)
+      } catch (error) {
+        console.error("Errore nel parsing della data:", error)
+        setSelectedDate(undefined)
+        setTimeValue("")
+      }
     } else {
       setSelectedDate(undefined)
-      setTempDate(undefined)
       setTimeValue("")
-      setTempTime("")
     }
   }, [value])
-
-  React.useEffect(() => {
-    if (selectedDate) {
-      const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
-      setTimeValue(`${hours}:${minutes}`)
-    } else {
-      setTimeValue("")
-    }
-  }, [selectedDate])
 
   // Funzione per arrotondare i minuti ai multipli di 5
   const roundToNearestFiveMinutes = (minutes: number): number => {
@@ -77,81 +71,51 @@ export function EnhancedDatePicker({
     return options
   }
 
+  // Quando si apre il popover, inizializza i valori temporanei
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen)
+
+    if (newOpen) {
+      // Inizializza i valori temporanei
+      if (selectedDate) {
+        setTempDate(selectedDate)
+        setTempTime(timeValue)
+      } else if (showCurrentTime) {
+        // Se showCurrentTime è true e non c'è una data selezionata, usa l'ora corrente
+        const now = new Date()
+        const minutes = roundToNearestFiveMinutes(now.getMinutes())
+        now.setMinutes(minutes)
+        now.setSeconds(0)
+        now.setMilliseconds(0)
+        setTempDate(now)
+        setTempTime(`${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`)
+      } else {
+        setTempDate(undefined)
+        setTempTime("")
+      }
+    }
+  }
+
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      let currentHours, currentMinutes
-      if (showCurrentTime && !value) {
-        const now = new Date()
-        currentHours = now.getHours()
-        currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
+      // Se c'è già un tempo temporaneo, mantienilo
+      if (tempTime && tempTime.includes(":")) {
+        const [hours, minutes] = tempTime.split(":").map(Number)
+        date.setHours(hours)
+        date.setMinutes(minutes)
       } else {
-        currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
-        currentMinutes = tempDate
-          ? roundToNearestFiveMinutes(tempDate.getMinutes())
-          : roundToNearestFiveMinutes(new Date().getMinutes())
+        // Altrimenti usa l'ora corrente
+        const now = new Date()
+        const minutes = roundToNearestFiveMinutes(now.getMinutes())
+        date.setHours(now.getHours())
+        date.setMinutes(minutes)
+        setTempTime(`${now.getHours().toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`)
       }
-
-      date.setHours(currentHours)
-      date.setMinutes(currentMinutes)
       date.setSeconds(0)
       date.setMilliseconds(0)
       setTempDate(date)
-
-      if (!tempTime || (showCurrentTime && !value)) {
-        const hours = date.getHours().toString().padStart(2, "0")
-        const minutes = date.getMinutes().toString().padStart(2, "0")
-        setTempTime(`${hours}:${minutes}`)
-      }
     } else {
       setTempDate(undefined)
-    }
-  }
-
-  const handleTimeChange = (timeString: string) => {
-    if (timeString && timeString.includes(":")) {
-      const [hours, minutes] = timeString.split(":").map(Number)
-      const roundedMinutes = roundToNearestFiveMinutes(minutes)
-      const adjustedTimeString = `${hours.toString().padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`
-      setTempTime(adjustedTimeString)
-    } else {
-      setTempTime(timeString)
-    }
-  }
-
-  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget
-    const [hours, minutes] = tempTime.split(":").map(Number)
-
-    if (e.key === "Enter") {
-      e.preventDefault()
-      confirmSelection()
-      return
-    }
-
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault()
-
-      const increment = e.key === "ArrowUp" ? 5 : -5
-      const cursorPosition = input.selectionStart || 0
-
-      let newHours = hours
-      let newMinutes = minutes
-
-      if (cursorPosition <= 2) {
-        newHours = Math.max(0, Math.min(23, hours + (increment > 0 ? 1 : -1)))
-      } else {
-        newMinutes = minutes + increment
-        if (newMinutes >= 60) {
-          newMinutes = 0
-          newHours = Math.min(23, hours + 1)
-        } else if (newMinutes < 0) {
-          newMinutes = 55
-          newHours = Math.max(0, hours - 1)
-        }
-      }
-
-      const newTimeString = `${newHours.toString().padStart(2, "0")}:${newMinutes.toString().padStart(2, "0")}`
-      setTempTime(newTimeString)
     }
   }
 
@@ -174,7 +138,6 @@ export function EnhancedDatePicker({
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
 
-      // CORREZIONE TIMEZONE: Crea una nuova data senza conversione timezone
       const finalDate = new Date(tempDate)
       finalDate.setHours(hours)
       finalDate.setMinutes(minutes)
@@ -183,7 +146,7 @@ export function EnhancedDatePicker({
 
       setSelectedDate(finalDate)
 
-      // CORREZIONE TIMEZONE: Formatta la data manualmente senza conversione timezone
+      // Formatta la data manualmente senza conversione timezone
       const year = finalDate.getFullYear()
       const month = String(finalDate.getMonth() + 1).padStart(2, "0")
       const day = String(finalDate.getDate()).padStart(2, "0")
@@ -191,10 +154,9 @@ export function EnhancedDatePicker({
       const minute = String(finalDate.getMinutes()).padStart(2, "0")
       const second = String(finalDate.getSeconds()).padStart(2, "0")
 
-      // Formato ISO locale senza timezone (YYYY-MM-DDTHH:mm:ss)
       const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
 
-      console.log(`[EnhancedDatePicker] Data selezionata: ${localISOString}`)
+      console.log(`[EnhancedDatePicker] Data confermata: ${localISOString}`)
       onChange(localISOString)
     } else if (!tempDate && !tempTime) {
       setSelectedDate(undefined)
@@ -204,32 +166,13 @@ export function EnhancedDatePicker({
   }
 
   const cancelSelection = () => {
+    // Ripristina i valori originali
     setTempDate(selectedDate)
-    if (selectedDate) {
-      const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
-      setTempTime(`${hours}:${minutes}`)
-    } else {
-      setTempTime("")
-    }
+    setTempTime(timeValue)
     setOpen(false)
   }
 
-  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault()
-      setOpen(!open)
-    }
-  }
-
-  React.useEffect(() => {
-    if (showCurrentTime && !value && open && !tempDate) {
-      setCurrentDateTime()
-    }
-  }, [showCurrentTime, value, open, tempDate])
-
   const modifiers = React.useMemo(() => {
-    const today = new Date()
     return {
       today: (date: Date) => isToday(date),
       selected: (date: Date) => (tempDate ? isSameDay(date, tempDate) : false),
@@ -254,14 +197,14 @@ export function EnhancedDatePicker({
 
   return (
     <div className={cn("flex flex-col sm:flex-row gap-2", className)}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <Button
             id={id}
             variant="outline"
             className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
             disabled={disabled}
-            onKeyDown={handleTriggerKeyDown}
+            type="button"
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {selectedDate ? (
@@ -298,7 +241,6 @@ export function EnhancedDatePicker({
                   onChange={(e) => {
                     const hours = e.target.value
                     const minutes = tempTime.split(":")[1] || "00"
-                    // Assicurati che i minuti siano sempre multipli di 5
                     const roundedMinutes = roundToNearestFiveMinutes(Number.parseInt(minutes))
                       .toString()
                       .padStart(2, "0")
@@ -333,19 +275,42 @@ export function EnhancedDatePicker({
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1 bg-transparent">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={setCurrentDateTime}
+                className="flex-1 bg-transparent"
+                type="button"
+              >
                 <Clock className="mr-2 h-4 w-4" />
                 Ora
               </Button>
-              <Button variant="outline" size="sm" onClick={clearDateTime} className="flex-1 bg-transparent">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearDateTime}
+                className="flex-1 bg-transparent"
+                type="button"
+              >
                 Cancella
               </Button>
             </div>
             <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1 bg-transparent">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelSelection}
+                className="flex-1 bg-transparent"
+                type="button"
+              >
                 Annulla
               </Button>
-              <Button size="sm" onClick={confirmSelection} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+                size="sm"
+                onClick={confirmSelection}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                type="button"
+              >
                 <Check className="mr-2 h-4 w-4" />
                 Conferma
               </Button>
