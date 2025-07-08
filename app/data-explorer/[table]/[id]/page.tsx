@@ -876,13 +876,13 @@ export default function ItemDetailPage() {
             <EnhancedDatePicker
               id={field}
               value={fieldValue || ""}
-              onChange={(value) => handleFieldChange(field, value)}
-              readOnly={!isEditMode} // 🔧 USARE readOnly INVECE DI disabled
-              showCurrentTime={field === "data_inizio" && !fieldValue}
+              onChange={isEditMode ? (value) => handleFieldChange(field, value) : () => {}}
+              readOnly={!isEditMode}
+              disabled={false}
+              showCurrentTime={field === "data_inizio" && !fieldValue && isEditMode}
               onDateTimeSet={
-                field === "data_inizio"
+                field === "data_inizio" && isEditMode
                   ? (endDateTime) => {
-                      // Imposta automaticamente data_fine se è vuota
                       if (!formData.data_fine) {
                         handleFieldChange("data_fine", endDateTime)
                       }
@@ -892,7 +892,8 @@ export default function ItemDetailPage() {
             />
             <p className="text-xs text-gray-500">
               ⏰ Orario locale senza timezone. Minuti in multipli di 5.
-              {field === "data_inizio" && " Data fine verrà impostata automaticamente (+1 ora)."}
+              {field === "data_inizio" && isEditMode && " Data fine verrà impostata automaticamente (+1 ora)."}
+              {!isEditMode && " Clicca per visualizzare il calendario."}
             </p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>

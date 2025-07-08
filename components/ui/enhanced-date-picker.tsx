@@ -273,10 +273,9 @@ export function EnhancedDatePicker({
             className={cn(
               "w-full justify-start text-left font-normal",
               !selectedDate && "text-muted-foreground",
-              readOnly && "cursor-pointer", // Permetti il click anche in readOnly
-              isInteractionDisabled && "cursor-not-allowed opacity-50", // Solo se veramente disabled
+              isInteractionDisabled && "cursor-not-allowed opacity-50",
             )}
-            disabled={isInteractionDisabled} // Solo se veramente disabled
+            disabled={false} // Permetti sempre il click per aprire il popover
           >
             {selectedDate ? (
               <div className="flex items-center justify-between w-full">
@@ -299,8 +298,7 @@ export function EnhancedDatePicker({
           <Calendar
             mode="single"
             selected={tempDate}
-            onSelect={handleDateSelect}
-            disabled={readOnly || isInteractionDisabled} // Disabilita il calendario se readOnly o disabled
+            onSelect={readOnly || isInteractionDisabled ? undefined : handleDateSelect}
             initialFocus
             locale={it}
             modifiers={modifiers}
