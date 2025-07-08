@@ -32,13 +32,15 @@ export function EnhancedDatePicker({
   const [open, setOpen] = React.useState(false)
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
   const [timeValue, setTimeValue] = React.useState("")
-
-  // Stati temporanei per il popover
   const [tempDate, setTempDate] = React.useState<Date | undefined>()
   const [tempTime, setTempTime] = React.useState("")
 
+  // Debug
+  console.log(`[EnhancedDatePicker] Render - open: ${open}, disabled: ${disabled}, value: ${value}`)
+
   // Inizializza i valori dal prop value
   React.useEffect(() => {
+    console.log(`[EnhancedDatePicker] useEffect value changed: ${value}`)
     if (value) {
       try {
         const date = parseISO(value)
@@ -46,6 +48,7 @@ export function EnhancedDatePicker({
         const hours = date.getHours().toString().padStart(2, "0")
         const minutes = date.getMinutes().toString().padStart(2, "0")
         setTimeValue(`${hours}:${minutes}`)
+        console.log(`[EnhancedDatePicker] Parsed date: ${date}, time: ${hours}:${minutes}`)
       } catch (error) {
         console.error("Errore nel parsing della data:", error)
         setSelectedDate(undefined)
@@ -71,40 +74,57 @@ export function EnhancedDatePicker({
     return options
   }
 
-  // Quando si apre il popover, inizializza i valori temporanei
+  // Gestione apertura popover con debug
   const handleOpenChange = (newOpen: boolean) => {
+    console.log(`[EnhancedDatePicker] handleOpenChange: ${newOpen}`)
     setOpen(newOpen)
 
     if (newOpen) {
-      // Inizializza i valori temporanei
+      console.log(
+        `[EnhancedDatePicker] Opening popover, selectedDate: ${selectedDate}, showCurrentTime: ${showCurrentTime}`,
+      )
+
       if (selectedDate) {
         setTempDate(selectedDate)
         setTempTime(timeValue)
+        console.log(`[EnhancedDatePicker] Using existing date: ${selectedDate}, time: ${timeValue}`)
       } else if (showCurrentTime) {
-        // Se showCurrentTime è true e non c'è una data selezionata, usa l'ora corrente
         const now = new Date()
         const minutes = roundToNearestFiveMinutes(now.getMinutes())
         now.setMinutes(minutes)
         now.setSeconds(0)
         now.setMilliseconds(0)
         setTempDate(now)
-        setTempTime(`${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`)
+        const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`
+        setTempTime(currentTime)
+        console.log(`[EnhancedDatePicker] Using current time: ${now}, time: ${currentTime}`)
       } else {
         setTempDate(undefined)
         setTempTime("")
+        console.log(`[EnhancedDatePicker] No date set`)
       }
     }
   }
 
+  // Click handler con debug
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    console.log(`[EnhancedDatePicker] Trigger clicked, disabled: ${disabled}`)
+    if (disabled) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    // Il Popover gestirà l'apertura
+  }
+
   const handleDateSelect = (date: Date | undefined) => {
+    console.log(`[EnhancedDatePicker] Date selected: ${date}`)
     if (date) {
-      // Se c'è già un tempo temporaneo, mantienilo
       if (tempTime && tempTime.includes(":")) {
         const [hours, minutes] = tempTime.split(":").map(Number)
         date.setHours(hours)
         date.setMinutes(minutes)
       } else {
-        // Altrimenti usa l'ora corrente
         const now = new Date()
         const minutes = roundToNearestFiveMinutes(now.getMinutes())
         date.setHours(now.getHours())
@@ -120,6 +140,7 @@ export function EnhancedDatePicker({
   }
 
   const setCurrentDateTime = () => {
+    console.log(`[EnhancedDatePicker] Setting current date time`)
     const now = new Date()
     const minutes = roundToNearestFiveMinutes(now.getMinutes())
     now.setMinutes(minutes)
@@ -130,11 +151,14 @@ export function EnhancedDatePicker({
   }
 
   const clearDateTime = () => {
+    console.log(`[EnhancedDatePicker] Clearing date time`)
     setTempDate(undefined)
     setTempTime("")
   }
 
   const confirmSelection = () => {
+    console.log(`[EnhancedDatePicker] Confirming selection - tempDate: ${tempDate}, tempTime: ${tempTime}`)
+
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
 
@@ -146,7 +170,6 @@ export function EnhancedDatePicker({
 
       setSelectedDate(finalDate)
 
-      // Formatta la data manualmente senza conversione timezone
       const year = finalDate.getFullYear()
       const month = String(finalDate.getMonth() + 1).padStart(2, "0")
       const day = String(finalDate.getDate()).padStart(2, "0")
@@ -156,9 +179,10 @@ export function EnhancedDatePicker({
 
       const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
 
-      console.log(`[EnhancedDatePicker] Data confermata: ${localISOString}`)
+      console.log(`[EnhancedDatePicker] Final date: ${localISOString}`)
       onChange(localISOString)
     } else if (!tempDate && !tempTime) {
+      console.log(`[EnhancedDatePicker] Clearing selection`)
       setSelectedDate(undefined)
       onChange("")
     }
@@ -166,7 +190,7 @@ export function EnhancedDatePicker({
   }
 
   const cancelSelection = () => {
-    // Ripristina i valori originali
+    console.log(`[EnhancedDatePicker] Cancelling selection`)
     setTempDate(selectedDate)
     setTempTime(timeValue)
     setOpen(false)
@@ -202,9 +226,14 @@ export function EnhancedDatePicker({
           <Button
             id={id}
             variant="outline"
-            className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
+            className={cn(
+              "w-full justify-start text-left font-normal",
+              !selectedDate && "text-muted-foreground",
+              disabled && "opacity-50 cursor-not-allowed",
+            )}
             disabled={disabled}
             type="button"
+            onClick={handleTriggerClick}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {selectedDate ? (
@@ -218,7 +247,10 @@ export function EnhancedDatePicker({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0" align="start" side="bottom">
+          <div className="p-2 text-xs text-gray-500 border-b">
+            Debug: open={open.toString()}, tempDate={tempDate?.toString() || "undefined"}
+          </div>
           <Calendar
             mode="single"
             selected={tempDate}
