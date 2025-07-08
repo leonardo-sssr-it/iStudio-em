@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { format, parseISO, isToday, isSameDay } from "date-fns"
+import { format, isToday, isSameDay } from "date-fns"
 import { it } from "date-fns/locale"
 import { CalendarIcon, Clock, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -20,6 +20,81 @@ interface EnhancedDatePickerProps {
   showCurrentTime?: boolean
 }
 
+// 🔧 FUNZIONI NATIVE SENZA TIMEZONE - IDENTICHE A QUELLE NEI FILE DI DETTAGLIO
+function formatDateTimeForInput(dateString: string): string {
+  if (!dateString) return ""
+  try {
+    // Parsing della data ISO senza conversione timezone
+    const date = new Date(dateString)
+
+    // Ottieni i componenti della data in locale (senza timezone)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    const hours = String(date.getHours()).padStart(2, "0")
+
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const minutes = Math.round(date.getMinutes() / 5) * 5
+    const formattedMinutes = String(minutes).padStart(2, "0")
+
+    // Formato per datetime-local: YYYY-MM-DDTHH:MM (senza timezone)
+    return `${year}-${month}-${day}T${hours}:${formattedMinutes}`
+  } catch (error) {
+    console.error("Errore nel formato data:", error)
+    return ""
+  }
+}
+
+function parseDateTimeFromInput(inputValue: string): string {
+  if (!inputValue) return ""
+  try {
+    // Parsing diretto del valore datetime-local (già in formato locale)
+    const [datePart, timePart] = inputValue.split("T")
+    const [year, month, day] = datePart.split("-").map(Number)
+    const [hours, minutes] = timePart.split(":").map(Number)
+
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const roundedMinutes = Math.round(minutes / 5) * 5
+
+    // Crea la data in locale (senza conversione timezone)
+    const date = new Date(year, month - 1, day, hours, roundedMinutes, 0, 0)
+
+    // Converte in ISO string mantenendo il tempo locale
+    const isoString =
+      date.getFullYear() +
+      "-" +
+      String(date.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getDate()).padStart(2, "0") +
+      "T" +
+      String(date.getHours()).padStart(2, "0") +
+      ":" +
+      String(date.getMinutes()).padStart(2, "0") +
+      ":00.000Z"
+
+    return isoString
+  } catch (error) {
+    console.error("Errore nel parsing data:", error)
+    return ""
+  }
+}
+
+// 🔧 FUNZIONE PER CREARE DATA LOCALE SENZA TIMEZONE
+function createLocalDate(year: number, month: number, day: number, hours: number, minutes: number): Date {
+  return new Date(year, month - 1, day, hours, minutes, 0, 0)
+}
+
+// 🔧 FUNZIONE PER CONVERTIRE DATA IN ISO SENZA TIMEZONE
+function dateToLocalISOString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:00.000Z`
+}
+
 export function EnhancedDatePicker({
   value,
   onChange,
@@ -30,19 +105,33 @@ export function EnhancedDatePicker({
   showCurrentTime = false,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(value ? new Date(value) : undefined)
   const [timeValue, setTimeValue] = React.useState("")
 
-  const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? parseISO(value) : undefined)
+  const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? new Date(value) : undefined)
   const [tempTime, setTempTime] = React.useState("")
+
+  // 🔧 GENERA LE OPZIONI PER I MINUTI IN MULTIPLI DI 5
+  const generateMinuteOptions = (): string[] => {
+    const options: string[] = []
+    for (let i = 0; i < 60; i += 5) {
+      options.push(i.toString().padStart(2, "0"))
+    }
+    return options
+  }
+
+  // 🔧 ARROTONDA I MINUTI AI MULTIPLI DI 5
+  const roundToNearestFiveMinutes = (minutes: number): number => {
+    return Math.round(minutes / 5) * 5
+  }
 
   React.useEffect(() => {
     if (value) {
-      const date = parseISO(value)
+      const date = new Date(value)
       setSelectedDate(date)
       setTempDate(date)
       const hours = date.getHours().toString().padStart(2, "0")
-      const minutes = date.getMinutes().toString().padStart(2, "0")
+      const minutes = roundToNearestFiveMinutes(date.getMinutes()).toString().padStart(2, "0")
       setTimeValue(`${hours}:${minutes}`)
       setTempTime(`${hours}:${minutes}`)
     } else {
@@ -56,26 +145,12 @@ export function EnhancedDatePicker({
   React.useEffect(() => {
     if (selectedDate) {
       const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
+      const minutes = roundToNearestFiveMinutes(selectedDate.getMinutes()).toString().padStart(2, "0")
       setTimeValue(`${hours}:${minutes}`)
     } else {
       setTimeValue("")
     }
   }, [selectedDate])
-
-  // 🔧 CORREZIONE: Funzione per arrotondare i minuti ai multipli di 5
-  const roundToNearestFiveMinutes = (minutes: number): number => {
-    return Math.round(minutes / 5) * 5
-  }
-
-  // 🔧 CORREZIONE: Genera le opzioni per i minuti in multipli di 5 (0,5,10,15,20,25,30,35,40,45,50,55)
-  const generateMinuteOptions = (): string[] => {
-    const options: string[] = []
-    for (let i = 0; i < 60; i += 5) {
-      options.push(i.toString().padStart(2, "0"))
-    }
-    return options
-  }
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -91,15 +166,20 @@ export function EnhancedDatePicker({
           : roundToNearestFiveMinutes(new Date().getMinutes())
       }
 
-      date.setHours(currentHours)
-      date.setMinutes(currentMinutes)
-      date.setSeconds(0)
-      date.setMilliseconds(0)
-      setTempDate(date)
+      // 🔧 CREA DATA LOCALE SENZA TIMEZONE
+      const newDate = createLocalDate(
+        date.getFullYear(),
+        date.getMonth() + 1,
+        date.getDate(),
+        currentHours,
+        currentMinutes,
+      )
+
+      setTempDate(newDate)
 
       if (!tempTime || (showCurrentTime && !value)) {
-        const hours = date.getHours().toString().padStart(2, "0")
-        const minutes = date.getMinutes().toString().padStart(2, "0")
+        const hours = newDate.getHours().toString().padStart(2, "0")
+        const minutes = newDate.getMinutes().toString().padStart(2, "0")
         setTempTime(`${hours}:${minutes}`)
       }
     } else {
@@ -158,11 +238,14 @@ export function EnhancedDatePicker({
   const setCurrentDateTime = () => {
     const now = new Date()
     const minutes = roundToNearestFiveMinutes(now.getMinutes())
-    now.setMinutes(minutes)
-    now.setSeconds(0)
-    now.setMilliseconds(0)
-    setTempDate(now)
-    setTempTime(`${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`)
+
+    // 🔧 CREA DATA LOCALE SENZA TIMEZONE
+    const currentDate = createLocalDate(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), minutes)
+
+    setTempDate(currentDate)
+    setTempTime(
+      `${currentDate.getHours().toString().padStart(2, "0")}:${currentDate.getMinutes().toString().padStart(2, "0")}`,
+    )
   }
 
   const clearDateTime = () => {
@@ -173,23 +256,21 @@ export function EnhancedDatePicker({
   const confirmSelection = () => {
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
-      const finalDate = new Date(tempDate)
-      finalDate.setHours(hours)
-      finalDate.setMinutes(minutes)
-      finalDate.setSeconds(0)
-      finalDate.setMilliseconds(0)
+
+      // 🔧 CREA DATA FINALE LOCALE SENZA TIMEZONE
+      const finalDate = createLocalDate(
+        tempDate.getFullYear(),
+        tempDate.getMonth() + 1,
+        tempDate.getDate(),
+        hours,
+        roundToNearestFiveMinutes(minutes),
+      )
 
       setSelectedDate(finalDate)
 
-      // Formatta la data senza conversione timezone
-      const year = finalDate.getFullYear()
-      const month = String(finalDate.getMonth() + 1).padStart(2, "0")
-      const day = String(finalDate.getDate()).padStart(2, "0")
-      const hour = String(finalDate.getHours()).padStart(2, "0")
-      const minute = String(finalDate.getMinutes()).padStart(2, "0")
-      const second = String(finalDate.getSeconds()).padStart(2, "0")
-
-      const localISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}`
+      // 🔧 CONVERTE IN ISO SENZA TIMEZONE
+      const localISOString = dateToLocalISOString(finalDate)
+      console.log("🔧 Data selezionata (senza timezone):", localISOString)
       onChange(localISOString)
     } else if (!tempDate && !tempTime) {
       setSelectedDate(undefined)
@@ -202,7 +283,7 @@ export function EnhancedDatePicker({
     setTempDate(selectedDate)
     if (selectedDate) {
       const hours = selectedDate.getHours().toString().padStart(2, "0")
-      const minutes = selectedDate.getMinutes().toString().padStart(2, "0")
+      const minutes = roundToNearestFiveMinutes(selectedDate.getMinutes()).toString().padStart(2, "0")
       setTempTime(`${hours}:${minutes}`)
     } else {
       setTempTime("")
@@ -323,6 +404,9 @@ export function EnhancedDatePicker({
                 </select>
               </div>
             </div>
+            <p className="text-xs text-gray-500">
+              ⏰ Minuti disponibili: 00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+            </p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1 bg-transparent">
                 <Clock className="mr-2 h-4 w-4" />
