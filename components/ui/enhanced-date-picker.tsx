@@ -18,23 +18,14 @@ interface EnhancedDatePickerProps {
   className?: string
   id?: string
   showCurrentTime?: boolean
-  onDateTimeSet?: (startDateTime: string) => void // Callback per impostare data_fine
+  onDateTimeSet?: (endDateTime: string) => void // Callback per impostare data_fine
 }
 
-// 🔧 FUNZIONE PER CREARE DATA LOCALE PURA (SENZA TIMEZONE)
-function createPureLocalDate(year: number, month: number, day: number, hours: number, minutes: number): Date {
-  const date = new Date()
-  date.setFullYear(year)
-  date.setMonth(month - 1) // month è 1-based, setMonth è 0-based
-  date.setDate(day)
-  date.setHours(hours)
-  date.setMinutes(minutes)
-  date.setSeconds(0)
-  date.setMilliseconds(0)
-  return date
+// 🔧 FUNZIONI NATIVE SENZA TIMEZONE
+function createLocalDate(year: number, month: number, day: number, hours: number, minutes: number): Date {
+  return new Date(year, month - 1, day, hours, minutes, 0, 0)
 }
 
-// 🔧 FUNZIONE PER CONVERTIRE DATA IN ISO LOCALE (SENZA TIMEZONE)
 function dateToLocalISOString(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")
@@ -46,17 +37,13 @@ function dateToLocalISOString(date: Date): string {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`
 }
 
-// 🔧 FUNZIONE PER PARSARE ISO IN DATA LOCALE (SENZA TIMEZONE)
 function parseLocalISOString(isoString: string): Date | null {
   if (!isoString) return null
-
   try {
-    // Estrai componenti dalla stringa ISO
     const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/)
     if (!match) return null
-
-    const [, year, month, day, hours, minutes, seconds] = match
-    return createPureLocalDate(
+    const [, year, month, day, hours, minutes] = match
+    return createLocalDate(
       Number.parseInt(year),
       Number.parseInt(month),
       Number.parseInt(day),
@@ -69,12 +56,18 @@ function parseLocalISOString(isoString: string): Date | null {
   }
 }
 
-// 🔧 GENERA SOLO I MINUTI IN MULTIPLI DI 5
-const MINUTE_OPTIONS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]
-
-// 🔧 ARROTONDA I MINUTI AL MULTIPLO DI 5 PIÙ VICINO
+// 🔧 ARROTONDA I MINUTI AI MULTIPLI DI 5
 function roundToNearestFiveMinutes(minutes: number): number {
   return Math.round(minutes / 5) * 5
+}
+
+// 🔧 GENERA LE OPZIONI PER I MINUTI IN MULTIPLI DI 5
+function generateMinuteOptions(): string[] {
+  const options: string[] = []
+  for (let i = 0; i < 60; i += 5) {
+    options.push(i.toString().padStart(2, "0"))
+  }
+  return options
 }
 
 export function EnhancedDatePicker({
@@ -88,97 +81,167 @@ export function EnhancedDatePicker({
   onDateTimeSet,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
-  const [tempDate, setTempDate] = React.useState<Date | undefined>()
-  const [tempHours, setTempHours] = React.useState("00")
-  const [tempMinutes, setTempMinutes] = React.useState("00")
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
+    value ? parseLocalISOString(value) : undefined,
+  )
+  const [timeValue, setTimeValue] = React.useState("")
 
-  // Inizializza i valori dal prop value
+  const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? parseLocalISOString(value) : undefined)
+  const [tempTime, setTempTime] = React.useState("")
+
   React.useEffect(() => {
     if (value) {
       const date = parseLocalISOString(value)
       if (date) {
         setSelectedDate(date)
         setTempDate(date)
-        setTempHours(date.getHours().toString().padStart(2, "0"))
-        setTempMinutes(roundToNearestFiveMinutes(date.getMinutes()).toString().padStart(2, "0"))
+        const hours = date.getHours().toString().padStart(2, "0")
+        const minutes = roundToNearestFiveMinutes(date.getMinutes()).toString().padStart(2, "0")
+        setTimeValue(`${hours}:${minutes}`)
+        setTempTime(`${hours}:${minutes}`)
       }
     } else {
       setSelectedDate(undefined)
       setTempDate(undefined)
-      setTempHours("00")
-      setTempMinutes("00")
+      setTimeValue("")
+      setTempTime("")
     }
   }, [value])
 
+  React.useEffect(() => {
+    if (selectedDate) {
+      const hours = selectedDate.getHours().toString().padStart(2, "0")
+      const minutes = roundToNearestFiveMinutes(selectedDate.getMinutes()).toString().padStart(2, "0")
+      setTimeValue(`${hours}:${minutes}`)
+    } else {
+      setTimeValue("")
+    }
+  }, [selectedDate])
+
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      // Crea una nuova data locale pura
-      const newDate = createPureLocalDate(
+      let currentHours, currentMinutes
+      if (showCurrentTime && !value) {
+        const now = new Date()
+        currentHours = now.getHours()
+        currentMinutes = roundToNearestFiveMinutes(now.getMinutes())
+      } else {
+        currentHours = tempDate ? tempDate.getHours() : new Date().getHours()
+        currentMinutes = tempDate
+          ? roundToNearestFiveMinutes(tempDate.getMinutes())
+          : roundToNearestFiveMinutes(new Date().getMinutes())
+      }
+
+      // 🔧 CREA DATA LOCALE SENZA TIMEZONE
+      const newDate = createLocalDate(
         date.getFullYear(),
         date.getMonth() + 1,
         date.getDate(),
-        Number.parseInt(tempHours),
-        Number.parseInt(tempMinutes),
+        currentHours,
+        currentMinutes,
       )
+
       setTempDate(newDate)
 
-      // Se è la prima selezione e showCurrentTime è true, imposta l'ora corrente
-      if (showCurrentTime && !tempDate) {
-        const now = new Date()
-        const currentHours = now.getHours().toString().padStart(2, "0")
-        const currentMinutes = roundToNearestFiveMinutes(now.getMinutes()).toString().padStart(2, "0")
-        setTempHours(currentHours)
-        setTempMinutes(currentMinutes)
+      if (!tempTime || (showCurrentTime && !value)) {
+        const hours = newDate.getHours().toString().padStart(2, "0")
+        const minutes = newDate.getMinutes().toString().padStart(2, "0")
+        setTempTime(`${hours}:${minutes}`)
       }
     } else {
       setTempDate(undefined)
+    }
+  }
+
+  const handleTimeChange = (timeString: string) => {
+    if (timeString && timeString.includes(":")) {
+      const [hours, minutes] = timeString.split(":").map(Number)
+      const roundedMinutes = roundToNearestFiveMinutes(minutes)
+      const adjustedTimeString = `${hours.toString().padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`
+      setTempTime(adjustedTimeString)
+    } else {
+      setTempTime(timeString)
+    }
+  }
+
+  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = e.currentTarget
+    const [hours, minutes] = tempTime.split(":").map(Number)
+
+    if (e.key === "Enter") {
+      e.preventDefault()
+      confirmSelection()
+      return
+    }
+
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault()
+
+      const increment = e.key === "ArrowUp" ? 5 : -5
+      const cursorPosition = input.selectionStart || 0
+
+      let newHours = hours
+      let newMinutes = minutes
+
+      if (cursorPosition <= 2) {
+        newHours = Math.max(0, Math.min(23, hours + (increment > 0 ? 1 : -1)))
+      } else {
+        newMinutes = minutes + increment
+        if (newMinutes >= 60) {
+          newMinutes = 0
+          newHours = Math.min(23, hours + 1)
+        } else if (newMinutes < 0) {
+          newMinutes = 55
+          newHours = Math.max(0, hours - 1)
+        }
+      }
+
+      const newTimeString = `${newHours.toString().padStart(2, "0")}:${newMinutes.toString().padStart(2, "0")}`
+      setTempTime(newTimeString)
     }
   }
 
   const setCurrentDateTime = () => {
     const now = new Date()
-    const currentDate = createPureLocalDate(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      now.getDate(),
-      now.getHours(),
-      roundToNearestFiveMinutes(now.getMinutes()),
-    )
+    const minutes = roundToNearestFiveMinutes(now.getMinutes())
+
+    // 🔧 CREA DATA LOCALE SENZA TIMEZONE
+    const currentDate = createLocalDate(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), minutes)
 
     setTempDate(currentDate)
-    setTempHours(now.getHours().toString().padStart(2, "0"))
-    setTempMinutes(roundToNearestFiveMinutes(now.getMinutes()).toString().padStart(2, "0"))
+    setTempTime(
+      `${currentDate.getHours().toString().padStart(2, "0")}:${currentDate.getMinutes().toString().padStart(2, "0")}`,
+    )
   }
 
   const clearDateTime = () => {
     setTempDate(undefined)
-    setTempHours("00")
-    setTempMinutes("00")
+    setTempTime("")
   }
 
   const confirmSelection = () => {
-    if (tempDate) {
-      // Crea la data finale con ore e minuti selezionati
-      const finalDate = createPureLocalDate(
+    if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
+      const [hours, minutes] = tempTime.split(":").map(Number)
+
+      // 🔧 CREA DATA FINALE LOCALE SENZA TIMEZONE
+      const finalDate = createLocalDate(
         tempDate.getFullYear(),
         tempDate.getMonth() + 1,
         tempDate.getDate(),
-        Number.parseInt(tempHours),
-        Number.parseInt(tempMinutes),
+        hours,
+        roundToNearestFiveMinutes(minutes),
       )
 
       setSelectedDate(finalDate)
 
-      // Converte in ISO locale
+      // 🔧 CONVERTE IN ISO SENZA TIMEZONE
       const localISOString = dateToLocalISOString(finalDate)
-      console.log("🔧 Data confermata (locale pura):", localISOString)
-
+      console.log("🔧 Data selezionata (senza timezone):", localISOString)
       onChange(localISOString)
 
-      // Se c'è il callback per impostare data_fine, chiamalo con data_inizio + 1 ora
+      // 🔧 CALCOLA DATA FINE (+1 ORA) SE RICHIESTO
       if (onDateTimeSet) {
-        const endDate = createPureLocalDate(
+        const endDate = createLocalDate(
           finalDate.getFullYear(),
           finalDate.getMonth() + 1,
           finalDate.getDate(),
@@ -189,7 +252,7 @@ export function EnhancedDatePicker({
         console.log("🔧 Data fine calcolata (+1 ora):", endISOString)
         onDateTimeSet(endISOString)
       }
-    } else if (!tempDate) {
+    } else if (!tempDate && !tempTime) {
       setSelectedDate(undefined)
       onChange("")
     }
@@ -197,14 +260,13 @@ export function EnhancedDatePicker({
   }
 
   const cancelSelection = () => {
+    setTempDate(selectedDate)
     if (selectedDate) {
-      setTempDate(selectedDate)
-      setTempHours(selectedDate.getHours().toString().padStart(2, "0"))
-      setTempMinutes(roundToNearestFiveMinutes(selectedDate.getMinutes()).toString().padStart(2, "0"))
+      const hours = selectedDate.getHours().toString().padStart(2, "0")
+      const minutes = roundToNearestFiveMinutes(selectedDate.getMinutes()).toString().padStart(2, "0")
+      setTempTime(`${hours}:${minutes}`)
     } else {
-      setTempDate(undefined)
-      setTempHours("00")
-      setTempMinutes("00")
+      setTempTime("")
     }
     setOpen(false)
   }
@@ -216,7 +278,6 @@ export function EnhancedDatePicker({
     }
   }
 
-  // Imposta ora corrente quando si apre il popover per la prima volta
   React.useEffect(() => {
     if (showCurrentTime && !value && open && !tempDate) {
       setCurrentDateTime()
@@ -262,10 +323,7 @@ export function EnhancedDatePicker({
               <div className="flex items-center gap-2">
                 <span>{format(selectedDate, "PPP", { locale: it })}</span>
                 <span className="text-muted-foreground">•</span>
-                <span>
-                  {selectedDate.getHours().toString().padStart(2, "0")}:
-                  {roundToNearestFiveMinutes(selectedDate.getMinutes()).toString().padStart(2, "0")}
-                </span>
+                <span>{timeValue}</span>
               </div>
             ) : (
               <span>{placeholder}</span>
@@ -286,31 +344,38 @@ export function EnhancedDatePicker({
           />
           <div className="p-3 border-t space-y-3">
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Ora:</Label>
-              <div className="flex gap-1 items-center">
+              <Label htmlFor={`${id}-time-popover`} className="text-sm font-medium">
+                Ora:
+              </Label>
+              <div className="flex gap-1">
                 <select
-                  value={tempHours}
-                  onChange={(e) => setTempHours(e.target.value)}
-                  className="px-2 py-1 border rounded text-sm min-w-[50px]"
+                  value={tempTime.split(":")[0] || "00"}
+                  onChange={(e) => {
+                    const hours = e.target.value
+                    const minutes = tempTime.split(":")[1] || "00"
+                    setTempTime(`${hours}:${minutes}`)
+                  }}
+                  className="px-2 py-1 border rounded text-sm"
                   disabled={disabled || !tempDate}
                 >
-                  {Array.from({ length: 24 }, (_, i) => {
-                    const hour = i.toString().padStart(2, "0")
-                    return (
-                      <option key={hour} value={hour}>
-                        {hour}
-                      </option>
-                    )
-                  })}
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i.toString().padStart(2, "0")}>
+                      {i.toString().padStart(2, "0")}
+                    </option>
+                  ))}
                 </select>
-                <span className="text-sm font-medium">:</span>
+                <span className="py-1">:</span>
                 <select
-                  value={tempMinutes}
-                  onChange={(e) => setTempMinutes(e.target.value)}
-                  className="px-2 py-1 border rounded text-sm min-w-[50px]"
+                  value={tempTime.split(":")[1] || "00"}
+                  onChange={(e) => {
+                    const hours = tempTime.split(":")[0] || "00"
+                    const minutes = e.target.value
+                    setTempTime(`${hours}:${minutes}`)
+                  }}
+                  className="px-2 py-1 border rounded text-sm"
                   disabled={disabled || !tempDate}
                 >
-                  {MINUTE_OPTIONS.map((minute) => (
+                  {generateMinuteOptions().map((minute) => (
                     <option key={minute} value={minute}>
                       {minute}
                     </option>
