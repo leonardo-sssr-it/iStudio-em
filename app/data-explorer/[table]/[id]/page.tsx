@@ -95,65 +95,6 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// 🔧 FUNZIONI NATIVE SENZA TIMEZONE PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
-function formatDateTimeForInput(dateString: string): string {
-  if (!dateString) return ""
-  try {
-    // Parsing della data ISO senza conversione timezone
-    const date = new Date(dateString)
-
-    // Ottieni i componenti della data in locale (senza timezone)
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, "0")
-    const day = String(date.getDate()).padStart(2, "0")
-    const hours = String(date.getHours()).padStart(2, "0")
-
-    // Arrotonda i minuti al multiplo di 5 più vicino
-    const minutes = Math.round(date.getMinutes() / 5) * 5
-    const formattedMinutes = String(minutes).padStart(2, "0")
-
-    // Formato per datetime-local: YYYY-MM-DDTHH:MM (senza timezone)
-    return `${year}-${month}-${day}T${hours}:${formattedMinutes}`
-  } catch (error) {
-    console.error("Errore nel formato data:", error)
-    return ""
-  }
-}
-
-function parseDateTimeFromInput(inputValue: string): string {
-  if (!inputValue) return ""
-  try {
-    // Parsing diretto del valore datetime-local (già in formato locale)
-    const [datePart, timePart] = inputValue.split("T")
-    const [year, month, day] = datePart.split("-").map(Number)
-    const [hours, minutes] = timePart.split(":").map(Number)
-
-    // Arrotonda i minuti al multiplo di 5 più vicino
-    const roundedMinutes = Math.round(minutes / 5) * 5
-
-    // Crea la data in locale (senza conversione timezone)
-    const date = new Date(year, month - 1, day, hours, roundedMinutes, 0, 0)
-
-    // Converte in ISO string mantenendo il tempo locale
-    const isoString =
-      date.getFullYear() +
-      "-" +
-      String(date.getMonth() + 1).padStart(2, "0") +
-      "-" +
-      String(date.getDate()).padStart(2, "0") +
-      "T" +
-      String(date.getHours()).padStart(2, "0") +
-      ":" +
-      String(date.getMinutes()).padStart(2, "0") +
-      ":00.000Z"
-
-    return isoString
-  } catch (error) {
-    console.error("Errore nel parsing data:", error)
-    return ""
-  }
-}
-
 // Funzione per formattare la data per la visualizzazione (senza timezone)
 function formatDateTimeForDisplay(dateString: string): string {
   if (!dateString) return "-"
@@ -165,7 +106,7 @@ function formatDateTimeForDisplay(dateString: string): string {
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
-      timeZone: "Europe/Rome", // Forza il timezone italiano per la visualizzazione
+      timeZone: "Europe/Rome",
     })
   } catch (error) {
     console.error("Errore nella formattazione per display:", error)

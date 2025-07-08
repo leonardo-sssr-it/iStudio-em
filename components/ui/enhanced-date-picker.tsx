@@ -18,7 +18,7 @@ interface EnhancedDatePickerProps {
   className?: string
   id?: string
   showCurrentTime?: boolean
-  onDateTimeSet?: (endDateTime: string) => void // Callback per impostare data_fine
+  onDateTimeSet?: (endDateTime: string) => void
 }
 
 // 🔧 FUNZIONI NATIVE SENZA TIMEZONE
@@ -33,7 +33,6 @@ function dateToLocalISOString(date: Date): string {
   const hours = String(date.getHours()).padStart(2, "0")
   const minutes = String(date.getMinutes()).padStart(2, "0")
   const seconds = String(date.getSeconds()).padStart(2, "0")
-
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.000Z`
 }
 
@@ -56,18 +55,8 @@ function parseLocalISOString(isoString: string): Date | null {
   }
 }
 
-// 🔧 ARROTONDA I MINUTI AI MULTIPLI DI 5
 function roundToNearestFiveMinutes(minutes: number): number {
   return Math.round(minutes / 5) * 5
-}
-
-// 🔧 GENERA LE OPZIONI PER I MINUTI IN MULTIPLI DI 5
-function generateMinuteOptions(): string[] {
-  const options: string[] = []
-  for (let i = 0; i < 60; i += 5) {
-    options.push(i.toString().padStart(2, "0"))
-  }
-  return options
 }
 
 export function EnhancedDatePicker({
@@ -132,7 +121,6 @@ export function EnhancedDatePicker({
           : roundToNearestFiveMinutes(new Date().getMinutes())
       }
 
-      // 🔧 CREA DATA LOCALE SENZA TIMEZONE
       const newDate = createLocalDate(
         date.getFullYear(),
         date.getMonth() + 1,
@@ -164,50 +152,10 @@ export function EnhancedDatePicker({
     }
   }
 
-  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget
-    const [hours, minutes] = tempTime.split(":").map(Number)
-
-    if (e.key === "Enter") {
-      e.preventDefault()
-      confirmSelection()
-      return
-    }
-
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault()
-
-      const increment = e.key === "ArrowUp" ? 5 : -5
-      const cursorPosition = input.selectionStart || 0
-
-      let newHours = hours
-      let newMinutes = minutes
-
-      if (cursorPosition <= 2) {
-        newHours = Math.max(0, Math.min(23, hours + (increment > 0 ? 1 : -1)))
-      } else {
-        newMinutes = minutes + increment
-        if (newMinutes >= 60) {
-          newMinutes = 0
-          newHours = Math.min(23, hours + 1)
-        } else if (newMinutes < 0) {
-          newMinutes = 55
-          newHours = Math.max(0, hours - 1)
-        }
-      }
-
-      const newTimeString = `${newHours.toString().padStart(2, "0")}:${newMinutes.toString().padStart(2, "0")}`
-      setTempTime(newTimeString)
-    }
-  }
-
   const setCurrentDateTime = () => {
     const now = new Date()
     const minutes = roundToNearestFiveMinutes(now.getMinutes())
-
-    // 🔧 CREA DATA LOCALE SENZA TIMEZONE
     const currentDate = createLocalDate(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), minutes)
-
     setTempDate(currentDate)
     setTempTime(
       `${currentDate.getHours().toString().padStart(2, "0")}:${currentDate.getMinutes().toString().padStart(2, "0")}`,
@@ -222,8 +170,6 @@ export function EnhancedDatePicker({
   const confirmSelection = () => {
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
-
-      // 🔧 CREA DATA FINALE LOCALE SENZA TIMEZONE
       const finalDate = createLocalDate(
         tempDate.getFullYear(),
         tempDate.getMonth() + 1,
@@ -233,8 +179,6 @@ export function EnhancedDatePicker({
       )
 
       setSelectedDate(finalDate)
-
-      // 🔧 CONVERTE IN ISO SENZA TIMEZONE
       const localISOString = dateToLocalISOString(finalDate)
       console.log("🔧 Data selezionata (senza timezone):", localISOString)
       onChange(localISOString)
@@ -245,7 +189,7 @@ export function EnhancedDatePicker({
           finalDate.getFullYear(),
           finalDate.getMonth() + 1,
           finalDate.getDate(),
-          finalDate.getHours() + 1, // +1 ora
+          finalDate.getHours() + 1,
           finalDate.getMinutes(),
         )
         const endISOString = dateToLocalISOString(endDate)
@@ -269,13 +213,6 @@ export function EnhancedDatePicker({
       setTempTime("")
     }
     setOpen(false)
-  }
-
-  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault()
-      setOpen(!open)
-    }
   }
 
   React.useEffect(() => {
@@ -316,17 +253,21 @@ export function EnhancedDatePicker({
             variant="outline"
             className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
             disabled={disabled}
-            onKeyDown={handleTriggerKeyDown}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
             {selectedDate ? (
-              <div className="flex items-center gap-2">
-                <span>{format(selectedDate, "PPP", { locale: it })}</span>
-                <span className="text-muted-foreground">•</span>
-                <span>{timeValue}</span>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <span>{format(selectedDate, "PPP", { locale: it })}</span>
+                  <span className="text-muted-foreground">•</span>
+                  <span>{timeValue}</span>
+                </div>
+                <CalendarIcon className="h-4 w-4 opacity-50" />
               </div>
             ) : (
-              <span>{placeholder}</span>
+              <div className="flex items-center justify-between w-full">
+                <span>{placeholder}</span>
+                <CalendarIcon className="h-4 w-4 opacity-50" />
+              </div>
             )}
           </Button>
         </PopoverTrigger>
@@ -375,7 +316,7 @@ export function EnhancedDatePicker({
                   className="px-2 py-1 border rounded text-sm"
                   disabled={disabled || !tempDate}
                 >
-                  {generateMinuteOptions().map((minute) => (
+                  {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((minute) => (
                     <option key={minute} value={minute}>
                       {minute}
                     </option>
@@ -399,7 +340,7 @@ export function EnhancedDatePicker({
               <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1 bg-transparent">
                 Annulla
               </Button>
-              <Button size="sm" onClick={confirmSelection} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
+              <Button size="sm" onClick={confirmSelection} className="flex-1">
                 <Check className="mr-2 h-4 w-4" />
                 Conferma
               </Button>
