@@ -77,7 +77,43 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// Configurazione dei campi per ogni tabella (CORRETTA e CONSISTENTE)
+// 🔧 FUNZIONE NATIVA PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
+function formatDateTimeForInput(dateString: string): string {
+  if (!dateString) return ""
+  try {
+    const date = new Date(dateString)
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const minutes = Math.round(date.getMinutes() / 5) * 5
+    date.setMinutes(minutes)
+    date.setSeconds(0)
+    date.setMilliseconds(0)
+
+    // Formato per datetime-local: YYYY-MM-DDTHH:MM
+    return date.toISOString().slice(0, 16)
+  } catch (error) {
+    console.error("Errore nel formato data:", error)
+    return ""
+  }
+}
+
+function parseDateTimeFromInput(inputValue: string): string {
+  if (!inputValue) return ""
+  try {
+    const date = new Date(inputValue)
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const minutes = Math.round(date.getMinutes() / 5) * 5
+    date.setMinutes(minutes)
+    date.setSeconds(0)
+    date.setMilliseconds(0)
+
+    return date.toISOString()
+  } catch (error) {
+    console.error("Errore nel parsing data:", error)
+    return ""
+  }
+}
+
+// Configurazione dei campi per ogni tabella (IDENTICA AL FILE DI DETTAGLIO)
 const TABLE_FIELDS = {
   appuntamenti: {
     requiredFields: ["titolo", "data_inizio"],
@@ -427,6 +463,12 @@ export default function NewItemPage() {
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
+  // 🔧 CORREZIONE NAVIGAZIONE: Funzione per tornare alla lista con URL corretto
+  const handleBackToList = useCallback(() => {
+    console.log(`[NewItemPage] Navigazione corretta verso: /data-explorer?table=${tableName}`)
+    router.push(`/data-explorer?table=${tableName}`)
+  }, [router, tableName])
+
   // Funzione per caricare le opzioni di priorità da Supabase
   const loadPriorityOptions = useCallback(async () => {
     if (!supabase) return
@@ -676,7 +718,7 @@ export default function NewItemPage() {
       if (data && data[0]) {
         router.push(`/data-explorer/${tableName}/${data[0].id}`)
       } else {
-        router.push(`/data-explorer/${tableName}`)
+        handleBackToList()
       }
     } catch (error: any) {
       console.error("Errore durante il salvataggio:", error)
@@ -758,12 +800,21 @@ export default function NewItemPage() {
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <Input
-              {...commonProps}
-              type="datetime-local"
-              value={fieldValue ? new Date(fieldValue).toISOString().slice(0, 16) : ""}
-              onChange={(e) => handleFieldChange(field, e.target.value ? new Date(e.target.value).toISOString() : "")}
-            />
+            <div className="relative">
+              <Input
+                id={field}
+                type="datetime-local"
+                value={formatDateTimeForInput(fieldValue)}
+                onChange={(e) => {
+                  const isoString = parseDateTimeFromInput(e.target.value)
+                  handleFieldChange(field, isoString)
+                }}
+                className={hasError ? "border-red-500" : ""}
+                step="300" // 5 minuti in secondi
+              />
+              <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+            <p className="text-xs text-gray-500">I minuti verranno arrotondati ai multipli di 5</p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
         )
@@ -906,7 +957,7 @@ export default function NewItemPage() {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline" className="mb-4">
+        <Button onClick={handleBackToList} variant="outline" className="mb-4 bg-transparent">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Torna alla lista
         </Button>
@@ -935,7 +986,7 @@ export default function NewItemPage() {
           </div>
 
           <div className="flex justify-end space-x-4 pt-6 border-t">
-            <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline">
+            <Button onClick={handleBackToList} variant="outline">
               Annulla
             </Button>
             <Button onClick={handleSave} disabled={saving}>

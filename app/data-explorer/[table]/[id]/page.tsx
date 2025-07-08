@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
-import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import {
   CheckCircle2,
   FileText,
@@ -93,6 +92,42 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   })
 
   return cleaned
+}
+
+// 🔧 FUNZIONE NATIVA PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
+function formatDateTimeForInput(dateString: string): string {
+  if (!dateString) return ""
+  try {
+    const date = new Date(dateString)
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const minutes = Math.round(date.getMinutes() / 5) * 5
+    date.setMinutes(minutes)
+    date.setSeconds(0)
+    date.setMilliseconds(0)
+
+    // Formato per datetime-local: YYYY-MM-DDTHH:MM
+    return date.toISOString().slice(0, 16)
+  } catch (error) {
+    console.error("Errore nel formato data:", error)
+    return ""
+  }
+}
+
+function parseDateTimeFromInput(inputValue: string): string {
+  if (!inputValue) return ""
+  try {
+    const date = new Date(inputValue)
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const minutes = Math.round(date.getMinutes() / 5) * 5
+    date.setMinutes(minutes)
+    date.setSeconds(0)
+    date.setMilliseconds(0)
+
+    return date.toISOString()
+  } catch (error) {
+    console.error("Errore nel parsing data:", error)
+    return ""
+  }
 }
 
 // Configurazione dei campi per ogni tabella
@@ -451,7 +486,7 @@ export default function ItemDetailPage() {
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
-  // 🔧 CORREZIONE NAVIGAZIONE: Funzione per tornare alla lista con URL corretto
+  // Funzione per tornare alla lista con URL corretto
   const handleBackToList = useCallback(() => {
     console.log(`[ItemDetailPage] Navigazione corretta verso: /data-explorer?table=${tableName}`)
     router.push(`/data-explorer?table=${tableName}`)
@@ -854,15 +889,21 @@ export default function ItemDetailPage() {
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <EnhancedDatePicker
-              value={fieldValue || ""}
-              onChange={(value) => handleFieldChange(field, value)}
-              placeholder={`Seleziona ${field.replace(/_/g, " ")}`}
-              disabled={false}
-              className={hasError ? "border-red-500" : ""}
-              id={field}
-              showCurrentTime={field === "data_inizio" && !fieldValue}
-            />
+            <div className="relative">
+              <Input
+                id={field}
+                type="datetime-local"
+                value={formatDateTimeForInput(fieldValue)}
+                onChange={(e) => {
+                  const isoString = parseDateTimeFromInput(e.target.value)
+                  handleFieldChange(field, isoString)
+                }}
+                className={hasError ? "border-red-500" : ""}
+                step="300" // 5 minuti in secondi
+              />
+              <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            </div>
+            <p className="text-xs text-gray-500">I minuti verranno arrotondati ai multipli di 5</p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
         )
