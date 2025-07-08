@@ -28,8 +28,20 @@ import {
   Save,
   Edit,
   X,
+  Trash2,
   AlertCircle,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
@@ -1105,4 +1117,73 @@ export default function ItemDetailPage() {
             ) : (
               <>
                 <Button onClick={() => setIsEditMode(true)} variant="outline">
-                  <Edit className="\
+                  <Edit className="w-4 h-4 mr-2" />
+                  Modifica
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={deleting}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Elimina
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Sei sicuro di voler eliminare questo elemento? Questa azione non può essere annullata.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                        {deleting ? "Eliminazione..." : "Elimina"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Renderizza i campi nell'ordine specificato o in ordine alfabetico */}
+            {(fieldOrder.length > 0 ? fieldOrder : Object.keys(fieldTypes).sort()).map((field) => renderField(field))}
+          </div>
+
+          {/* Mostra i campi automatici in modalità visualizzazione */}
+          {!isEditMode && (
+            <div className="mt-8 pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-4 text-gray-700">Informazioni di sistema</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {autoFields.map((field) => {
+                  const fieldValue = formData[field]
+                  let displayValue = fieldValue
+
+                  if (fieldTypes[field] === "datetime" && fieldValue) {
+                    displayValue = formatDateTimeForDisplay(fieldValue)
+                  } else if (fieldTypes[field] === "boolean") {
+                    displayValue = fieldValue ? "Sì" : "No"
+                  }
+
+                  return (
+                    <div key={field} className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-600">
+                        {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+                      </Label>
+                      <div className="text-sm text-gray-800 bg-gray-50 p-2 rounded">{displayValue || "-"}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
