@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
-import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import {
   CheckCircle2,
   FileText,
@@ -428,12 +427,6 @@ export default function NewItemPage() {
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
-  // CORREZIONE NAVIGAZIONE: Funzione per tornare alla lista
-  const handleBackToList = useCallback(() => {
-    console.log(`[NewItemPage] Navigazione verso: /data-explorer?table=${tableName}`)
-    router.push(`/data-explorer?table=${tableName}`)
-  }, [router, tableName])
-
   // Funzione per caricare le opzioni di priorità da Supabase
   const loadPriorityOptions = useCallback(async () => {
     if (!supabase) return
@@ -504,8 +497,6 @@ export default function NewItemPage() {
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
-    console.log(`[NewItemPage] Campo ${field} modificato:`, value)
-
     setFormData((prev: any) => {
       const newData = { ...prev, [field]: value }
 
@@ -685,7 +676,7 @@ export default function NewItemPage() {
       if (data && data[0]) {
         router.push(`/data-explorer/${tableName}/${data[0].id}`)
       } else {
-        handleBackToList()
+        router.push(`/data-explorer/${tableName}`)
       }
     } catch (error: any) {
       console.error("Errore durante il salvataggio:", error)
@@ -767,17 +758,11 @@ export default function NewItemPage() {
               {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </Label>
-            <EnhancedDatePicker
-              value={fieldValue || ""}
-              onChange={(value) => {
-                console.log(`[NewItemPage] EnhancedDatePicker onChange per ${field}:`, value)
-                handleFieldChange(field, value)
-              }}
-              placeholder={`Seleziona ${field.replace(/_/g, " ")}`}
-              disabled={false}
-              className={hasError ? "border-red-500" : ""}
-              id={field}
-              showCurrentTime={field === "data_inizio" && !fieldValue}
+            <Input
+              {...commonProps}
+              type="datetime-local"
+              value={fieldValue ? new Date(fieldValue).toISOString().slice(0, 16) : ""}
+              onChange={(e) => handleFieldChange(field, e.target.value ? new Date(e.target.value).toISOString() : "")}
             />
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
@@ -921,7 +906,7 @@ export default function NewItemPage() {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <Button onClick={handleBackToList} variant="outline" className="mb-4 bg-transparent">
+        <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline" className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Torna alla lista
         </Button>
@@ -950,7 +935,7 @@ export default function NewItemPage() {
           </div>
 
           <div className="flex justify-end space-x-4 pt-6 border-t">
-            <Button onClick={handleBackToList} variant="outline">
+            <Button onClick={() => router.push(`/data-explorer/${tableName}`)} variant="outline">
               Annulla
             </Button>
             <Button onClick={handleSave} disabled={saving}>
