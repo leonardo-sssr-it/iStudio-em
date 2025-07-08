@@ -94,19 +94,25 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// 🔧 FUNZIONE NATIVA PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
+// 🔧 FUNZIONI NATIVE SENZA TIMEZONE PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
 function formatDateTimeForInput(dateString: string): string {
   if (!dateString) return ""
   try {
+    // Parsing della data ISO senza conversione timezone
     const date = new Date(dateString)
+
+    // Ottieni i componenti della data in locale (senza timezone)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    const hours = String(date.getHours()).padStart(2, "0")
+
     // Arrotonda i minuti al multiplo di 5 più vicino
     const minutes = Math.round(date.getMinutes() / 5) * 5
-    date.setMinutes(minutes)
-    date.setSeconds(0)
-    date.setMilliseconds(0)
+    const formattedMinutes = String(minutes).padStart(2, "0")
 
-    // Formato per datetime-local: YYYY-MM-DDTHH:MM
-    return date.toISOString().slice(0, 16)
+    // Formato per datetime-local: YYYY-MM-DDTHH:MM (senza timezone)
+    return `${year}-${month}-${day}T${hours}:${formattedMinutes}`
   } catch (error) {
     console.error("Errore nel formato data:", error)
     return ""
@@ -116,17 +122,53 @@ function formatDateTimeForInput(dateString: string): string {
 function parseDateTimeFromInput(inputValue: string): string {
   if (!inputValue) return ""
   try {
-    const date = new Date(inputValue)
-    // Arrotonda i minuti al multiplo di 5 più vicino
-    const minutes = Math.round(date.getMinutes() / 5) * 5
-    date.setMinutes(minutes)
-    date.setSeconds(0)
-    date.setMilliseconds(0)
+    // Parsing diretto del valore datetime-local (già in formato locale)
+    const [datePart, timePart] = inputValue.split("T")
+    const [year, month, day] = datePart.split("-").map(Number)
+    const [hours, minutes] = timePart.split(":").map(Number)
 
-    return date.toISOString()
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const roundedMinutes = Math.round(minutes / 5) * 5
+
+    // Crea la data in locale (senza conversione timezone)
+    const date = new Date(year, month - 1, day, hours, roundedMinutes, 0, 0)
+
+    // Converte in ISO string mantenendo il tempo locale
+    const isoString =
+      date.getFullYear() +
+      "-" +
+      String(date.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getDate()).padStart(2, "0") +
+      "T" +
+      String(date.getHours()).padStart(2, "0") +
+      ":" +
+      String(date.getMinutes()).padStart(2, "0") +
+      ":00.000Z"
+
+    return isoString
   } catch (error) {
     console.error("Errore nel parsing data:", error)
     return ""
+  }
+}
+
+// Funzione per formattare la data per la visualizzazione (senza timezone)
+function formatDateTimeForDisplay(dateString: string): string {
+  if (!dateString) return "-"
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleString("it-IT", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Rome", // Forza il timezone italiano per la visualizzazione
+    })
+  } catch (error) {
+    console.error("Errore nella formattazione per display:", error)
+    return "-"
   }
 }
 
@@ -816,7 +858,7 @@ export default function ItemDetailPage() {
     if (!isEditMode) {
       let displayValue = fieldValue
       if (fieldType === "datetime" && fieldValue) {
-        displayValue = new Date(fieldValue).toLocaleString("it-IT")
+        displayValue = formatDateTimeForDisplay(fieldValue)
       } else if (fieldType === "boolean") {
         displayValue = fieldValue ? "Sì" : "No"
       } else if (fieldType === "priority_select") {
@@ -903,7 +945,9 @@ export default function ItemDetailPage() {
               />
               <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
-            <p className="text-xs text-gray-500">I minuti verranno arrotondati ai multipli di 5</p>
+            <p className="text-xs text-gray-500">
+              ⏰ Minuti automaticamente arrotondati ai multipli di 5 (00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+            </p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
         )

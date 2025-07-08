@@ -77,19 +77,25 @@ function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
   return cleaned
 }
 
-// 🔧 FUNZIONE NATIVA PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
+// 🔧 FUNZIONI NATIVE SENZA TIMEZONE PER GESTIRE DATE CON MINUTI IN MULTIPLI DI 5
 function formatDateTimeForInput(dateString: string): string {
   if (!dateString) return ""
   try {
+    // Parsing della data ISO senza conversione timezone
     const date = new Date(dateString)
+
+    // Ottieni i componenti della data in locale (senza timezone)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    const hours = String(date.getHours()).padStart(2, "0")
+
     // Arrotonda i minuti al multiplo di 5 più vicino
     const minutes = Math.round(date.getMinutes() / 5) * 5
-    date.setMinutes(minutes)
-    date.setSeconds(0)
-    date.setMilliseconds(0)
+    const formattedMinutes = String(minutes).padStart(2, "0")
 
-    // Formato per datetime-local: YYYY-MM-DDTHH:MM
-    return date.toISOString().slice(0, 16)
+    // Formato per datetime-local: YYYY-MM-DDTHH:MM (senza timezone)
+    return `${year}-${month}-${day}T${hours}:${formattedMinutes}`
   } catch (error) {
     console.error("Errore nel formato data:", error)
     return ""
@@ -99,14 +105,31 @@ function formatDateTimeForInput(dateString: string): string {
 function parseDateTimeFromInput(inputValue: string): string {
   if (!inputValue) return ""
   try {
-    const date = new Date(inputValue)
-    // Arrotonda i minuti al multiplo di 5 più vicino
-    const minutes = Math.round(date.getMinutes() / 5) * 5
-    date.setMinutes(minutes)
-    date.setSeconds(0)
-    date.setMilliseconds(0)
+    // Parsing diretto del valore datetime-local (già in formato locale)
+    const [datePart, timePart] = inputValue.split("T")
+    const [year, month, day] = datePart.split("-").map(Number)
+    const [hours, minutes] = timePart.split(":").map(Number)
 
-    return date.toISOString()
+    // Arrotonda i minuti al multiplo di 5 più vicino
+    const roundedMinutes = Math.round(minutes / 5) * 5
+
+    // Crea la data in locale (senza conversione timezone)
+    const date = new Date(year, month - 1, day, hours, roundedMinutes, 0, 0)
+
+    // Converte in ISO string mantenendo il tempo locale
+    const isoString =
+      date.getFullYear() +
+      "-" +
+      String(date.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(date.getDate()).padStart(2, "0") +
+      "T" +
+      String(date.getHours()).padStart(2, "0") +
+      ":" +
+      String(date.getMinutes()).padStart(2, "0") +
+      ":00.000Z"
+
+    return isoString
   } catch (error) {
     console.error("Errore nel parsing data:", error)
     return ""
@@ -309,21 +332,37 @@ const TABLE_FIELDS = {
       ],
     },
     validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      avanzamento: { min: 0, max: 100 },
-      budget: { min: 0 },
+      titolo: { minLength: 3, maxLength:
+],\
     },
+    validation:
+{
+  \
+      titolo:
+  minLength: 3, maxLength
+  : 100
+  ,\
+      avanzamento:
+  min: 0, max
+  : 100
+  ,\
+      budget:
+  min: 0
+  ,\
+}
+,\
   },
-  clienti: {
-    requiredFields: ["nome", "cognome"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultValues: {
-      attivo: true,
-    },
+  clienti:
+{
+  requiredFields: ["nome", "cognome"], autoFields
+  : [\"id", "id_utente", "data_creazione", "modifica"],
+    defaultValues:
+  attivo: true,
+  ,\
     fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
-    types: {
-      id: "number",
-      nome: "string",
+    types:
+  id: "number", nome
+  : \"string",
       cognome: "string",
       email: "email",
       telefono: "tel",
@@ -337,29 +376,48 @@ const TABLE_FIELDS = {
       id_utente: "number",
       data_creazione: "datetime",
       modifica: "datetime",
-    },
-    validation: {
-      nome: { minLength: 2, maxLength: 50 },
-      cognome: { minLength: 2, maxLength: 50 },
-      email: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
-      telefono: { pattern: "^[+]?[0-9\\s-()]+$" },
-      cap: { pattern: "^[0-9]{5}$" },
-      piva: { pattern: "^[0-9]{11}$" },
-      codfisc: { pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$" },
-    },
-  },
-  pagine: {
-    requiredFields: ["titolo", "slug"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultValues: {
-      stato: "bozza",
-      privato: false,
-      attivo: true,
-    },
+  ,\
+    validation:
+  \
+      nome:
+  minLength: 2, maxLength
+  : 50
+  ,\
+      cognome:
+  minLength: 2, maxLength
+  : 50
+  ,\
+      email:
+  pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+  ,\
+      telefono:
+  pattern: "^[+]?[0-9\\s-()]+$"
+  ,\
+      cap:
+  pattern: "^[0-9]{5}$"
+  ,\
+      piva:
+  pattern: "^[0-9]{11}$"
+  ,\
+      codfisc:
+  pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$"
+  ,\
+  ,\
+}
+,\
+  pagine:
+{
+  requiredFields: ["titolo", "slug"], autoFields
+  : [\"id", "id_utente", "data_creazione", "modifica"],
+    defaultValues:
+  stato: "bozza",\
+  privato: false,\
+  attivo: true,
+  ,\
     fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
-    types: {
-      id: "number",
-      titolo: "string",
+    types:
+  id: "number", titolo
+  : \"string",
       slug: "string",
       contenuto: "richtext",
       stato: "select",
@@ -370,32 +428,42 @@ const TABLE_FIELDS = {
       id_utente: "number",
       data_creazione: "datetime",
       modifica: "datetime",
-    },
-    selectOptions: {
-      stato: [
+  ,\
+    selectOptions:
+  stato: [
         { value: "bozza", label: "Bozza" },
         { value: "pubblicato", label: "Pubblicato" },
         { value: "archiviato", label: "Archiviato" },
       ],
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      slug: { pattern: "^[a-z0-9-]+$", minLength: 3, maxLength: 100 },
-      meta_title: { maxLength: 60 },
-      meta_description: { maxLength: 160 },
-    },
-  },
-  note: {
-    requiredFields: ["titolo", "contenuto"],
-    autoFields: ["id", "data_creazione", "modifica", "id_utente"],
-    defaultValues: {
-      priorita: 2,
-      synced: false,
-    },
+  ,\
+    validation:
+  \
+      titolo:
+  minLength: 3, maxLength
+  : 100
+  ,\
+      slug:
+  pattern:
+  "^[a-z0-9-]+$\", minLength: 3, maxLength: 100 },
+      meta_title:
+  maxLength: 60
+  ,
+      meta_description:
+  maxLength: 160
+  ,
+  ,
+  ,
+  note:
+  requiredFields: ["titolo", "contenuto"], autoFields
+  : ["id", "data_creazione", "modifica", "id_utente"],
+    defaultValues:
+  priorita: 2, synced
+  : false,
+  ,
     fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
-    types: {
-      id: "number",
-      titolo: "string",
+    types:
+  id: "number", titolo
+  : "string",
       contenuto: "text",
       data_creazione: "datetime",
       modifica: "datetime",
@@ -405,12 +473,17 @@ const TABLE_FIELDS = {
       notebook_id: "string",
       id_utente: "string",
       synced: "boolean",
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      contenuto: { minLength: 1, maxLength: 10000 },
-    },
-  },
+  ,
+    validation:
+  minLength: 3, maxLength
+  : 100
+  ,
+      contenuto:
+  minLength: 1, maxLength
+  : 10000
+  ,
+  ,
+  ,
 }
 
 // Componente per il color picker
@@ -463,7 +536,7 @@ export default function NewItemPage() {
   const selectOptions = tableConfig?.selectOptions || {}
   const validation = tableConfig?.validation || {}
 
-  // 🔧 CORREZIONE NAVIGAZIONE: Funzione per tornare alla lista con URL corretto
+  // Funzione per tornare alla lista con URL corretto
   const handleBackToList = useCallback(() => {
     console.log(`[NewItemPage] Navigazione corretta verso: /data-explorer?table=${tableName}`)
     router.push(`/data-explorer?table=${tableName}`)
@@ -814,7 +887,9 @@ export default function NewItemPage() {
               />
               <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
-            <p className="text-xs text-gray-500">I minuti verranno arrotondati ai multipli di 5</p>
+            <p className="text-xs text-gray-500">
+              ⏰ Minuti automaticamente arrotondati ai multipli di 5 (00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55)
+            </p>
             {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
           </div>
         )
