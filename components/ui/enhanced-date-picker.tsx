@@ -19,6 +19,7 @@ interface EnhancedDatePickerProps {
   id?: string
   showCurrentTime?: boolean
   onDateTimeSet?: (endDateTime: string) => void
+  readOnly?: boolean // Nuovo prop per modalità sola lettura
 }
 
 // 🔧 FUNZIONI NATIVE SENZA TIMEZONE
@@ -68,6 +69,7 @@ export function EnhancedDatePicker({
   id,
   showCurrentTime = false,
   onDateTimeSet,
+  readOnly = false,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
@@ -77,6 +79,10 @@ export function EnhancedDatePicker({
 
   const [tempDate, setTempDate] = React.useState<Date | undefined>(value ? parseLocalISOString(value) : undefined)
   const [tempTime, setTempTime] = React.useState("")
+
+  // Il componente è effettivamente disabilitato solo se disabled è true
+  // readOnly permette di aprire il popover ma non di modificare
+  const isInteractionDisabled = disabled
 
   React.useEffect(() => {
     if (value) {
@@ -108,6 +114,8 @@ export function EnhancedDatePicker({
   }, [selectedDate])
 
   const handleDateSelect = (date: Date | undefined) => {
+    if (readOnly || isInteractionDisabled) return // Non permettere modifiche se readOnly o disabled
+
     if (date) {
       let currentHours, currentMinutes
       if (showCurrentTime && !value) {
@@ -142,6 +150,8 @@ export function EnhancedDatePicker({
   }
 
   const handleTimeChange = (timeString: string) => {
+    if (readOnly || isInteractionDisabled) return // Non permettere modifiche se readOnly o disabled
+
     if (timeString && timeString.includes(":")) {
       const [hours, minutes] = timeString.split(":").map(Number)
       const roundedMinutes = roundToNearestFiveMinutes(minutes)
@@ -153,6 +163,8 @@ export function EnhancedDatePicker({
   }
 
   const setCurrentDateTime = () => {
+    if (readOnly || isInteractionDisabled) return // Non permettere modifiche se readOnly o disabled
+
     const now = new Date()
     const minutes = roundToNearestFiveMinutes(now.getMinutes())
     const currentDate = createLocalDate(now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), minutes)
@@ -163,11 +175,18 @@ export function EnhancedDatePicker({
   }
 
   const clearDateTime = () => {
+    if (readOnly || isInteractionDisabled) return // Non permettere modifiche se readOnly o disabled
+
     setTempDate(undefined)
     setTempTime("")
   }
 
   const confirmSelection = () => {
+    if (readOnly || isInteractionDisabled) {
+      setOpen(false)
+      return // Non permettere modifiche se readOnly o disabled
+    }
+
     if (tempDate && tempTime && tempTime.match(/^\d{2}:\d{2}$/)) {
       const [hours, minutes] = tempTime.split(":").map(Number)
       const finalDate = createLocalDate(
@@ -216,10 +235,10 @@ export function EnhancedDatePicker({
   }
 
   React.useEffect(() => {
-    if (showCurrentTime && !value && open && !tempDate) {
+    if (showCurrentTime && !value && open && !tempDate && !readOnly && !isInteractionDisabled) {
       setCurrentDateTime()
     }
-  }, [showCurrentTime, value, open, tempDate])
+  }, [showCurrentTime, value, open, tempDate, readOnly, isInteractionDisabled])
 
   const modifiers = React.useMemo(() => {
     return {
@@ -251,8 +270,13 @@ export function EnhancedDatePicker({
           <Button
             id={id}
             variant="outline"
-            className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
-            disabled={disabled}
+            className={cn(
+              "w-full justify-start text-left font-normal",
+              !selectedDate && "text-muted-foreground",
+              readOnly && "cursor-pointer", // Permetti il click anche in readOnly
+              isInteractionDisabled && "cursor-not-allowed opacity-50", // Solo se veramente disabled
+            )}
+            disabled={isInteractionDisabled} // Solo se veramente disabled
           >
             {selectedDate ? (
               <div className="flex items-center justify-between w-full">
@@ -276,7 +300,7 @@ export function EnhancedDatePicker({
             mode="single"
             selected={tempDate}
             onSelect={handleDateSelect}
-            disabled={disabled}
+            disabled={readOnly || isInteractionDisabled} // Disabilita il calendario se readOnly o disabled
             initialFocus
             locale={it}
             modifiers={modifiers}
@@ -294,10 +318,10 @@ export function EnhancedDatePicker({
                   onChange={(e) => {
                     const hours = e.target.value
                     const minutes = tempTime.split(":")[1] || "00"
-                    setTempTime(`${hours}:${minutes}`)
+                    handleTimeChange(`${hours}:${minutes}`)
                   }}
                   className="px-2 py-1 border rounded text-sm"
-                  disabled={disabled || !tempDate}
+                  disabled={readOnly || isInteractionDisabled || !tempDate}
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i.toString().padStart(2, "0")}>
@@ -311,10 +335,10 @@ export function EnhancedDatePicker({
                   onChange={(e) => {
                     const hours = tempTime.split(":")[0] || "00"
                     const minutes = e.target.value
-                    setTempTime(`${hours}:${minutes}`)
+                    handleTimeChange(`${hours}:${minutes}`)
                   }}
                   className="px-2 py-1 border rounded text-sm"
-                  disabled={disabled || !tempDate}
+                  disabled={readOnly || isInteractionDisabled || !tempDate}
                 >
                   {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((minute) => (
                     <option key={minute} value={minute}>
@@ -324,27 +348,47 @@ export function EnhancedDatePicker({
                 </select>
               </div>
             </div>
-            <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-              ⏰ Minuti disponibili: 00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1 bg-transparent">
-                <Clock className="mr-2 h-4 w-4" />
-                Ora attuale
-              </Button>
-              <Button variant="outline" size="sm" onClick={clearDateTime} className="flex-1 bg-transparent">
-                Cancella
-              </Button>
-            </div>
-            <div className="flex gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1 bg-transparent">
-                Annulla
-              </Button>
-              <Button size="sm" onClick={confirmSelection} className="flex-1">
-                <Check className="mr-2 h-4 w-4" />
-                Conferma
-              </Button>
-            </div>
+
+            {readOnly ? (
+              <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                👁️ Modalità visualizzazione - Le modifiche non sono permesse
+              </p>
+            ) : (
+              <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                ⏰ Minuti disponibili: 00, 05, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+              </p>
+            )}
+
+            {!readOnly && !isInteractionDisabled && (
+              <>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={setCurrentDateTime} className="flex-1 bg-transparent">
+                    <Clock className="mr-2 h-4 w-4" />
+                    Ora attuale
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={clearDateTime} className="flex-1 bg-transparent">
+                    Cancella
+                  </Button>
+                </div>
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button variant="outline" size="sm" onClick={cancelSelection} className="flex-1 bg-transparent">
+                    Annulla
+                  </Button>
+                  <Button size="sm" onClick={confirmSelection} className="flex-1">
+                    <Check className="mr-2 h-4 w-4" />
+                    Conferma
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {readOnly && (
+              <div className="flex gap-2 pt-2 border-t">
+                <Button variant="outline" size="sm" onClick={cancelSelection} className="w-full bg-transparent">
+                  Chiudi
+                </Button>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>

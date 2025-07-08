@@ -6,7 +6,7 @@ import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -28,20 +28,8 @@ import {
   Save,
   Edit,
   X,
-  Trash2,
   AlertCircle,
 } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
@@ -877,7 +865,7 @@ export default function ItemDetailPage() {
               id={field}
               value={fieldValue || ""}
               onChange={(value) => handleFieldChange(field, value)}
-              disabled={!isEditMode}
+              readOnly={!isEditMode} // 🔧 USARE readOnly INVECE DI disabled
               showCurrentTime={field === "data_inizio" && !fieldValue}
               onDateTimeSet={
                 field === "data_inizio"
@@ -1117,54 +1105,4 @@ export default function ItemDetailPage() {
             ) : (
               <>
                 <Button onClick={() => setIsEditMode(true)} variant="outline">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Modifica
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Elimina
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Questa azione non può essere annullata. L'elemento verrà eliminato permanentemente dal database.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-                        {deleting ? "Eliminazione..." : "Elimina"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Icon className="w-5 h-5" />
-            <span>Dettagli {tableInfo?.label}</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {fieldOrder.length > 0
-              ? fieldOrder.map((field) => renderField(field))
-              : Object.keys(fieldTypes)
-                  .filter((field) => !autoFields.includes(field))
-                  .map((field) => renderField(field))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+                  <Edit className="\
