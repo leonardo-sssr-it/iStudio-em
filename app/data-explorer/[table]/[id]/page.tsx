@@ -46,6 +46,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { SimpleDateTest } from "@/components/ui/simple-date-test"
+import { NativePopoverTest } from "@/components/ui/native-popover-test"
 
 // Definizione delle tabelle disponibili
 const AVAILABLE_TABLES = [
@@ -1126,7 +1127,10 @@ export default function ItemDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <SimpleDateTest />
+          <div className="space-y-4">
+            <SimpleDateTest />
+            <NativePopoverTest />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {fieldOrder.length > 0
               ? fieldOrder.map((field) => renderField(field))
