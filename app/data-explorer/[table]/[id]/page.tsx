@@ -1,36 +1,19 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
-import { useSupabase } from "@/lib/supabase-provider"
-import { useAuth } from "@/lib/auth-provider"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "@/components/ui/use-toast"
-import { parseISO, formatISO } from "date-fns"
-import {
-  CheckCircle2,
-  FileText,
-  Settings,
-  Calendar,
-  CheckSquare,
-  Clock,
-  ListTodo,
-  Briefcase,
-  Users,
-  StickyNote,
-  ArrowLeft,
-  Save,
-  Edit,
-  X,
-  Trash2,
-  AlertCircle,
-} from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft, Save, Trash2, Edit, Eye, Calendar } from "lucide-react"
+import { toast } from "sonner"
+import { createClient } from "@/lib/supabase/client"
+import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,1146 +25,372 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 
-// Definizione delle tabelle disponibili
-const AVAILABLE_TABLES = [
-  { id: "appuntamenti", label: "Appuntamenti", icon: Calendar },
-  { id: "attivita", label: "Attività", icon: CheckSquare },
-  { id: "scadenze", label: "Scadenze", icon: Clock },
-  { id: "todolist", label: "To-Do List", icon: ListTodo },
-  { id: "progetti", label: "Progetti", icon: Briefcase },
-  { id: "clienti", label: "Clienti", icon: Users },
-  { id: "pagine", label: "Pagine", icon: FileText },
-  { id: "note", label: "Note", icon: StickyNote },
-]
-
-// Funzione per pulire i dati prima del salvataggio
-function cleanDataForSave(data: any, readOnlyFields: string[] = []): any {
-  const cleaned = { ...data }
-
-  readOnlyFields.forEach((field) => {
-    if (field !== "id_utente") {
-      delete cleaned[field]
-    }
-  })
-
-  Object.keys(cleaned).forEach((key) => {
-    const value = cleaned[key]
-
-    if (value === undefined) {
-      delete cleaned[key]
-      return
-    }
-
-    if (value === "undefined") {
-      delete cleaned[key]
-      return
-    }
-
-    if (typeof value === "string") {
-      if (value.trim() === "") {
-        cleaned[key] = null
-      }
-    }
-
-    if (typeof value === "number" && isNaN(value)) {
-      delete cleaned[key]
-    }
-  })
-
-  return cleaned
-}
-
-// Funzione per formattare la data per la visualizzazione (senza timezone)
-function formatDateTimeForDisplay(dateString: string): string {
-  if (!dateString) return "-"
-  try {
-    const date = new Date(dateString)
-    return date.toLocaleString("it-IT", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Rome",
-    })
-  } catch (error) {
-    console.error("Errore nella formattazione per display:", error)
-    return "-"
-  }
-}
-
-// Configurazione dei campi per ogni tabella
-const TABLE_FIELDS = {
+// Configurazione dei tipi di campo per tabella
+const TABLE_CONFIGS: Record<
+  string,
+  Record<string, { type: string; label: string; required?: boolean; readOnly?: boolean }>
+> = {
   appuntamenti: {
-    requiredFields: ["titolo", "data_inizio"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
-    defaultValues: {
-      stato: "pianificato",
-      attivo: true,
-    },
-    fieldGroups: {
-      principale: {
-        title: "Informazioni Principali",
-        icon: FileText,
-        fields: ["titolo", "descrizione", "stato"],
-      },
-      date: {
-        title: "Date e Orari",
-        icon: Calendar,
-        fields: ["data_inizio", "data_fine"],
-      },
-      dettagli: {
-        title: "Dettagli Aggiuntivi",
-        icon: Settings,
-        fields: ["luogo", "note", "tags"],
-      },
-    },
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      data_inizio: "datetime",
-      data_fine: "datetime",
-      stato: "select",
-      priorita: "priority_select",
-      note: "text",
-      luogo: "string",
-      tags: "tags",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    selectOptions: {
-      stato: [
-        { value: "pianificato", label: "Pianificato" },
-        { value: "in_corso", label: "In corso" },
-        { value: "completato", label: "Completato" },
-        { value: "annullato", label: "Annullato" },
-      ],
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-    },
-  },
-  attivita: {
-    requiredFields: ["titolo", "data_inizio"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
-    defaultValues: {
-      stato: "da_fare",
-      priorita: 3,
-      attivo: true,
-    },
-    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "note"],
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      data_inizio: "datetime",
-      data_fine: "datetime",
-      stato: "select",
-      priorita: "priority_select",
-      note: "text",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    selectOptions: {
-      stato: [
-        { value: "da_fare", label: "Da fare" },
-        { value: "in_corso", label: "In corso" },
-        { value: "completato", label: "Completato" },
-        { value: "sospeso", label: "Sospeso" },
-      ],
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      priorita: { min: 1, max: 5 },
-    },
-  },
-  scadenze: {
-    requiredFields: ["titolo", "scadenza"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultValues: {
-      stato: "attivo",
-      privato: false,
-      attivo: true,
-    },
-    fieldOrder: ["titolo", "descrizione", "scadenza", "stato", "note"],
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      scadenza: "datetime",
-      stato: "select",
-      note: "text",
-      privato: "boolean",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    selectOptions: {
-      stato: [
-        { value: "attivo", label: "Attivo" },
-        { value: "completato", label: "Completato" },
-        { value: "scaduto", label: "Scaduto" },
-      ],
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-    },
-  },
-  todolist: {
-    requiredFields: ["titolo", "descrizione"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultValues: {
-      completato: false,
-      priorita: 3,
-    },
-    fieldOrder: ["titolo", "descrizione", "scadenza", "priorita", "completato", "note"],
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      completato: "boolean",
-      priorita: "priority_select",
-      scadenza: "datetime",
-      note: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      descrizione: { minLength: 3, maxLength: 500 },
-      priorita: { min: 1, max: 5 },
-    },
-  },
-  progetti: {
-    requiredFields: ["titolo", "data_inizio"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica", "attivo"],
-    defaultValues: {
-      stato: "pianificato",
-      attivo: true,
-      avanzamento: 0,
-      colore: "#3B82F6",
-    },
-    fieldOrder: [
-      "titolo",
-      "descrizione",
-      "stato",
-      "colore",
-      "gruppo",
-      "budget",
-      "data_inizio",
-      "data_fine",
-      "avanzamento",
-      "note",
-    ],
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      stato: "select",
-      colore: "color",
-      gruppo: "string",
-      budget: "number",
-      data_inizio: "datetime",
-      data_fine: "datetime",
-      avanzamento: "number",
-      note: "text",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    selectOptions: {
-      stato: [
-        { value: "pianificato", label: "Pianificato" },
-        { value: "in_corso", label: "In corso" },
-        { value: "completato", label: "Completato" },
-        { value: "sospeso", label: "Sospeso" },
-      ],
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      avanzamento: { min: 0, max: 100 },
-      budget: { min: 0 },
-    },
-  },
-  clienti: {
-    requiredFields: ["nome", "cognome"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultValues: {
-      attivo: true,
-    },
-    fieldOrder: ["nome", "cognome", "email", "telefono", "citta", "indirizzo", "cap", "piva", "codfisc", "note"],
-    types: {
-      id: "number",
-      nome: "string",
-      cognome: "string",
-      email: "email",
-      telefono: "tel",
-      citta: "string",
-      indirizzo: "string",
-      cap: "string",
-      piva: "string",
-      codfisc: "string",
-      note: "text",
-      attivo: "boolean",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    validation: {
-      nome: { minLength: 2, maxLength: 50 },
-      cognome: { minLength: 2, maxLength: 50 },
-      email: { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" },
-      telefono: { pattern: "^[+]?[0-9\\s-()]+$" },
-      cap: { pattern: "^[0-9]{5}$" },
-      piva: { pattern: "^[0-9]{11}$" },
-      codfisc: { pattern: "^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$" },
-    },
-  },
-  pagine: {
-    requiredFields: ["titolo", "slug"],
-    autoFields: ["id", "id_utente", "data_creazione", "modifica"],
-    defaultValues: {
-      stato: "bozza",
-      privato: false,
-      attivo: true,
-    },
-    fieldOrder: ["titolo", "slug", "contenuto", "stato", "privato", "meta_title", "meta_description"],
-    types: {
-      id: "number",
-      titolo: "string",
-      slug: "string",
-      contenuto: "richtext",
-      stato: "select",
-      privato: "boolean",
-      attivo: "boolean",
-      meta_title: "string",
-      meta_description: "text",
-      id_utente: "number",
-      data_creazione: "datetime",
-      modifica: "datetime",
-    },
-    selectOptions: {
-      stato: [
-        { value: "bozza", label: "Bozza" },
-        { value: "pubblicato", label: "Pubblicato" },
-        { value: "archiviato", label: "Archiviato" },
-      ],
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      slug: { pattern: "^[a-z0-9-]+$", minLength: 3, maxLength: 100 },
-      meta_title: { maxLength: 60 },
-      meta_description: { maxLength: 160 },
-    },
+    id: { type: "number", label: "ID", readOnly: true },
+    titolo: { type: "text", label: "Titolo", required: true },
+    descrizione: { type: "textarea", label: "Descrizione" },
+    data_inizio: { type: "datetime", label: "Data Inizio", required: true },
+    data_fine: { type: "datetime", label: "Data Fine" },
+    luogo: { type: "text", label: "Luogo" },
+    partecipanti: { type: "textarea", label: "Partecipanti" },
+    stato: { type: "text", label: "Stato" },
+    priorita: { type: "text", label: "Priorità" },
+    note: { type: "textarea", label: "Note" },
+    created_at: { type: "datetime", label: "Creato il", readOnly: true },
+    updated_at: { type: "datetime", label: "Aggiornato il", readOnly: true },
   },
   note: {
-    requiredFields: ["titolo", "contenuto"],
-    autoFields: ["id", "data_creazione", "modifica", "id_utente"],
-    defaultValues: {
-      priorita: 2,
-      synced: false,
-    },
-    fieldOrder: ["titolo", "contenuto", "tags", "priorita", "notifica", "notebook_id"],
-    types: {
-      id: "number",
-      titolo: "string",
-      contenuto: "text",
-      data_creazione: "datetime",
-      modifica: "datetime",
-      tags: "array",
-      priorita: "priority_select",
-      notifica: "datetime",
-      notebook_id: "string",
-      id_utente: "string",
-      synced: "boolean",
-    },
-    validation: {
-      titolo: { minLength: 3, maxLength: 100 },
-      contenuto: { minLength: 1, maxLength: 10000 },
-    },
+    id: { type: "number", label: "ID", readOnly: true },
+    titolo: { type: "text", label: "Titolo", required: true },
+    contenuto: { type: "textarea", label: "Contenuto" },
+    categoria: { type: "text", label: "Categoria" },
+    tags: { type: "text", label: "Tags" },
+    pubblico: { type: "boolean", label: "Pubblico" },
+    created_at: { type: "datetime", label: "Creato il", readOnly: true },
+    updated_at: { type: "datetime", label: "Aggiornato il", readOnly: true },
+  },
+  pagine: {
+    id: { type: "number", label: "ID", readOnly: true },
+    titolo: { type: "text", label: "Titolo", required: true },
+    contenuto: { type: "textarea", label: "Contenuto" },
+    slug: { type: "text", label: "Slug" },
+    pubblicato: { type: "boolean", label: "Pubblicato" },
+    meta_description: { type: "textarea", label: "Meta Description" },
+    created_at: { type: "datetime", label: "Creato il", readOnly: true },
+    updated_at: { type: "datetime", label: "Aggiornato il", readOnly: true },
   },
 }
 
-// Componente per il color picker
-const ColorPicker = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
-  return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-      <Input
-        type="color"
-        value={value || "#000000"}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full sm:w-20 h-10 p-1 cursor-pointer"
-      />
-      <Input
-        type="text"
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="#000000"
-        className="w-full sm:flex-1"
-        pattern="^#[0-9A-Fa-f]{6}$"
-      />
-    </div>
-  )
+interface RecordData {
+  [key: string]: any
 }
 
-// Componente principale
-export default function ItemDetailPage() {
-  const { supabase } = useSupabase()
-  const { user } = useAuth()
-  const router = useRouter()
+export default function RecordDetailPage() {
   const params = useParams()
-  const searchParams = useSearchParams()
-
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const router = useRouter()
+  const [record, setRecord] = useState<RecordData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [formData, setFormData] = useState<any>({})
-  const [originalData, setOriginalData] = useState<any>({})
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [priorityOptions, setPriorityOptions] = useState<any[]>([])
-  const [isEditMode, setIsEditMode] = useState<boolean>(searchParams.get("edit") === "true")
+  const [saving, setSaving] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [formData, setFormData] = useState<RecordData>({})
 
-  // Estrai il nome della tabella e l'ID
-  const tableName = Array.isArray(params.table) ? params.table[0] : params.table
-  const itemId = Array.isArray(params.id) ? params.id[0] : params.id
+  const tableName = params.table as string
+  const recordId = params.id as string
+  const isNewRecord = recordId === "new"
 
-  // Verifica che la tabella sia valida
-  const isValidTable = AVAILABLE_TABLES.some((table) => table.id === tableName)
+  const supabase = createClient()
 
-  // Ottieni la configurazione della tabella
-  const tableConfig = TABLE_FIELDS[tableName as keyof typeof TABLE_FIELDS]
-  const requiredFields = tableConfig?.requiredFields || []
-  const autoFields = tableConfig?.autoFields || []
-  const defaultValues = tableConfig?.defaultValues || {}
-  const fieldOrder = tableConfig?.fieldOrder || []
-  const fieldTypes = tableConfig?.types || {}
-  const selectOptions = tableConfig?.selectOptions || {}
-  const validation = tableConfig?.validation || {}
-
-  // Funzione per tornare alla lista con URL corretto
-  const handleBackToList = useCallback(() => {
-    console.log(`[ItemDetailPage] Navigazione corretta verso: /data-explorer?table=${tableName}`)
-    router.push(`/data-explorer?table=${tableName}`)
-  }, [router, tableName])
-
-  // Funzione per caricare le opzioni di priorità da Supabase
-  const loadPriorityOptions = useCallback(async () => {
-    if (!supabase) return
-    try {
-      const { data, error } = await supabase.from("configurazione").select("priorita").single()
-      if (error) throw error
-      let priorityArray = null
-      if (data?.priorita) {
-        if (Array.isArray(data.priorita)) priorityArray = data.priorita
-        else if (data.priorita.priorità && Array.isArray(data.priorita.priorità)) priorityArray = data.priorita.priorità
-        else if (data.priorita.priorita && Array.isArray(data.priorita.priorita)) priorityArray = data.priorita.priorita
-      }
-      if (!priorityArray || priorityArray.length === 0) {
-        setPriorityOptions([])
-        return
-      }
-      const mappedPriorities = priorityArray.map((item: any) => ({
-        value: item.livello || item.value,
-        nome: item.nome || item.label || `Priorità ${item.livello || item.value}`,
-        descrizione: item.descrizione || item.description || "",
-      }))
-      setPriorityOptions(mappedPriorities)
-    } catch (error: any) {
-      console.error("Errore nel caricamento delle priorità:", error)
-      setPriorityOptions([])
-    }
-  }, [supabase])
-
-  // Carica le opzioni di priorità all'avvio
+  // Carica il record esistente
   useEffect(() => {
-    if (supabase) {
-      loadPriorityOptions()
-    }
-  }, [supabase, loadPriorityOptions])
-
-  // Carica i dati dell'elemento
-  const loadItem = useCallback(async () => {
-    if (!supabase || !tableName || !itemId || !isValidTable) return
-
-    setLoading(true)
-    try {
-      let query = supabase.from(tableName).select("*").eq("id", itemId)
-
-      if (tableName !== "utenti" && user?.id) {
-        query = query.eq("id_utente", user.id)
-      }
-
-      const { data, error } = await query.single()
-
-      if (error) throw error
-
-      setFormData(data)
-      setOriginalData(data)
-    } catch (error: any) {
-      console.error("Errore nel caricamento dell'elemento:", error)
-      toast({
-        title: "Errore",
-        description: `Impossibile caricare l'elemento: ${error.message}`,
-        variant: "destructive",
-      })
-      handleBackToList()
-    } finally {
+    if (isNewRecord) {
+      setEditMode(true)
       setLoading(false)
-    }
-  }, [supabase, tableName, itemId, user?.id, isValidTable, handleBackToList])
-
-  useEffect(() => {
-    if (supabase && tableName && itemId && isValidTable) {
-      loadItem()
-    }
-  }, [supabase, loadItem, tableName, itemId, isValidTable])
-
-  // Gestisce il cambio di un campo
-  const handleFieldChange = (field: string, value: any) => {
-    console.log(`[ItemDetailPage] Campo ${field} modificato:`, value)
-
-    setFormData((prev: any) => {
-      const newData = { ...prev, [field]: value }
-
-      // Preimposta data_fine se data_inizio cambia e data_fine è vuota o non impostata
-      if (field === "data_inizio" && value) {
-        try {
-          const startDate = parseISO(value)
-          if (!newData.data_fine) {
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000)
-            newData.data_fine = formatISO(endDate)
-          }
-        } catch (e) {
-          console.warn("Data inizio non valida per calcolare data fine:", value)
+      // Inizializza con valori di default
+      const defaultData: RecordData = {}
+      const config = TABLE_CONFIGS[tableName] || {}
+      Object.entries(config).forEach(([field, fieldConfig]) => {
+        if (fieldConfig.type === "boolean") {
+          defaultData[field] = false
+        } else if (fieldConfig.type === "datetime" && field.includes("data_inizio")) {
+          // Per data_inizio, usa l'ora corrente arrotondata
+          defaultData[field] = new Date().toISOString()
         }
-      }
-      return newData
-    })
-
-    // Rimuovi l'errore quando il campo viene modificato
-    if (errors[field]) {
-      setErrors((prevErrors) => {
-        const newErrors = { ...prevErrors }
-        delete newErrors[field]
-        return newErrors
       })
-    }
-
-    // Validazione in tempo reale per alcuni campi
-    validateField(field, value)
-  }
-
-  // Valida un singolo campo
-  const validateField = (field: string, value: any): boolean => {
-    const rules = validation[field]
-    if (!rules) return true
-
-    let error = ""
-
-    // Validazione lunghezza minima
-    if (rules.minLength && (!value || value.length < rules.minLength)) {
-      error = `Minimo ${rules.minLength} caratteri`
-    }
-
-    // Validazione lunghezza massima
-    if (rules.maxLength && value && value.length > rules.maxLength) {
-      error = `Massimo ${rules.maxLength} caratteri`
-    }
-
-    // Validazione valore minimo
-    if (rules.min !== undefined && value < rules.min) {
-      error = `Valore minimo: ${rules.min}`
-    }
-
-    // Validazione valore massimo
-    if (rules.max !== undefined && value > rules.max) {
-      error = `Valore massimo: ${rules.max}`
-    }
-
-    // Validazione pattern
-    if (rules.pattern && value) {
-      const regex = new RegExp(rules.pattern)
-      if (!regex.test(value)) {
-        error = getPatternErrorMessage(field, fieldTypes[field])
-      }
-    }
-
-    if (error) {
-      setErrors((prev) => ({ ...prev, [field]: error }))
-      return false
-    }
-
-    return true
-  }
-
-  // Ottieni il messaggio di errore per il pattern
-  const getPatternErrorMessage = (field: string, type: string): string => {
-    switch (type) {
-      case "email":
-        return "Email non valida"
-      case "tel":
-        return "Numero di telefono non valido"
-      case "string":
-        if (field === "slug") return "Solo lettere minuscole, numeri e trattini"
-        if (field === "cap") return "CAP deve essere di 5 cifre"
-        if (field === "piva") return "P.IVA deve essere di 11 cifre"
-        if (field === "codfisc") return "Codice fiscale non valido"
-        return "Formato non valido"
-      default:
-        return "Formato non valido"
-    }
-  }
-
-  // Valida tutti i campi
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {}
-
-    // Controlla i campi richiesti
-    requiredFields.forEach((field) => {
-      if (!formData[field] || (typeof formData[field] === "string" && !formData[field].trim())) {
-        newErrors[field] = "Campo obbligatorio"
-      }
-    })
-
-    // Valida tutti i campi con regole
-    Object.keys(formData).forEach((field) => {
-      if (!autoFields.includes(field) && !validateField(field, formData[field])) {
-        // L'errore è già stato impostato da validateField
-      }
-    })
-
-    // Validazioni speciali
-    if (tableName === "appuntamenti" || tableName === "attivita" || tableName === "progetti") {
-      if (formData.data_fine && formData.data_inizio && new Date(formData.data_fine) < new Date(formData.data_inizio)) {
-        newErrors.data_fine = "La data di fine deve essere successiva alla data di inizio"
-      }
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  // Salva le modifiche
-  const handleSave = async () => {
-    if (!supabase || !tableName || !user?.id || !isValidTable) return
-
-    // Valida il form
-    if (!validateForm()) {
-      toast({
-        title: "Errore di validazione",
-        description: "Controlla i campi evidenziati in rosso",
-        variant: "destructive",
-      })
+      setFormData(defaultData)
       return
     }
 
+    const fetchRecord = async () => {
+      try {
+        const { data, error } = await supabase.from(tableName).select("*").eq("id", recordId).single()
+
+        if (error) throw error
+
+        setRecord(data)
+        setFormData(data)
+      } catch (error) {
+        console.error("Error fetching record:", error)
+        toast.error("Errore nel caricamento del record")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRecord()
+  }, [tableName, recordId, isNewRecord, supabase])
+
+  const handleSave = async () => {
     setSaving(true)
     try {
-      // Prepara i dati da salvare usando la funzione di pulizia
-      const dataToSave = cleanDataForSave(formData, autoFields)
+      // Prepara i dati per il salvataggio
+      const saveData = { ...formData }
 
-      // Aggiorna i campi di sistema
-      dataToSave.modifica = new Date().toISOString()
-
-      console.log(`Aggiornamento elemento in tabella: ${tableName}`, dataToSave)
-
-      // Aggiorna nel database
-      const { data, error } = await supabase.from(tableName).update(dataToSave).eq("id", itemId).select()
-
-      if (error) {
-        console.error("Errore aggiornamento:", error)
-
-        // Gestisci errori specifici del database
-        let errorMessage = error.message
-        if (error.message.includes("check constraint")) {
-          if (error.message.includes("descrizione_check")) {
-            errorMessage =
-              "La descrizione non rispetta i requisiti del database. Assicurati che sia compilata correttamente."
-          }
-        }
-
-        throw new Error(errorMessage)
+      // Rimuovi campi readonly per gli update
+      if (!isNewRecord) {
+        delete saveData.id
+        delete saveData.created_at
+        delete saveData.updated_at
       }
 
-      toast({
-        title: "Elemento aggiornato con successo!",
-        description: "Le modifiche sono state salvate nel database",
-        action: (
-          <div className="flex items-center">
-            <CheckCircle2 className="w-4 h-4 text-green-500" />
-          </div>
-        ),
-      })
-
-      // Aggiorna i dati locali
-      if (data && data[0]) {
-        setFormData(data[0])
-        setOriginalData(data[0])
+      let result
+      if (isNewRecord) {
+        result = await supabase.from(tableName).insert([saveData]).select().single()
+      } else {
+        result = await supabase.from(tableName).update(saveData).eq("id", recordId).select().single()
       }
-      setIsEditMode(false)
-      setErrors({})
-    } catch (error: any) {
-      console.error("Errore durante il salvataggio:", error)
-      toast({
-        title: "Errore durante il salvataggio",
-        description: error.message || "Si è verificato un errore imprevisto",
-        variant: "destructive",
-      })
+
+      if (result.error) throw result.error
+
+      setRecord(result.data)
+      setFormData(result.data)
+      setEditMode(false)
+
+      toast.success(isNewRecord ? "Record creato con successo" : "Record aggiornato con successo")
+
+      if (isNewRecord) {
+        router.replace(`/data-explorer/${tableName}/${result.data.id}`)
+      }
+    } catch (error) {
+      console.error("Error saving record:", error)
+      toast.error("Errore nel salvataggio del record")
     } finally {
       setSaving(false)
     }
   }
 
-  // Annulla le modifiche
-  const handleCancelEdit = () => {
-    setFormData(originalData)
-    setIsEditMode(false)
-    setErrors({})
-  }
-
-  // Elimina l'elemento
   const handleDelete = async () => {
-    if (!supabase || !tableName || !itemId || !isValidTable) return
+    if (isNewRecord) return
 
-    setDeleting(true)
     try {
-      const { error } = await supabase.from(tableName).delete().eq("id", itemId)
+      const { error } = await supabase.from(tableName).delete().eq("id", recordId)
 
       if (error) throw error
 
-      toast({
-        title: "Elemento eliminato con successo!",
-        description: "L'elemento è stato rimosso dal database",
-      })
-
-      handleBackToList()
-    } catch (error: any) {
-      console.error("Errore durante l'eliminazione:", error)
-      toast({
-        title: "Errore durante l'eliminazione",
-        description: error.message || "Si è verificato un errore imprevisto",
-        variant: "destructive",
-      })
-    } finally {
-      setDeleting(false)
+      toast.success("Record eliminato con successo")
+      router.push(`/data-explorer`)
+    } catch (error) {
+      console.error("Error deleting record:", error)
+      toast.error("Errore nell'eliminazione del record")
     }
   }
 
-  // Renderizza un campo del form
-  const renderField = (field: string) => {
-    const fieldType = fieldTypes[field]
-    const fieldValue = formData[field]
-    const hasError = !!errors[field]
-    const isRequired = requiredFields.includes(field)
+  const handleFieldChange = (field: string, value: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
 
-    // Non renderizzare i campi automatici
-    if (autoFields.includes(field)) return null
-
-    const commonProps = {
-      id: field,
-      value: fieldValue || "",
-      onChange: (e: any) => handleFieldChange(field, e.target.value),
-      className: hasError ? "border-red-500" : "",
+    // Auto-set data_fine quando viene impostata data_inizio
+    if (field === "data_inizio" && value && !formData.data_fine) {
+      const startDate = new Date(value)
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000) // +1 ora
+      setFormData((prev) => ({
+        ...prev,
+        data_fine: endDate.toISOString(),
+      }))
     }
+  }
 
-    // Se non siamo in modalità modifica, mostra solo il valore
-    if (!isEditMode) {
-      let displayValue = fieldValue
-      if (fieldType === "datetime" && fieldValue) {
-        displayValue = formatDateTimeForDisplay(fieldValue)
-      } else if (fieldType === "boolean") {
-        displayValue = fieldValue ? "Sì" : "No"
-      } else if (fieldType === "priority_select") {
-        const priorityOption = priorityOptions.find((option) => option.value === fieldValue)
-        displayValue = priorityOption ? priorityOption.nome : fieldValue
-      } else if (fieldType === "select") {
-        const options = selectOptions[field] || []
-        const selectedOption = options.find((option: any) => option.value === fieldValue)
-        displayValue = selectedOption ? selectedOption.label : fieldValue
-      }
+  const renderField = (field: string, fieldConfig: any, value: any) => {
+    const isReadOnly = fieldConfig.readOnly || (!editMode && !isNewRecord)
 
-      return (
-        <div key={field} className="space-y-2">
-          <Label className="text-sm font-medium">
-            {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-          </Label>
-          <div className="mt-1 p-2 rounded-md bg-gray-50">{displayValue || "-"}</div>
-        </div>
-      )
-    }
-
-    switch (fieldType) {
-      case "string":
-      case "email":
-      case "tel":
-        return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Input {...commonProps} type={fieldType === "email" ? "email" : fieldType === "tel" ? "tel" : "text"} />
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
-        )
-
-      case "text":
-      case "richtext":
-        return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Textarea {...commonProps} rows={fieldType === "richtext" ? 8 : 4} />
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
-        )
-
-      case "number":
-        return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Input
-              {...commonProps}
-              type="number"
-              onChange={(e) => handleFieldChange(field, Number.parseFloat(e.target.value) || 0)}
-            />
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
-        )
-
+    switch (fieldConfig.type) {
       case "datetime":
         return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <EnhancedDatePicker
-              id={field}
-              value={fieldValue || ""}
-              onChange={isEditMode ? (value) => handleFieldChange(field, value) : () => {}}
-              readOnly={!isEditMode}
-              disabled={false}
-              showCurrentTime={field === "data_inizio" && !fieldValue && isEditMode}
-              onDateTimeSet={
-                field === "data_inizio" && isEditMode
-                  ? (endDateTime) => {
-                      if (!formData.data_fine) {
-                        handleFieldChange("data_fine", endDateTime)
-                      }
-                    }
-                  : undefined
-              }
-            />
-            <p className="text-xs text-gray-500">
-              ⏰ Orario locale senza timezone. Minuti in multipli di 5.
-              {field === "data_inizio" && isEditMode && " Data fine verrà impostata automaticamente (+1 ora)."}
-              {!isEditMode && " Clicca per visualizzare il calendario."}
-            </p>
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
+          <EnhancedDatePicker
+            value={value || ""}
+            onChange={(newValue) => handleFieldChange(field, newValue)}
+            readOnly={isReadOnly}
+            showCurrentTime={field.includes("data_inizio")}
+            onDateTimeSet={field === "data_inizio" ? (dateTime) => handleFieldChange("data_fine", dateTime) : undefined}
+            placeholder={`Seleziona ${fieldConfig.label.toLowerCase()}`}
+          />
         )
 
       case "boolean":
         return (
-          <div key={field} className="flex items-center space-x-2">
-            <Checkbox
-              id={field}
-              checked={!!fieldValue}
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={value || false}
               onCheckedChange={(checked) => handleFieldChange(field, checked)}
+              disabled={isReadOnly}
             />
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-            </Label>
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
+            <span className="text-sm text-muted-foreground">{value ? "Sì" : "No"}</span>
           </div>
         )
 
-      case "select":
-        const options = selectOptions[field] || []
+      case "textarea":
         return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Select value={fieldValue || ""} onValueChange={(value) => handleFieldChange(field, value)}>
-              <SelectTrigger className={hasError ? "border-red-500" : ""}>
-                <SelectValue placeholder="Seleziona..." />
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
+          <Textarea
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            readOnly={isReadOnly}
+            rows={4}
+            className={isReadOnly ? "bg-muted" : ""}
+          />
         )
 
-      case "priority_select":
+      case "number":
         return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            {priorityOptions.length > 0 ? (
-              <Select
-                value={fieldValue?.toString() || ""}
-                onValueChange={(value) => handleFieldChange(field, Number.parseInt(value))}
-              >
-                <SelectTrigger className={hasError ? "border-red-500" : ""}>
-                  <SelectValue placeholder="Seleziona priorità..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {priorityOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value.toString()}>
-                      {option.nome}
-                      {option.descrizione && <span className="text-sm text-gray-500 ml-2">({option.descrizione})</span>}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="mt-1 p-2 border border-red-300 bg-red-50 rounded-md text-red-600 text-sm">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Impossibile caricare le opzioni di priorità. Verificare la configurazione.</span>
-                </div>
-                <Button variant="outline" size="sm" className="mt-2 bg-transparent" onClick={loadPriorityOptions}>
-                  Riprova caricamento
-                </Button>
-              </div>
-            )}
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
-        )
-
-      case "color":
-        return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <ColorPicker value={fieldValue || ""} onChange={(value) => handleFieldChange(field, value)} />
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
+          <Input
+            type="number"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            readOnly={isReadOnly}
+            className={isReadOnly ? "bg-muted" : ""}
+          />
         )
 
       default:
         return (
-          <div key={field} className="space-y-2">
-            <Label htmlFor={field} className={hasError ? "text-red-500" : ""}>
-              {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Input {...commonProps} />
-            {hasError && <p className="text-sm text-red-500">{errors[field]}</p>}
-          </div>
+          <Input
+            type="text"
+            value={value || ""}
+            onChange={(e) => handleFieldChange(field, e.target.value)}
+            readOnly={isReadOnly}
+            className={isReadOnly ? "bg-muted" : ""}
+          />
         )
     }
-  }
-
-  // Se la tabella non è valida, mostra un errore
-  if (!isValidTable) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-red-600 mb-4">Tabella non trovata</h1>
-              <p className="text-gray-600 mb-4">La tabella "{tableName}" non è disponibile.</p>
-              <Button onClick={() => router.push("/data-explorer")} variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Torna al Data Explorer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Se non c'è configurazione per la tabella
-  if (!tableConfig) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-red-600 mb-4">Configurazione mancante</h1>
-              <p className="text-gray-600 mb-4">La configurazione per la tabella "{tableName}" non è disponibile.</p>
-              <Button onClick={() => router.push("/data-explorer")} variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Torna al Data Explorer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-32" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-1/3"></div>
+          <div className="h-64 bg-muted rounded"></div>
+        </div>
       </div>
     )
   }
 
-  const tableInfo = AVAILABLE_TABLES.find((table) => table.id === tableName)
-  const Icon = tableInfo?.icon || FileText
-
-  const getItemTitle = () => {
-    if (formData.titolo) return formData.titolo
-    if (formData.username) return formData.username
-    if (formData.nome) return formData.cognome ? `${formData.nome} ${formData.cognome}` : formData.nome
-    return `ID: ${itemId}`
-  }
+  const config = TABLE_CONFIGS[tableName] || {}
+  const title = isNewRecord ? `Nuovo ${tableName}` : `${tableName} #${recordId}`
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <Button onClick={handleBackToList} variant="outline" className="mb-4 bg-transparent">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Torna alla lista
-        </Button>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3 mb-2">
-            <Icon className="w-8 h-8 text-blue-600" />
-            <div>
-              <h1 className="text-3xl font-bold">{getItemTitle()}</h1>
-              <div className="flex items-center space-x-2">
-                <p className="text-gray-600">{tableInfo?.label}</p>
-                <Badge variant="outline">ID: {itemId}</Badge>
-              </div>
-            </div>
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Indietro
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{title}</h1>
+            <p className="text-muted-foreground">
+              Tabella: <Badge variant="secondary">{tableName}</Badge>
+            </p>
           </div>
+        </div>
 
-          <div className="flex space-x-2">
-            {isEditMode ? (
-              <>
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                      Salvataggio...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Salva
-                    </>
-                  )}
-                </Button>
-                <Button onClick={handleCancelEdit} variant="outline">
-                  <X className="w-4 h-4 mr-2" />
-                  Annulla
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button onClick={() => setIsEditMode(true)} variant="outline">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Modifica
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" disabled={deleting}>
-                      <Trash2 className="w-4 h-4 mr-2" />
+        <div className="flex items-center gap-2">
+          {!isNewRecord && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditMode(!editMode)}>
+                {editMode ? (
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Visualizza
+                  </>
+                ) : (
+                  <>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Modifica
+                  </>
+                )}
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Elimina
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Sei sicuro di voler eliminare questo record? Questa azione non può essere annullata.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
                       Elimina
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Sei sicuro di voler eliminare questo elemento? Questa azione non può essere annullata.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Annulla</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                        {deleting ? "Eliminazione..." : "Elimina"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-          </div>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+
+          {(editMode || isNewRecord) && (
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Salvataggio..." : "Salva"}
+            </Button>
+          )}
         </div>
       </div>
 
+      {/* Form */}
       <Card>
-        <CardContent className="p-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Dettagli Record
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Renderizza i campi nell'ordine specificato o in ordine alfabetico */}
-            {(fieldOrder.length > 0 ? fieldOrder : Object.keys(fieldTypes).sort()).map((field) => renderField(field))}
+            {Object.entries(config).map(([field, fieldConfig]) => (
+              <div key={field} className="space-y-2">
+                <Label htmlFor={field} className="flex items-center gap-2">
+                  {fieldConfig.label}
+                  {fieldConfig.required && <span className="text-destructive">*</span>}
+                  {fieldConfig.readOnly && (
+                    <Badge variant="outline" className="text-xs">
+                      Solo lettura
+                    </Badge>
+                  )}
+                </Label>
+                {renderField(field, fieldConfig, formData[field])}
+              </div>
+            ))}
           </div>
 
-          {/* Mostra i campi automatici in modalità visualizzazione */}
-          {!isEditMode && (
-            <div className="mt-8 pt-6 border-t">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Informazioni di sistema</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {autoFields.map((field) => {
-                  const fieldValue = formData[field]
-                  let displayValue = fieldValue
-
-                  if (fieldTypes[field] === "datetime" && fieldValue) {
-                    displayValue = formatDateTimeForDisplay(fieldValue)
-                  } else if (fieldTypes[field] === "boolean") {
-                    displayValue = fieldValue ? "Sì" : "No"
-                  }
-
-                  return (
-                    <div key={field} className="space-y-1">
-                      <Label className="text-sm font-medium text-gray-600">
-                        {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
-                      </Label>
-                      <div className="text-sm text-gray-800 bg-gray-50 p-2 rounded">{displayValue || "-"}</div>
-                    </div>
-                  )
-                })}
+          {(editMode || isNewRecord) && (
+            <>
+              <Separator />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (isNewRecord) {
+                      router.back()
+                    } else {
+                      setEditMode(false)
+                      setFormData(record || {})
+                    }
+                  }}
+                >
+                  Annulla
+                </Button>
+                <Button onClick={handleSave} disabled={saving}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Salvataggio..." : "Salva"}
+                </Button>
               </div>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>
