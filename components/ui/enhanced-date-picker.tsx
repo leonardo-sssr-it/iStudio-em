@@ -180,8 +180,8 @@ export function EnhancedDatePicker({
               </div>
             )}
 
-            {/* Calendario compatto */}
-            <div className="p-0">
+            {/* Calendario */}
+            <div className="p-3">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -189,7 +189,6 @@ export function EnhancedDatePicker({
                 disabled={disabled}
                 initialFocus
                 locale={it}
-                className="p-0"
               />
             </div>
 
