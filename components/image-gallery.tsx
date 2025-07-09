@@ -6,26 +6,26 @@ import { cn } from "@/lib/utils"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-// Array di immagini personalizzate
+// Array di immagini con placeholder sicuri
 const GALLERY_IMAGES = [
   {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/x.jpg-XOiK6xtrpfrACfJ1tpOu7243XAV8Pr.jpeg",
+    src: "/placeholder.svg?height=400&width=600&text=Arte+Digitale",
     alt: "Arte digitale creata da mani robotiche",
   },
   {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG3.jpg-in3EFYtEhe5JjvJ0KNkEZ0Yb4HjLJb.jpeg",
+    src: "/placeholder.svg?height=400&width=600&text=Business+Analytics",
     alt: "Professionista in ufficio moderno con grafici analitici",
   },
   {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG1.jpg-H2DuXCHMM87aAIV3vz39CMfQB5O1gq.jpeg",
+    src: "/placeholder.svg?height=400&width=600&text=Multitasking",
     alt: "Illustrazione di multitasking e gestione dello stress lavorativo",
   },
   {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG4.jpg-VgxWj7w218JlNDMAhpLjrqA4ykPs3A.jpeg",
+    src: "/placeholder.svg?height=400&width=600&text=Team+Collaboration",
     alt: "Team di lavoro collaborativo in ambiente moderno",
   },
   {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG2.rAe.jpg-JO4CqjqquIJZQm7Jchtkv24VyJU4Yh.jpeg",
+    src: "/placeholder.svg?height=400&width=600&text=Music+Performance",
     alt: "Pianista che si esibisce in un teatro vuoto",
   },
 ]
@@ -118,6 +118,10 @@ export const ImageGallery = memo(function ImageGallery({ className, autoplayInte
               priority={index === 0}
               className="object-cover"
               onLoad={() => handleImageLoad(index)}
+              onError={() => {
+                console.warn(`Failed to load image: ${image.src}`)
+                handleImageLoad(index) // Mark as loaded even on error to hide loading state
+              }}
             />
             <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm">{image.alt}</div>
           </div>
@@ -173,7 +177,14 @@ export const ImageGallery = memo(function ImageGallery({ className, autoplayInte
             aria-label={`Vai all'immagine ${index + 1}`}
           >
             <div className="relative w-full h-full">
-              <Image src={image.src || "/placeholder.svg"} alt={image.alt} fill sizes="48px" className="object-cover" />
+              <Image
+                src={image.src || "/placeholder.svg"}
+                alt={image.alt}
+                fill
+                sizes="48px"
+                className="object-cover"
+                onError={() => console.warn(`Thumbnail failed to load: ${image.src}`)}
+              />
             </div>
           </button>
         ))}
