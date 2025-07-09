@@ -1,27 +1,25 @@
 "use client"
 
 import * as React from "react"
-import { format } from "date-fns"
+import { format, parseISO, isValid } from "date-fns"
 import { it } from "date-fns/locale"
 import { CalendarIcon, Clock } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface EnhancedDatePickerProps {
   id?: string
   value?: string
   onChange?: (value: string) => void
-  disabled?: boolean
   readOnly?: boolean
-  placeholder?: string
+  disabled?: boolean
   showCurrentTime?: boolean
-  onDateTimeSet?: (date: Date) => void
+  onDateTimeSet?: (dateTime: string) => void
   className?: string
 }
 
@@ -29,153 +27,175 @@ export function EnhancedDatePicker({
   id,
   value,
   onChange,
-  disabled = false,
   readOnly = false,
-  placeholder = "Seleziona data...",
+  disabled = false,
   showCurrentTime = false,
   onDateTimeSet,
   className,
 }: EnhancedDatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(value ? new Date(value) : undefined)
-  const [timeValue, setTimeValue] = React.useState(() => {
-    if (value) {
-      const date = new Date(value)
-      return format(date, "HH:mm")
-    }
-    return showCurrentTime ? format(new Date(), "HH:mm") : "00:00"
-  })
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>()
+  const [selectedTime, setSelectedTime] = React.useState({ hours: "09", minutes: "00" })
 
+  // Parse the initial value
   React.useEffect(() => {
     if (value) {
-      const date = new Date(value)
-      setSelectedDate(date)
-      setTimeValue(format(date, "HH:mm"))
-    } else {
-      setSelectedDate(undefined)
-      setTimeValue(showCurrentTime ? format(new Date(), "HH:mm") : "00:00")
+      try {
+        const date = parseISO(value)
+        if (isValid(date)) {
+          setSelectedDate(date)
+          setSelectedTime({
+            hours: date.getHours().toString().padStart(2, "0"),
+            minutes:
+              Math.round(date.getMinutes() / 5) *
+              (5) // Round to nearest 5 minutes
+                .toString()
+                .padStart(2, "0"),
+          })
+        }
+      } catch (error) {
+        console.error("Error parsing date:", error)
+      }
+    } else if (showCurrentTime) {
+      const now = new Date()
+      setSelectedDate(now)
+      setSelectedTime({
+        hours: now.getHours().toString().padStart(2, "0"),
+        minutes: Math.round(now.getMinutes() / 5) * (5).toString().padStart(2, "0"),
+      })
     }
   }, [value, showCurrentTime])
 
   const handleDateSelect = (date: Date | undefined) => {
-    if (readOnly || disabled) return
+    if (!date || readOnly) return
 
-    if (date) {
-      const [hours, minutes] = timeValue.split(":").map(Number)
-      const newDate = new Date(date)
-      newDate.setHours(hours, minutes, 0, 0)
+    setSelectedDate(date)
 
-      setSelectedDate(newDate)
+    // Combine date with current time
+    const newDateTime = new Date(date)
+    newDateTime.setHours(Number.parseInt(selectedTime.hours))
+    newDateTime.setMinutes(Number.parseInt(selectedTime.minutes))
 
-      const isoString = newDate.toISOString()
-      onChange?.(isoString)
-      onDateTimeSet?.(newDate)
-    } else {
-      setSelectedDate(undefined)
-      onChange?.("")
+    const isoString = newDateTime.toISOString()
+    onChange?.(isoString)
+
+    // Call onDateTimeSet if provided (for auto-setting end time)
+    if (onDateTimeSet) {
+      const endDateTime = new Date(newDateTime.getTime() + 60 * 60 * 1000) // +1 hour
+      onDateTimeSet(endDateTime.toISOString())
     }
   }
 
-  const handleTimeChange = (newTime: string) => {
-    if (readOnly || disabled) return
+  const handleTimeChange = (type: "hours" | "minutes", value: string) => {
+    if (readOnly) return
 
-    setTimeValue(newTime)
+    const newTime = { ...selectedTime, [type]: value }
+    setSelectedTime(newTime)
 
     if (selectedDate) {
-      const [hours, minutes] = newTime.split(":").map(Number)
-      const newDate = new Date(selectedDate)
-      newDate.setHours(hours, minutes, 0, 0)
+      const newDateTime = new Date(selectedDate)
+      newDateTime.setHours(Number.parseInt(newTime.hours))
+      newDateTime.setMinutes(Number.parseInt(newTime.minutes))
 
-      setSelectedDate(newDate)
-
-      const isoString = newDate.toISOString()
+      const isoString = newDateTime.toISOString()
       onChange?.(isoString)
-      onDateTimeSet?.(newDate)
     }
   }
 
-  const handleSetCurrentDateTime = () => {
-    if (readOnly || disabled) return
+  const formatDisplayValue = () => {
+    if (!selectedDate) return "Seleziona data e ora"
 
-    const now = new Date()
-    setSelectedDate(now)
-    setTimeValue(format(now, "HH:mm"))
-
-    const isoString = now.toISOString()
-    onChange?.(isoString)
-    onDateTimeSet?.(now)
-    setOpen(false)
+    try {
+      return format(selectedDate, "dd/MM/yyyy HH:mm", { locale: it })
+    } catch (error) {
+      return "Data non valida"
+    }
   }
 
-  const displayValue = selectedDate ? format(selectedDate, "dd/MM/yyyy HH:mm", { locale: it }) : ""
+  // Generate time options
+  const hourOptions = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, "0"))
+
+  const minuteOptions = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, "0"))
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          id={id}
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !selectedDate && "text-muted-foreground",
-            className,
-          )}
-          type="button"
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {displayValue || placeholder}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="p-3">
-          {readOnly && (
-            <div className="mb-3 text-sm text-muted-foreground bg-muted p-2 rounded">
-              Modalità visualizzazione - Solo lettura
-            </div>
-          )}
+    <div className={cn("grid gap-2", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            variant="outline"
+            className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}
+            type="button"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {formatDisplayValue()}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="p-3 space-y-3">
+            {readOnly && (
+              <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                Modalità visualizzazione - non è possibile modificare
+              </div>
+            )}
 
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={readOnly ? undefined : handleDateSelect}
-            disabled={disabled}
-            initialFocus
-            locale={it}
-          />
-
-          <Separator className="my-3" />
-
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Clock className="h-4 w-4" />
-              <Label htmlFor="time-input" className="text-sm font-medium">
-                Ora
-              </Label>
-            </div>
-
-            <Input
-              id="time-input"
-              type="time"
-              value={timeValue}
-              onChange={(e) => handleTimeChange(e.target.value)}
-              disabled={disabled || readOnly}
-              className="w-full"
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={readOnly ? undefined : handleDateSelect}
+              disabled={disabled}
+              initialFocus
+              locale={it}
             />
 
-            {showCurrentTime && !readOnly && !disabled && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleSetCurrentDateTime}
-                className="w-full bg-transparent"
-              >
-                Imposta data e ora corrente
-              </Button>
-            )}
+            <div className="border-t pt-3">
+              <Label className="text-sm font-medium mb-2 block">
+                <Clock className="inline w-4 h-4 mr-1" />
+                Orario
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Select
+                  value={selectedTime.hours}
+                  onValueChange={(value) => handleTimeChange("hours", value)}
+                  disabled={readOnly || disabled}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hourOptions.map((hour) => (
+                      <SelectItem key={hour} value={hour}>
+                        {hour}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <span className="text-muted-foreground">:</span>
+
+                <Select
+                  value={selectedTime.minutes}
+                  onValueChange={(value) => handleTimeChange("minutes", value)}
+                  disabled={readOnly || disabled}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {minuteOptions.map((minute) => (
+                      <SelectItem key={minute} value={minute}>
+                        {minute}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-2">Orario in formato 24h, minuti in multipli di 5</p>
+            </div>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }
