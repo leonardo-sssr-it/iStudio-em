@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
-import { Upload, Trash2, Edit, Save, X, Plus, ImageIcon, Loader2, Eye, Download } from "lucide-react"
+import { Upload, Trash2, Edit, Save, X, Plus, ImageIcon, Loader2, Eye, Download, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -40,59 +40,41 @@ interface GalleryImage {
   title?: string
   description?: string
   uploadedAt: string
+  filename?: string
 }
 
-// Simulazione del database locale - in produzione useresti Supabase
-const INITIAL_GALLERY: GalleryImage[] = [
-  {
-    id: "1",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/x.jpg-XOiK6xtrpfrACfJ1tpOu7243XAV8Pr.jpeg",
-    alt: "Arte digitale creata da mani robotiche",
-    title: "Arte Digitale AI",
-    description: "Creazione artistica realizzata con intelligenza artificiale",
-    uploadedAt: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "2",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG3.jpg-in3EFYtEhe5JjvJ0KNkEZ0Yb4HjLJb.jpeg",
-    alt: "Professionista in ufficio moderno con grafici analitici",
-    title: "Business Analytics",
-    description: "Ambiente di lavoro moderno con analisi dati",
-    uploadedAt: "2024-01-14T15:45:00Z",
-  },
-  {
-    id: "3",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG1.jpg-H2DuXCHMM87aAIV3vz39CMfQB5O1gq.jpeg",
-    alt: "Illustrazione di multitasking e gestione dello stress lavorativo",
-    title: "Multitasking",
-    description: "Gestione efficace del carico di lavoro",
-    uploadedAt: "2024-01-13T09:20:00Z",
-  },
-  {
-    id: "4",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG4.jpg-VgxWj7w218JlNDMAhpLjrqA4ykPs3A.jpeg",
-    alt: "Team di lavoro collaborativo in ambiente moderno",
-    title: "Team Collaboration",
-    description: "Collaborazione efficace in team",
-    uploadedAt: "2024-01-12T14:10:00Z",
-  },
-  {
-    id: "5",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG2.rAe.jpg-JO4CqjqquIJZQm7Jchtkv24VyJU4Yh.jpeg",
-    alt: "Pianista che si esibisce in un teatro vuoto",
-    title: "Performance Artistica",
-    description: "Momento di arte e creatività",
-    uploadedAt: "2024-01-11T20:30:00Z",
-  },
-]
-
 export function GalleryManagerWidget() {
-  const [images, setImages] = useState<GalleryImage[]>(INITIAL_GALLERY)
+  const [images, setImages] = useState<GalleryImage[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [editingImage, setEditingImage] = useState<GalleryImage | null>(null)
   const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  // Carica le immagini dalla cartella gallery
+  const loadGalleryImages = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/gallery-images")
+      const data = await response.json()
+      setImages(data.images || [])
+    } catch (error) {
+      console.error("Errore nel caricamento delle immagini:", error)
+      toast({
+        title: "Errore",
+        description: "Impossibile caricare le immagini della galleria",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [toast])
+
+  // Carica le immagini al mount del componente
+  useEffect(() => {
+    loadGalleryImages()
+  }, [loadGalleryImages])
 
   // Simulazione upload - in produzione useresti Vercel Blob o Supabase Storage
   const handleFileUpload = useCallback(
@@ -133,6 +115,7 @@ export function GalleryManagerWidget() {
               title: file.name.replace(/\.[^/.]+$/, ""),
               description: `Caricata il ${new Date().toLocaleDateString()}`,
               uploadedAt: new Date().toISOString(),
+              filename: file.name,
             }
 
             setImages((prev) => [newImage, ...prev])
@@ -177,7 +160,7 @@ export function GalleryManagerWidget() {
       setImages((prev) => prev.filter((img) => img.id !== id))
       toast({
         title: "Successo",
-        description: "Immagine eliminata",
+        description: "Immagine eliminata dalla vista (per eliminarla definitivamente, rimuovila dalla cartella)",
       })
     },
     [toast],
@@ -189,7 +172,7 @@ export function GalleryManagerWidget() {
       setEditingImage(null)
       toast({
         title: "Successo",
-        description: "Immagine aggiornata",
+        description: "Informazioni immagine aggiornate",
       })
     },
     [toast],
@@ -203,7 +186,7 @@ export function GalleryManagerWidget() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
         a.href = url
-        a.download = `${image.title || "image"}.jpg`
+        a.download = `${image.filename || image.title || "image"}`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -219,6 +202,25 @@ export function GalleryManagerWidget() {
     [toast],
   )
 
+  const refreshGallery = useCallback(() => {
+    loadGalleryImages()
+    toast({
+      title: "Aggiornamento",
+      description: "Galleria aggiornata con le immagini dalla cartella",
+    })
+  }, [loadGalleryImages, toast])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Caricamento galleria...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header con statistiche */}
@@ -233,6 +235,16 @@ export function GalleryManagerWidget() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Dalla Cartella</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {images.filter((img) => img.filename && !img.src.startsWith("data:")).length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Caricate Oggi</CardTitle>
           </CardHeader>
           <CardContent>
@@ -241,14 +253,15 @@ export function GalleryManagerWidget() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Spazio Utilizzato</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">~{Math.round(images.length * 2.5)}MB</div>
-          </CardContent>
-        </Card>
+      </div>
+
+      {/* Controlli */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Gestione Galleria</h2>
+        <Button onClick={refreshGallery} variant="outline" className="flex items-center gap-2 bg-transparent">
+          <RefreshCw className="h-4 w-4" />
+          Aggiorna Galleria
+        </Button>
       </div>
 
       {/* Area di upload */}
@@ -258,7 +271,12 @@ export function GalleryManagerWidget() {
             <Upload className="h-5 w-5" />
             Carica Nuove Immagini
           </CardTitle>
-          <CardDescription>Trascina le immagini qui o clicca per selezionarle (max 5MB per file)</CardDescription>
+          <CardDescription>
+            Trascina le immagini qui o clicca per selezionarle (max 5MB per file).
+            <br />
+            <strong>Nota:</strong> Per aggiungere immagini permanenti, inseriscile nella cartella /public/images/gallery
+            e clicca "Aggiorna Galleria"
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div
@@ -304,105 +322,143 @@ export function GalleryManagerWidget() {
       <Card>
         <CardHeader>
           <CardTitle>Galleria Immagini</CardTitle>
-          <CardDescription>Gestisci le tue immagini: visualizza, modifica o elimina</CardDescription>
+          <CardDescription>
+            Gestisci le tue immagini: visualizza, modifica o elimina. Le immagini dalla cartella si aggiornano
+            automaticamente.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {images.map((image) => (
-                <Card key={image.id} className="overflow-hidden group">
-                  <div className="relative aspect-square">
-                    <Image
-                      src={image.src || "/placeholder.svg"}
-                      alt={image.alt}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="flex gap-1">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              className="h-8 w-8"
-                              onClick={() => setPreviewImage(image)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                              <DialogTitle>{image.title}</DialogTitle>
-                              <DialogDescription>{image.description}</DialogDescription>
-                            </DialogHeader>
-                            <div className="relative aspect-video">
-                              <Image
-                                src={image.src || "/placeholder.svg"}
-                                alt={image.alt}
-                                fill
-                                className="object-contain"
-                                sizes="(max-width: 1200px) 100vw, 1200px"
-                              />
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-8 w-8"
-                          onClick={() => downloadImage(image)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-8 w-8"
-                          onClick={() => setEditingImage(image)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="destructive" className="h-8 w-8">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Elimina Immagine</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Sei sicuro di voler eliminare questa immagine? L'azione non può essere annullata.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annulla</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteImage(image.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          {images.length === 0 ? (
+            <div className="text-center py-12">
+              <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg font-medium text-muted-foreground">Nessuna immagine trovata</p>
+              <p className="text-sm text-muted-foreground">
+                Aggiungi immagini nella cartella /public/images/gallery o caricale qui sopra
+              </p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[600px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {images.map((image) => (
+                  <Card key={image.id} className="overflow-hidden group">
+                    <div className="relative aspect-square">
+                      <Image
+                        src={image.src || "/placeholder.svg"}
+                        alt={image.alt}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/placeholder.svg?height=300&width=300"
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="secondary"
+                                className="h-8 w-8"
+                                onClick={() => setPreviewImage(image)}
                               >
-                                Elimina
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl">
+                              <DialogHeader>
+                                <DialogTitle>{image.title}</DialogTitle>
+                                <DialogDescription>{image.description}</DialogDescription>
+                              </DialogHeader>
+                              <div className="relative aspect-video">
+                                <Image
+                                  src={image.src || "/placeholder.svg"}
+                                  alt={image.alt}
+                                  fill
+                                  className="object-contain"
+                                  sizes="(max-width: 1200px) 100vw, 1200px"
+                                />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8"
+                            onClick={() => downloadImage(image)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8"
+                            onClick={() => setEditingImage(image)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="destructive" className="h-8 w-8">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Rimuovi Immagine</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Sei sicuro di voler rimuovere questa immagine dalla vista?
+                                  {image.filename && !image.src.startsWith("data:") && (
+                                    <span className="block mt-2 text-sm">
+                                      <strong>Nota:</strong> Per eliminarla definitivamente, rimuovi il file "
+                                      {image.filename}" dalla cartella /public/images/gallery
+                                    </span>
+                                  )}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteImage(image.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Rimuovi
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                      {/* Badge per indicare la fonte dell'immagine */}
+                      <div className="absolute bottom-2 left-2">
+                        {image.filename && !image.src.startsWith("data:") ? (
+                          <div className="bg-green-500/80 text-white text-xs px-2 py-1 rounded">Cartella</div>
+                        ) : (
+                          <div className="bg-blue-500/80 text-white text-xs px-2 py-1 rounded">Caricata</div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-sm truncate">{image.title}</h3>
-                    <p className="text-xs text-muted-foreground truncate">{image.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(image.uploadedAt).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </ScrollArea>
+                    <CardContent className="p-3">
+                      <h3 className="font-medium text-sm truncate">{image.title}</h3>
+                      <p className="text-xs text-muted-foreground truncate">{image.description}</p>
+                      <div className="flex justify-between items-center mt-1">
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(image.uploadedAt).toLocaleDateString()}
+                        </p>
+                        {image.filename && (
+                          <p className="text-xs text-muted-foreground truncate max-w-20" title={image.filename}>
+                            {image.filename}
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
         </CardContent>
       </Card>
 
@@ -464,6 +520,12 @@ export function GalleryManagerWidget() {
                   rows={3}
                 />
               </div>
+              {editingImage.filename && (
+                <div className="space-y-2">
+                  <Label>Nome file</Label>
+                  <Input value={editingImage.filename} disabled />
+                </div>
+              )}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditingImage(null)}>
                   <X className="h-4 w-4 mr-2" />
