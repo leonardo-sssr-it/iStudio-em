@@ -6,7 +6,7 @@ import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -25,25 +25,8 @@ import {
   Users,
   StickyNote,
   ArrowLeft,
-  Save,
-  Edit,
-  X,
-  Trash2,
   AlertCircle,
 } from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 
 // Definizione delle tabelle disponibili
@@ -1023,140 +1006,4 @@ export default function ItemDetailPage() {
     )
   }
 
-  // Se non c'è configurazione per la tab
-  if (!tableConfig) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-red-600 mb-4">Configurazione mancante</h1>
-              <p className="text-gray-600 mb-4">La configurazione per la tabella "{tableName}" non è disponibile.</p>
-              <Button onClick={() => router.push("/data-explorer")} variant="outline">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Torna al Data Explorer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Trova l'icona della tabella
-  const tableInfo = AVAILABLE_TABLES.find((table) => table.id === tableName)
-  const TableIcon = tableInfo?.icon || FileText
-
-  // Ordina i campi secondo fieldOrder se disponibile
-  const fieldsToRender = fieldOrder.length > 0 ? fieldOrder : Object.keys(fieldTypes)
-
-  return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center space-x-3">
-          <Button onClick={handleBackToList} variant="outline" size="sm">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Indietro
-          </Button>
-          <div className="flex items-center space-x-2">
-            <TableIcon className="w-6 h-6 text-blue-600" />
-            <div>
-              <h1 className="text-2xl font-bold">
-                {tableInfo?.label || tableName} #{itemId}
-              </h1>
-              <p className="text-sm text-gray-500">{isEditMode ? "Modalità modifica" : "Modalità visualizzazione"}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Azioni */}
-        <div className="flex items-center space-x-2">
-          {!isEditMode ? (
-            <>
-              <Button onClick={() => setIsEditMode(true)} variant="outline" size="sm">
-                <Edit className="w-4 h-4 mr-2" />
-                Modifica
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={deleting}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Elimina
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Sei sicuro di voler eliminare questo elemento? Questa azione non può essere annullata.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annulla</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                      Elimina
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          ) : (
-            <>
-              <Button onClick={handleCancelEdit} variant="outline" size="sm">
-                <X className="w-4 h-4 mr-2" />
-                Annulla
-              </Button>
-              <Button onClick={handleSave} size="sm" disabled={saving}>
-                <Save className="w-4 h-4 mr-2" />
-                {saving ? "Salvataggio..." : "Salva"}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Contenuto */}
-      {loading ? (
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <Skeleton className="h-4 w-1/4" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">{formData.titolo || formData.nome || `Elemento #${itemId}`}</h2>
-                {formData.stato && (
-                  <Badge variant="secondary" className="mt-1">
-                    {formData.stato}
-                  </Badge>
-                )}
-              </div>
-              {formData.data_creazione && (
-                <div className="text-sm text-gray-500">
-                  Creato: {formatDateTimeForDisplay(formData.data_creazione)}
-                  {formData.modifica && <div>Modificato: {formatDateTimeForDisplay(formData.modifica)}</div>}
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {fieldsToRender.map((field) => renderField(field))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-}
+// Se non c'è configurazione per la tab
