@@ -1,13 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { readdir } from "fs/promises"
-import { join } from "path"
+import fs from "fs"
+import path from "path"
 
 export async function GET(request: NextRequest) {
   try {
-    const galleryPath = join(process.cwd(), "public", "images", "gallery")
+    const galleryPath = path.join(process.cwd(), "public", "images", "gallery")
 
-    // Leggi tutti i file nella cartella gallery
-    const files = await readdir(galleryPath)
+    // Verifica se la cartella esiste
+    if (!fs.existsSync(galleryPath)) {
+      return NextResponse.json({
+        success: false,
+        message: "Cartella gallery non trovata",
+        images: [],
+        stats: {
+          total: 0,
+          fromFolder: 0,
+          uploadedToday: 0,
+        },
+      })
+    }
+
+    // Legge tutti i file dalla cartella
+    const files = fs.readdirSync(galleryPath)
 
     // Filtra solo i file immagine
     const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
@@ -15,10 +29,13 @@ export async function GET(request: NextRequest) {
 
     // Crea l'array delle immagini con metadati
     const images = imageFiles.map((filename, index) => {
-      // Converti il nome del file in un titolo leggibile
+      const filePath = path.join(galleryPath, filename)
+      const stats = fs.statSync(filePath)
+
+      // Genera un titolo dal nome del file
       const title = filename
-        .replace(/\.[^/.]+$/, "") // Rimuovi l'estensione
-        .replace(/[-_]/g, " ") // Sostituisci trattini e underscore con spazi
+        .replace(/\.[^/.]+$/, "") // Rimuove l'estensione
+        .replace(/[-_]/g, " ") // Sostituisce trattini e underscore con spazi
         .replace(/\b\w/g, (l) => l.toUpperCase()) // Capitalizza ogni parola
 
       return {
@@ -26,28 +43,46 @@ export async function GET(request: NextRequest) {
         filename,
         title,
         src: `/images/gallery/${filename}`,
-        description: `Immagine dalla galleria: ${title}`,
-        uploadedAt: new Date().toISOString(),
+        description: `Immagine della galleria: ${title}`,
+        uploadedAt: stats.mtime.toISOString(),
         source: "folder",
       }
     })
 
+    // Calcola le statistiche
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const uploadedToday = images.filter((img) => {
+      const uploadDate = new Date(img.uploadedAt)
+      uploadDate.setHours(0, 0, 0, 0)
+      return uploadDate.getTime() === today.getTime()
+    }).length
+
+    const stats = {
+      total: images.length,
+      fromFolder: images.length,
+      uploadedToday,
+    }
+
     return NextResponse.json({
       success: true,
+      message: `Trovate ${images.length} immagini nella galleria`,
       images,
-      count: images.length,
+      stats,
     })
   } catch (error) {
-    console.error("Errore nel caricamento delle immagini dalla galleria:", error)
+    console.error("Errore nell'API gallery-images:", error)
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Impossibile caricare le immagini dalla galleria",
-        images: [],
-        count: 0,
+    return NextResponse.json({
+      success: false,
+      message: "Errore nel caricamento delle immagini",
+      images: [],
+      stats: {
+        total: 0,
+        fromFolder: 0,
+        uploadedToday: 0,
       },
-      { status: 500 },
-    )
+    })
   }
 }

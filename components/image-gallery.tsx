@@ -21,11 +21,7 @@ interface ImageGalleryProps {
   showControls?: boolean
 }
 
-export default function ImageGallery({
-  className = "",
-  autoplayInterval = 4000,
-  showControls = true,
-}: ImageGalleryProps) {
+export function ImageGallery({ className = "", autoplayInterval = 4000, showControls = true }: ImageGalleryProps) {
   const [images, setImages] = useState<GalleryImage[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
