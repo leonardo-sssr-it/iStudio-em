@@ -1,35 +1,50 @@
-// Gallery images index
-export const galleryImages = [
+// Gallery images index - questo file viene utilizzato come fallback
+// Le immagini vengono caricate dinamicamente dalla cartella /public/images/gallery
+
+export interface GalleryImageData {
+  src: string
+  alt: string
+  title: string
+  description: string
+}
+
+// Immagini di fallback nel caso la cartella sia vuota
+export const fallbackImages: GalleryImageData[] = [
   {
-    src: "/images/gallery/business-analytics.png",
-    alt: "Business Analytics Dashboard",
-    title: "Analytics",
-    description: "Modern business analytics dashboard with charts and graphs",
+    src: "/placeholder.svg?height=600&width=800",
+    alt: "Benvenuto in iStudio",
+    title: "iStudio",
+    description: "Il sistema di gestione integrato per il tuo ufficio",
   },
   {
-    src: "/images/gallery/creative-ai.png",
-    alt: "Creative AI Workspace",
-    title: "Creative AI",
-    description: "Creative AI workspace with digital art and design tools",
+    src: "/placeholder.svg?height=600&width=800",
+    alt: "Gestione Dati",
+    title: "Gestione Dati",
+    description: "Organizza e gestisci tutti i tuoi dati in un unico posto",
   },
   {
-    src: "/images/gallery/multitasking.png",
-    alt: "Multitasking Workspace",
-    title: "Productivity",
-    description: "Professional multitasking workspace with multiple screens",
+    src: "/placeholder.svg?height=600&width=800",
+    alt: "Collaborazione",
+    title: "Collaborazione",
+    description: "Lavora in team con accessi e permessi personalizzati",
   },
   {
-    src: "/images/gallery/pianist.png",
-    alt: "Pianist Performance",
-    title: "Music",
-    description: "Elegant pianist hands on piano keys in artistic lighting",
+    src: "/placeholder.svg?height=600&width=800",
+    alt: "Analisi Dati",
+    title: "Analisi Dati",
+    description: "Visualizza e analizza i tuoi dati con grafici interattivi",
   },
   {
-    src: "/images/gallery/team-collaboration.png",
-    alt: "Team Collaboration",
-    title: "Teamwork",
-    description: "Modern team collaboration workspace with people working together",
+    src: "/placeholder.svg?height=600&width=800",
+    alt: "Automazione",
+    title: "Automazione",
+    description: "Automatizza i processi ripetitivi e risparmia tempo",
   },
 ]
 
-export default galleryImages
+// Funzione per ottenere le immagini (utilizzata come fallback)
+export const getGalleryImages = (): GalleryImageData[] => {
+  return fallbackImages
+}
+
+export default fallbackImages
