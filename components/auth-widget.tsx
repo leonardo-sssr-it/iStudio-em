@@ -200,8 +200,8 @@ export function AuthWidget() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Link href="/dasboard-utente">
-            <Button className="w-full" variant="default">
+          <Link href="/dashboard-utente">
+            <Button className="w-full" variant="outline">
               <Home className="h-4 w-4 mr-2" />
               Vai alla Dashboard Utente
             </Button>
