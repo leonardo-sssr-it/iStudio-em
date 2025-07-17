@@ -1,141 +1,168 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Image from "next/image"
-import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
+import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 interface GalleryImage {
-  id: string
+  id: number
+  filename: string
+  title: string
   src: string
-  alt: string
-  title?: string
-  description?: string
+  description: string
+  uploadedAt: string
+  source: string
 }
 
 interface ImageGalleryProps {
   className?: string
-  autoPlay?: boolean
-  interval?: number
+  autoplayInterval?: number
+  showControls?: boolean
 }
 
-export function ImageGallery({ className, autoPlay = true, interval = 4000 }: ImageGalleryProps) {
+export default function ImageGallery({
+  className = "",
+  autoplayInterval = 4000,
+  showControls = true,
+}: ImageGalleryProps) {
   const [images, setImages] = useState<GalleryImage[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(autoPlay)
-  const [isLoading, setIsLoading] = useState(true)
-  const [imageError, setImageError] = useState<Record<string, boolean>>({})
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+
+  // Immagini di fallback se non ci sono immagini nella cartella
+  const fallbackImages: GalleryImage[] = [
+    {
+      id: 1,
+      filename: "placeholder-1.svg",
+      title: "Benvenuto in iStudio",
+      src: "/placeholder.svg?height=400&width=600",
+      description: "Gestisci i tuoi progetti con facilità",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+    {
+      id: 2,
+      filename: "placeholder-2.svg",
+      title: "Organizza il tuo lavoro",
+      src: "/placeholder.svg?height=400&width=600",
+      description: "Strumenti potenti per la produttività",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+    {
+      id: 3,
+      filename: "placeholder-3.svg",
+      title: "Collabora con il team",
+      src: "/placeholder.svg?height=400&width=600",
+      description: "Lavora insieme in modo efficiente",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+  ]
 
   // Carica le immagini dalla API
   const loadImages = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
     try {
       const response = await fetch("/api/gallery-images")
       const data = await response.json()
 
-      if (data.images && data.images.length > 0) {
+      if (data.success && data.images.length > 0) {
         setImages(data.images)
       } else {
-        // Fallback con immagini placeholder se non ci sono immagini nella cartella
-        setImages([
-          {
-            id: "placeholder-1",
-            src: "/placeholder.svg?height=600&width=800",
-            alt: "Immagine placeholder 1",
-            title: "Benvenuto in iStudio",
-            description: "Il tuo sistema di gestione integrato",
-          },
-          {
-            id: "placeholder-2",
-            src: "/placeholder.svg?height=600&width=800",
-            alt: "Immagine placeholder 2",
-            title: "Gestione Dati",
-            description: "Organizza e gestisci i tuoi dati",
-          },
-          {
-            id: "placeholder-3",
-            src: "/placeholder.svg?height=600&width=800",
-            alt: "Immagine placeholder 3",
-            title: "Collaborazione",
-            description: "Lavora in team efficacemente",
-          },
-        ])
+        // Se non ci sono immagini o c'è un errore, usa le immagini di fallback
+        console.log("Nessuna immagine trovata nella galleria, uso immagini di fallback")
+        setImages(fallbackImages)
       }
-    } catch (error) {
-      console.error("Errore nel caricamento delle immagini:", error)
-      // Fallback in caso di errore
-      setImages([
-        {
-          id: "fallback",
-          src: "/placeholder.svg?height=600&width=800",
-          alt: "Immagine di fallback",
-          title: "iStudio",
-          description: "Sistema di gestione integrato",
-        },
-      ])
+    } catch (err) {
+      console.error("Errore nel caricamento delle immagini:", err)
+      setError("Impossibile caricare le immagini")
+      setImages(fallbackImages)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }, [])
 
-  // Carica le immagini al mount
+  // Carica le immagini all'avvio
   useEffect(() => {
     loadImages()
   }, [loadImages])
 
-  // Gestione autoplay
+  // Gestione dell'autoplay
   useEffect(() => {
     if (!isPlaying || images.length <= 1) return
 
-    const timer = setInterval(() => {
+    const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % images.length)
-    }, interval)
+      setProgress(0)
+    }, autoplayInterval)
 
-    return () => clearInterval(timer)
-  }, [isPlaying, images.length, interval])
+    return () => clearInterval(interval)
+  }, [isPlaying, images.length, autoplayInterval])
 
-  const goToPrevious = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
-  }, [images.length])
+  // Gestione della barra di progresso
+  useEffect(() => {
+    if (!isPlaying || images.length <= 1) return
 
-  const goToNext = useCallback(() => {
+    const progressInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) return 0
+        return prev + 100 / (autoplayInterval / 100)
+      })
+    }, 100)
+
+    return () => clearInterval(progressInterval)
+  }, [isPlaying, autoplayInterval, currentIndex])
+
+  // Reset del progresso quando cambia l'indice
+  useEffect(() => {
+    setProgress(0)
+  }, [currentIndex])
+
+  const nextImage = () => {
     setCurrentIndex((prev) => (prev + 1) % images.length)
-  }, [images.length])
+  }
 
-  const goToSlide = useCallback((index: number) => {
+  const prevImage = () => {
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
+  }
+
+  const togglePlayPause = () => {
+    setIsPlaying(!isPlaying)
+  }
+
+  const goToImage = (index: number) => {
     setCurrentIndex(index)
-  }, [])
+  }
 
-  const togglePlayPause = useCallback(() => {
-    setIsPlaying((prev) => !prev)
-  }, [])
-
-  const handleImageError = useCallback((imageId: string) => {
-    setImageError((prev) => ({ ...prev, [imageId]: true }))
-  }, [])
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className={cn("relative w-full h-full bg-muted rounded-lg overflow-hidden", className)}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Caricamento galleria...</div>
-        </div>
+      <div className={cn("relative w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center", className)}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600">Caricamento galleria...</span>
       </div>
     )
   }
 
-  if (images.length === 0) {
+  if (error && images.length === 0) {
     return (
       <div
         className={cn(
-          "relative w-full h-full bg-muted rounded-lg overflow-hidden flex items-center justify-center",
+          "relative w-full h-64 bg-gray-100 rounded-lg flex flex-col items-center justify-center",
           className,
         )}
       >
-        <div className="text-center text-muted-foreground">
-          <p className="text-lg font-medium">Nessuna immagine disponibile</p>
-          <p className="text-sm">Aggiungi immagini nella cartella /public/images/gallery</p>
-        </div>
+        <div className="text-red-500 mb-2">⚠️ {error}</div>
+        <Button onClick={loadImages} variant="outline" size="sm">
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Riprova
+        </Button>
       </div>
     )
   }
@@ -143,96 +170,99 @@ export function ImageGallery({ className, autoPlay = true, interval = 4000 }: Im
   const currentImage = images[currentIndex]
 
   return (
-    <div className={cn("relative w-full h-full group", className)}>
+    <div className={cn("relative w-full h-64 md:h-80 lg:h-96 overflow-hidden group", className)}>
       {/* Immagine principale */}
-      <div className="relative w-full h-full overflow-hidden rounded-lg">
-        <Image
-          src={imageError[currentImage.id] ? "/placeholder.svg?height=600&width=800" : currentImage.src}
-          alt={currentImage.alt}
-          fill
-          className="object-cover transition-all duration-500 ease-in-out"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          priority={currentIndex === 0}
-          onError={() => handleImageError(currentImage.id)}
+      <div className="relative w-full h-full">
+        <img
+          src={currentImage?.src || "/placeholder.svg"}
+          alt={currentImage?.title || "Immagine galleria"}
+          className="w-full h-full object-cover transition-opacity duration-500"
+          onError={(e) => {
+            // Fallback se l'immagine non si carica
+            const target = e.target as HTMLImageElement
+            target.src = "/placeholder.svg?height=400&width=600"
+          }}
         />
 
-        {/* Overlay con gradiente */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-        {/* Informazioni immagine */}
-        <div className="absolute bottom-4 left-4 right-4 text-white">
-          <h3 className="text-lg font-semibold mb-1 drop-shadow-lg">
-            {currentImage.title || `Immagine ${currentIndex + 1}`}
-          </h3>
-          {currentImage.description && (
-            <p className="text-sm opacity-90 drop-shadow-lg line-clamp-2">{currentImage.description}</p>
-          )}
+        {/* Overlay con informazioni */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
+          <div className="absolute bottom-4 left-4 text-white">
+            <h3 className="text-lg font-semibold mb-1">{currentImage?.title}</h3>
+            <p className="text-sm opacity-90">{currentImage?.description}</p>
+          </div>
         </div>
+
+        {/* Barra di progresso */}
+        {isPlaying && images.length > 1 && (
+          <div className="absolute top-0 left-0 w-full h-1 bg-black/20">
+            <div
+              className="h-full bg-white/80 transition-all duration-100 ease-linear"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Controlli di navigazione - visibili solo se ci sono più immagini */}
-      {images.length > 1 && (
+      {/* Controlli di navigazione */}
+      {showControls && images.length > 1 && (
         <>
           {/* Pulsanti precedente/successivo */}
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-0"
-            onClick={goToPrevious}
-            aria-label="Immagine precedente"
-          >
-            <ChevronLeft className="h-4 w-4 text-white" />
-          </Button>
+          <div className="absolute inset-y-0 left-0 flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={prevImage}
+              className="ml-2 bg-black/20 hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+          </div>
 
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-0"
-            onClick={goToNext}
-            aria-label="Immagine successiva"
-          >
-            <ChevronRight className="h-4 w-4 text-white" />
-          </Button>
+          <div className="absolute inset-y-0 right-0 flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={nextImage}
+              className="mr-2 bg-black/20 hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </Button>
+          </div>
 
-          {/* Controllo play/pause */}
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/20 hover:bg-white/30 backdrop-blur-sm border-0"
-            onClick={togglePlayPause}
-            aria-label={isPlaying ? "Pausa slideshow" : "Avvia slideshow"}
-          >
-            {isPlaying ? <Pause className="h-4 w-4 text-white" /> : <Play className="h-4 w-4 text-white" />}
-          </Button>
+          {/* Controlli play/pause */}
+          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={togglePlayPause}
+              className="bg-black/20 hover:bg-black/40 text-white"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </Button>
+          </div>
 
           {/* Indicatori di posizione */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          <div className="absolute bottom-4 right-4 flex space-x-2">
             {images.map((_, index) => (
               <button
                 key={index}
+                onClick={() => goToImage(index)}
                 className={cn(
                   "w-2 h-2 rounded-full transition-all duration-200",
                   index === currentIndex ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75",
                 )}
-                onClick={() => goToSlide(index)}
-                aria-label={`Vai all'immagine ${index + 1}`}
               />
             ))}
           </div>
         </>
       )}
 
-      {/* Indicatore di caricamento per la prossima immagine */}
-      {images.length > 1 && isPlaying && (
-        <div className="absolute top-0 left-0 h-1 bg-white/30 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-white transition-all duration-100 ease-linear"
-            style={{
-              width: `${((Date.now() % interval) / interval) * 100}%`,
-            }}
-          />
+      {/* Informazioni sulla fonte */}
+      <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="bg-black/20 text-white text-xs px-2 py-1 rounded">
+          {currentImage?.source === "folder" ? "📁 Galleria" : "🔄 Fallback"} • {currentIndex + 1}/{images.length}
         </div>
-      )}
+      </div>
     </div>
   )
 }

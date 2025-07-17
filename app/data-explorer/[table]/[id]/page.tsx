@@ -6,7 +6,7 @@ import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,7 +16,6 @@ import { parseISO, formatISO } from "date-fns"
 import {
   CheckCircle2,
   FileText,
-  Settings,
   Calendar,
   CheckSquare,
   Clock,
@@ -25,8 +24,25 @@ import {
   Users,
   StickyNote,
   ArrowLeft,
+  Save,
+  Edit,
+  X,
+  Trash2,
   AlertCircle,
 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 
 // Definizione delle tabelle disponibili
@@ -106,23 +122,7 @@ const TABLE_FIELDS = {
       stato: "pianificato",
       attivo: true,
     },
-    fieldGroups: {
-      principale: {
-        title: "Informazioni Principali",
-        icon: FileText,
-        fields: ["titolo", "descrizione", "stato"],
-      },
-      date: {
-        title: "Date e Orari",
-        icon: Calendar,
-        fields: ["data_inizio", "data_fine"],
-      },
-      dettagli: {
-        title: "Dettagli Aggiuntivi",
-        icon: Settings,
-        fields: ["luogo", "note", "tags"],
-      },
-    },
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "luogo", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -133,7 +133,6 @@ const TABLE_FIELDS = {
       priorita: "priority_select",
       note: "text",
       luogo: "string",
-      tags: "tags",
       attivo: "boolean",
       id_utente: "number",
       data_creazione: "datetime",
@@ -1006,4 +1005,168 @@ export default function ItemDetailPage() {
     )
   }
 
-// Se non c'è configurazione per la tab
+  // Se non c'è configurazione per la tabella
+  if (!tableConfig) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-red-600 mb-4">Configurazione mancante</h1>
+              <p className="text-gray-600 mb-4">La configurazione per la tabella "{tableName}" non è disponibile.</p>
+              <Button onClick={() => router.push("/data-explorer")} variant="outline">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Torna al Data Explorer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const tableInfo = AVAILABLE_TABLES.find((table) => table.id === tableName)
+  const Icon = tableInfo?.icon || FileText
+
+  const getItemTitle = () => {
+    if (formData.titolo) return formData.titolo
+    if (formData.username) return formData.username
+    if (formData.nome) return formData.cognome ? `${formData.nome} ${formData.cognome}` : formData.nome
+    return `ID: ${itemId}`
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-6">
+        <Button onClick={handleBackToList} variant="outline" className="mb-4 bg-transparent">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Torna alla lista
+        </Button>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3 mb-2">
+            <Icon className="w-8 h-8 text-blue-600" />
+            <div>
+              <h1 className="text-3xl font-bold">{getItemTitle()}</h1>
+              <div className="flex items-center space-x-2">
+                <p className="text-gray-600">{tableInfo?.label}</p>
+                <Badge variant="outline">ID: {itemId}</Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex space-x-2">
+            {isEditMode ? (
+              <>
+                <Button onClick={handleSave} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Salvataggio...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Salva
+                    </>
+                  )}
+                </Button>
+                <Button onClick={handleCancelEdit} variant="outline">
+                  <X className="w-4 h-4 mr-2" />
+                  Annulla
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button onClick={() => setIsEditMode(true)} variant="outline">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Modifica
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={deleting}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Elimina
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Sei sicuro di voler eliminare questo elemento? Questa azione non può essere annullata.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                        {deleting ? "Eliminazione..." : "Elimina"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Renderizza i campi nell'ordine specificato o in ordine alfabetico */}
+            {(fieldOrder.length > 0 ? fieldOrder : Object.keys(fieldTypes).sort()).map((field) => renderField(field))}
+          </div>
+
+          {/* Mostra i campi automatici in modalità visualizzazione */}
+          {!isEditMode && (
+            <div className="mt-8 pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-4 text-gray-700">Informazioni di sistema</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {autoFields.map((field) => {
+                  const fieldValue = formData[field]
+                  let displayValue = fieldValue
+
+                  if (fieldTypes[field] === "datetime" && fieldValue) {
+                    displayValue = formatDateTimeForDisplay(fieldValue)
+                  } else if (fieldTypes[field] === "boolean") {
+                    displayValue = fieldValue ? "Sì" : "No"
+                  }
+
+                  return (
+                    <div key={field} className="space-y-1">
+                      <Label className="text-sm font-medium text-gray-600">
+                        {field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ")}
+                      </Label>
+                      <div className="text-sm text-gray-800 bg-gray-50 p-2 rounded">{displayValue || "-"}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

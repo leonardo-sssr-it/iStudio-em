@@ -1,65 +1,51 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { readdir } from "fs/promises"
 import { join } from "path"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const galleryPath = join(process.cwd(), "public", "images", "gallery")
 
-    let files: string[] = []
-    try {
-      files = await readdir(galleryPath)
-    } catch (error) {
-      console.warn("Cartella gallery non trovata o non accessibile:", error)
-      return NextResponse.json({
-        images: [],
-        message: "Cartella gallery non trovata. Assicurati che esista /public/images/gallery",
-      })
-    }
+    // Leggi tutti i file nella cartella gallery
+    const files = await readdir(galleryPath)
 
     // Filtra solo i file immagine
-    const imageFiles = files.filter(
-      (file) => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file) && !file.startsWith(".") && file !== "index.ts",
-    )
-
-    if (imageFiles.length === 0) {
-      return NextResponse.json({
-        images: [],
-        message: "Nessuna immagine trovata nella cartella gallery",
-      })
-    }
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
+    const imageFiles = files.filter((file) => imageExtensions.some((ext) => file.toLowerCase().endsWith(ext)))
 
     // Crea l'array delle immagini con metadati
-    const images = imageFiles.map((file, index) => {
-      const nameWithoutExt = file.replace(/\.[^/.]+$/, "")
-      const formattedName = nameWithoutExt
-        .split(/[-_\s]/)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ")
+    const images = imageFiles.map((filename, index) => {
+      // Converti il nome del file in un titolo leggibile
+      const title = filename
+        .replace(/\.[^/.]+$/, "") // Rimuovi l'estensione
+        .replace(/[-_]/g, " ") // Sostituisci trattini e underscore con spazi
+        .replace(/\b\w/g, (l) => l.toUpperCase()) // Capitalizza ogni parola
 
       return {
-        id: `gallery-${index + 1}`,
-        src: `/images/gallery/${file}`,
-        alt: `${formattedName}`,
-        title: formattedName,
-        description: `Immagine della galleria: ${formattedName}`,
+        id: index + 1,
+        filename,
+        title,
+        src: `/images/gallery/${filename}`,
+        description: `Immagine dalla galleria: ${title}`,
         uploadedAt: new Date().toISOString(),
-        filename: file,
+        source: "folder",
       }
     })
 
     return NextResponse.json({
+      success: true,
       images,
       count: images.length,
-      message: `${images.length} immagini caricate con successo`,
     })
   } catch (error) {
-    console.error("Errore nel caricamento delle immagini:", error)
+    console.error("Errore nel caricamento delle immagini dalla galleria:", error)
+
     return NextResponse.json(
       {
+        success: false,
+        error: "Impossibile caricare le immagini dalla galleria",
         images: [],
-        error: "Errore interno del server",
-        message: "Impossibile caricare le immagini",
+        count: 0,
       },
       { status: 500 },
     )

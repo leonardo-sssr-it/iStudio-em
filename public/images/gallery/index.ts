@@ -1,50 +1,84 @@
-// Gallery images index - questo file viene utilizzato come fallback
-// Le immagini vengono caricate dinamicamente dalla cartella /public/images/gallery
+// File di configurazione per la galleria immagini
+// Questo file viene generato automaticamente dall'API /api/gallery-images
 
-export interface GalleryImageData {
-  src: string
-  alt: string
+export interface GalleryImageConfig {
+  id: number
+  filename: string
   title: string
+  src: string
   description: string
+  uploadedAt: string
+  source: string
 }
 
-// Immagini di fallback nel caso la cartella sia vuota
-export const fallbackImages: GalleryImageData[] = [
-  {
-    src: "/placeholder.svg?height=600&width=800",
-    alt: "Benvenuto in iStudio",
-    title: "iStudio",
-    description: "Il sistema di gestione integrato per il tuo ufficio",
-  },
-  {
-    src: "/placeholder.svg?height=600&width=800",
-    alt: "Gestione Dati",
-    title: "Gestione Dati",
-    description: "Organizza e gestisci tutti i tuoi dati in un unico posto",
-  },
-  {
-    src: "/placeholder.svg?height=600&width=800",
-    alt: "Collaborazione",
-    title: "Collaborazione",
-    description: "Lavora in team con accessi e permessi personalizzati",
-  },
-  {
-    src: "/placeholder.svg?height=600&width=800",
-    alt: "Analisi Dati",
-    title: "Analisi Dati",
-    description: "Visualizza e analizza i tuoi dati con grafici interattivi",
-  },
-  {
-    src: "/placeholder.svg?height=600&width=800",
-    alt: "Automazione",
-    title: "Automazione",
-    description: "Automatizza i processi ripetitivi e risparmia tempo",
-  },
-]
+// Funzione per ottenere le immagini dalla cartella
+export async function getGalleryImages(): Promise<GalleryImageConfig[]> {
+  try {
+    const response = await fetch("/api/gallery-images")
+    const data = await response.json()
 
-// Funzione per ottenere le immagini (utilizzata come fallback)
-export const getGalleryImages = (): GalleryImageData[] => {
-  return fallbackImages
+    if (data.success) {
+      return data.images
+    }
+
+    // Fallback se l'API non funziona
+    return getFallbackImages()
+  } catch (error) {
+    console.error("Errore nel caricamento delle immagini:", error)
+    return getFallbackImages()
+  }
 }
 
-export default fallbackImages
+// Immagini di fallback
+function getFallbackImages(): GalleryImageConfig[] {
+  return [
+    {
+      id: 1,
+      filename: "business-analytics.jpg",
+      title: "Business Analytics",
+      src: "/images/gallery/business-analytics.jpg",
+      description: "Analisi e reportistica aziendale",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+    {
+      id: 2,
+      filename: "creative-ai.jpg",
+      title: "Creative AI",
+      src: "/images/gallery/creative-ai.jpg",
+      description: "Intelligenza artificiale creativa",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+    {
+      id: 3,
+      filename: "multitasking.jpg",
+      title: "Multitasking",
+      src: "/images/gallery/multitasking.jpg",
+      description: "Gestione efficiente delle attività",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+    {
+      id: 4,
+      filename: "pianist.jpg",
+      title: "Pianist",
+      src: "/images/gallery/pianist.jpg",
+      description: "Creatività e concentrazione",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+    {
+      id: 5,
+      filename: "team-collaboration.jpg",
+      title: "Team Collaboration",
+      src: "/images/gallery/team-collaboration.jpg",
+      description: "Collaborazione di squadra",
+      uploadedAt: new Date().toISOString(),
+      source: "fallback",
+    },
+  ]
+}
+
+// Esporta le immagini di fallback per uso diretto
+export const fallbackImages = getFallbackImages()
