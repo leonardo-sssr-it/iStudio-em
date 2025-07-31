@@ -147,8 +147,24 @@ const NewItemMenu = ({ day, onClose }: { day: Date; onClose: () => void }) => {
     // Formatta la data per il passaggio come parametro
     const dateParam = format(day, "yyyy-MM-dd")
 
-    // Naviga a data-explorer con parametri per creare nuovo elemento
-    router.push(`/data-explorer?new=${type}&date=${dateParam}`)
+    // Mappa i tipi alle tabelle corrette in data-explorer
+    const tableMap = {
+      appuntamento: "appuntamenti",
+      attivita: "attivita",
+      todolist: "todolist",
+      scadenza: "scadenze",
+      progetto: "progetti",
+    }
+
+    const tableName = tableMap[type as keyof typeof tableMap]
+
+    if (tableName) {
+      // Naviga alla pagina specifica per creare nuovo elemento nella tabella corretta
+      router.push(`/data-explorer/${tableName}/new?date=${dateParam}`)
+    } else {
+      console.error(`Tipo non riconosciuto: ${type}`)
+    }
+
     onClose()
   }
 
