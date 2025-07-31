@@ -1,264 +1,226 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { ChevronLeft, ChevronRight, Play, Pause, RotateCcw } from "lucide-react"
+import { useState, useEffect } from "react"
+import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 interface GalleryImage {
-  id: number
-  filename: string
-  title: string
   src: string
-  description: string
-  uploadedAt: string
-  source: string
+  alt: string
+  title?: string
 }
 
 interface ImageGalleryProps {
-  className?: string
-  autoplayInterval?: number
+  autoPlay?: boolean
+  interval?: number
   showControls?: boolean
+  className?: string
 }
 
-export function ImageGallery({ className = "", autoplayInterval = 4000, showControls = true }: ImageGalleryProps) {
+export function ImageGallery({
+  autoPlay = true,
+  interval = 5000,
+  showControls = true,
+  className = "",
+}: ImageGalleryProps) {
   const [images, setImages] = useState<GalleryImage[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [loading, setLoading] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0)
 
-  // Immagini di fallback se non ci sono immagini nella cartella
-  const fallbackImages: GalleryImage[] = [
-    {
-      id: 1,
-      filename: "placeholder-1.svg",
-      title: "Benvenuto in iStudio",
-      src: "/placeholder.svg?height=400&width=600",
-      description: "Gestisci i tuoi progetti con facilità",
-      uploadedAt: new Date().toISOString(),
-      source: "fallback",
-    },
-    {
-      id: 2,
-      filename: "placeholder-2.svg",
-      title: "Organizza il tuo lavoro",
-      src: "/placeholder.svg?height=400&width=600",
-      description: "Strumenti potenti per la produttività",
-      uploadedAt: new Date().toISOString(),
-      source: "fallback",
-    },
-    {
-      id: 3,
-      filename: "placeholder-3.svg",
-      title: "Collabora con il team",
-      src: "/placeholder.svg?height=400&width=600",
-      description: "Lavora insieme in modo efficiente",
-      uploadedAt: new Date().toISOString(),
-      source: "fallback",
-    },
-  ]
+  // Carica le immagini dall'API
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch("/api/gallery-images")
 
-  // Carica le immagini dalla API
-  const loadImages = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
 
-    try {
-      const response = await fetch("/api/gallery-images")
-      const data = await response.json()
+        const data = await response.json()
 
-      if (data.success && data.images.length > 0) {
-        setImages(data.images)
-      } else {
-        // Se non ci sono immagini o c'è un errore, usa le immagini di fallback
-        console.log("Nessuna immagine trovata nella galleria, uso immagini di fallback")
-        setImages(fallbackImages)
+        if (data.success && data.images && data.images.length > 0) {
+          setImages(data.images)
+          setError(null)
+        } else {
+          // Fallback a immagini placeholder se non ci sono immagini
+          setImages([
+            {
+              src: "/placeholder.svg?height=400&width=600&text=Galleria+Vuota",
+              alt: "Galleria vuota",
+              title: "Nessuna immagine disponibile",
+            },
+          ])
+        }
+      } catch (err) {
+        console.error("Errore nel caricamento delle immagini:", err)
+        setError("Errore nel caricamento delle immagini")
+        // Fallback in caso di errore
+        setImages([
+          {
+            src: "/placeholder.svg?height=400&width=600&text=Errore+Caricamento",
+            alt: "Errore caricamento",
+            title: "Errore nel caricamento delle immagini",
+          },
+        ])
+      } finally {
+        setIsLoading(false)
       }
-    } catch (err) {
-      console.error("Errore nel caricamento delle immagini:", err)
-      setError("Impossibile caricare le immagini")
-      setImages(fallbackImages)
-    } finally {
-      setLoading(false)
     }
+
+    loadImages()
   }, [])
 
-  // Carica le immagini all'avvio
-  useEffect(() => {
-    loadImages()
-  }, [loadImages])
-
-  // Gestione dell'autoplay
+  // Gestione autoplay
   useEffect(() => {
     if (!isPlaying || images.length <= 1) return
 
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % images.length)
-      setProgress(0)
-    }, autoplayInterval)
+    const timer = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex === images.length - 1 ? 0 : prevIndex + 1))
+    }, interval)
 
-    return () => clearInterval(interval)
-  }, [isPlaying, images.length, autoplayInterval])
+    return () => clearInterval(timer)
+  }, [isPlaying, images.length, interval])
 
-  // Gestione della barra di progresso
-  useEffect(() => {
-    if (!isPlaying || images.length <= 1) return
-
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) return 0
-        return prev + 100 / (autoplayInterval / 100)
-      })
-    }, 100)
-
-    return () => clearInterval(progressInterval)
-  }, [isPlaying, autoplayInterval, currentIndex])
-
-  // Reset del progresso quando cambia l'indice
-  useEffect(() => {
-    setProgress(0)
-  }, [currentIndex])
-
-  const nextImage = () => {
-    setCurrentIndex((prev) => (prev + 1) % images.length)
+  const goToPrevious = () => {
+    setCurrentIndex(currentIndex === 0 ? images.length - 1 : currentIndex - 1)
   }
 
-  const prevImage = () => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length)
+  const goToNext = () => {
+    setCurrentIndex(currentIndex === images.length - 1 ? 0 : currentIndex + 1)
   }
 
   const togglePlayPause = () => {
     setIsPlaying(!isPlaying)
   }
 
-  const goToImage = (index: number) => {
-    setCurrentIndex(index)
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className={cn("relative w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center", className)}>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Caricamento galleria...</span>
-      </div>
+      <Card className={className}>
+        <CardContent className="p-0">
+          <div className="relative w-full h-[400px] bg-gray-100 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
-  if (error && images.length === 0) {
+  if (error) {
     return (
-      <div
-        className={cn(
-          "relative w-full h-64 bg-gray-100 rounded-lg flex flex-col items-center justify-center",
-          className,
-        )}
-      >
-        <div className="text-red-500 mb-2">⚠️ {error}</div>
-        <Button onClick={loadImages} variant="outline" size="sm">
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Riprova
-        </Button>
-      </div>
+      <Card className={className}>
+        <CardContent className="p-0">
+          <div className="relative w-full h-[400px] bg-gray-100 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-red-500 mb-2">{error}</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Riprova
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   const currentImage = images[currentIndex]
 
   return (
-    <div className={cn("relative w-full h-64 md:h-80 lg:h-96 overflow-hidden group", className)}>
-      {/* Immagine principale */}
-      <div className="relative w-full h-full">
-        <img
-          src={currentImage?.src || "/placeholder.svg"}
-          alt={currentImage?.title || "Immagine galleria"}
-          className="w-full h-full object-cover transition-opacity duration-500"
-          onError={(e) => {
-            // Fallback se l'immagine non si carica
-            const target = e.target as HTMLImageElement
-            target.src = "/placeholder.svg?height=400&width=600"
-          }}
-        />
+    <Card className={className}>
+      <CardContent className="p-0">
+        <div className="relative w-full h-[400px] overflow-hidden rounded-lg">
+          {/* Immagine principale */}
+          <img
+            src={currentImage.src || "/placeholder.svg"}
+            alt={currentImage.alt}
+            className="w-full h-full object-cover transition-opacity duration-500"
+            onError={(e) => {
+              // Fallback se l'immagine non si carica
+              const target = e.target as HTMLImageElement
+              target.src = "/placeholder.svg?height=400&width=600&text=Immagine+Non+Disponibile"
+            }}
+          />
 
-        {/* Overlay con informazioni */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
-          <div className="absolute bottom-4 left-4 text-white">
-            <h3 className="text-lg font-semibold mb-1">{currentImage?.title}</h3>
-            <p className="text-sm opacity-90">{currentImage?.description}</p>
-          </div>
-        </div>
+          {/* Overlay con titolo se presente */}
+          {currentImage.title && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-4">
+              <h3 className="text-lg font-semibold">{currentImage.title}</h3>
+            </div>
+          )}
 
-        {/* Barra di progresso */}
-        {isPlaying && images.length > 1 && (
-          <div className="absolute top-0 left-0 w-full h-1 bg-black/20">
-            <div
-              className="h-full bg-white/80 transition-all duration-100 ease-linear"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        )}
-      </div>
+          {/* Controlli di navigazione */}
+          {showControls && images.length > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white"
+                onClick={goToPrevious}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
 
-      {/* Controlli di navigazione */}
-      {showControls && images.length > 1 && (
-        <>
-          {/* Pulsanti precedente/successivo */}
-          <div className="absolute inset-y-0 left-0 flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={prevImage}
-              className="ml-2 bg-black/20 hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-          </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white"
+                onClick={goToNext}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
 
-          <div className="absolute inset-y-0 right-0 flex items-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={nextImage}
-              className="mr-2 bg-black/20 hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </Button>
-          </div>
-
-          {/* Controlli play/pause */}
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={togglePlayPause}
-              className="bg-black/20 hover:bg-black/40 text-white"
-            >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </Button>
-          </div>
+              {/* Controllo play/pause */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white"
+                onClick={togglePlayPause}
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+            </>
+          )}
 
           {/* Indicatori di posizione */}
-          <div className="absolute bottom-4 right-4 flex space-x-2">
-            {images.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => goToImage(index)}
-                className={cn(
-                  "w-2 h-2 rounded-full transition-all duration-200",
-                  index === currentIndex ? "bg-white scale-125" : "bg-white/50 hover:bg-white/75",
-                )}
-              />
-            ))}
-          </div>
-        </>
-      )}
+          {images.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+              {images.map((_, index) => (
+                <button
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    index === currentIndex ? "bg-white" : "bg-white bg-opacity-50"
+                  }`}
+                  onClick={() => setCurrentIndex(index)}
+                />
+              ))}
+            </div>
+          )}
 
-      {/* Informazioni sulla fonte */}
-      <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="bg-black/20 text-white text-xs px-2 py-1 rounded">
-          {currentImage?.source === "folder" ? "📁 Galleria" : "🔄 Fallback"} • {currentIndex + 1}/{images.length}
+          {/* Badge con numero immagine */}
+          {images.length > 1 && (
+            <Badge className="absolute top-2 left-2 bg-black bg-opacity-50 text-white">
+              {currentIndex + 1} / {images.length}
+            </Badge>
+          )}
+
+          {/* Barra di progresso per autoplay */}
+          {isPlaying && images.length > 1 && (
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-black bg-opacity-30">
+              <div
+                className="h-full bg-white transition-all duration-100 ease-linear"
+                style={{
+                  width: `${((Date.now() % interval) / interval) * 100}%`,
+                }}
+              />
+            </div>
+          )}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

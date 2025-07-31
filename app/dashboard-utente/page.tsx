@@ -152,7 +152,7 @@ const AVAILABLE_WIDGETS = [
 
 export default function UserDashboardPage() {
   const { user } = useAuth()
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("todo_kanban")
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string>("agenda")
   const [key, setKey] = useState(0)
 
   const selectedWidget = AVAILABLE_WIDGETS.find((widget) => widget.id === selectedWidgetId)
@@ -215,7 +215,12 @@ export default function UserDashboardPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={reloadWidget} className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reloadWidget}
+              className="flex items-center gap-2 bg-transparent"
+            >
               <RefreshCw className="h-4 w-4" />
               Ricarica Widget
             </Button>

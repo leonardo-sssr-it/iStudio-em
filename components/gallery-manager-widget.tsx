@@ -1,250 +1,226 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { RefreshCw, ImageIcon, Folder, Calendar, Eye } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { RefreshCw, ImageIcon, Eye, AlertCircle, CheckCircle, Folder, FileImage } from "lucide-react"
+import { ImageGallery } from "@/components/image-gallery"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface GalleryImage {
-  id: number
-  filename: string
-  title: string
   src: string
-  description: string
-  uploadedAt: string
-  source: string
+  alt: string
+  title?: string
 }
 
 interface GalleryStats {
-  total: number
-  fromFolder: number
-  uploadedToday: number
+  totalImages: number
+  lastUpdated: string
+  folderPath: string
 }
 
 export function GalleryManagerWidget() {
   const [images, setImages] = useState<GalleryImage[]>([])
-  const [stats, setStats] = useState<GalleryStats>({
-    total: 0,
-    fromFolder: 0,
-    uploadedToday: 0,
-  })
-  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<GalleryStats | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
+  // Carica le immagini e le statistiche
   const loadGalleryData = async () => {
-    setLoading(true)
-    setError(null)
-
     try {
+      setIsLoading(true)
+      setError(null)
+
       const response = await fetch("/api/gallery-images")
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
       const data = await response.json()
 
       if (data.success) {
         setImages(data.images || [])
-        setStats(data.stats || { total: 0, fromFolder: 0, uploadedToday: 0 })
+        setStats({
+          totalImages: data.count || 0,
+          lastUpdated: new Date().toLocaleString("it-IT"),
+          folderPath: "/public/images/gallery",
+        })
       } else {
-        setError(data.message || "Errore nel caricamento")
-        setImages([])
-        setStats({ total: 0, fromFolder: 0, uploadedToday: 0 })
+        throw new Error(data.message || "Errore nel caricamento")
       }
+
+      setLastRefresh(new Date())
     } catch (err) {
       console.error("Errore nel caricamento della galleria:", err)
-      setError("Impossibile caricare la galleria")
-      setImages([])
-      setStats({ total: 0, fromFolder: 0, uploadedToday: 0 })
+      setError(err instanceof Error ? err.message : "Errore sconosciuto")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
+  // Carica i dati al mount del componente
   useEffect(() => {
     loadGalleryData()
   }, [])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("it-IT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  // Funzione per aggiornare manualmente
+  const handleRefresh = () => {
+    loadGalleryData()
   }
 
-  const handleImageClick = (image: GalleryImage) => {
-    setSelectedImage(selectedImage?.id === image.id ? null : image)
+  // Funzione per mostrare/nascondere l'anteprima
+  const togglePreview = () => {
+    setShowPreview(!showPreview)
   }
 
   return (
     <Card className="w-full">
-      <CardHeader className="pb-3">
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <ImageIcon className="h-5 w-5" />
-              Gestione Galleria
-            </CardTitle>
-            <CardDescription>Gestisci le immagini della galleria principale</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <ImageIcon className="h-5 w-5" />
+            Gestione Galleria
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={togglePreview}
+              className="flex items-center gap-1 bg-transparent"
+            >
+              <Eye className="h-4 w-4" />
+              {showPreview ? "Nascondi" : "Anteprima"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-1 bg-transparent"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              Aggiorna
+            </Button>
           </div>
-          <Button onClick={loadGalleryData} disabled={loading} variant="outline" size="sm">
-            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-            Aggiorna
-          </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Statistiche */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">Totale</div>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
           </div>
-          <div className="text-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.fromFolder}</div>
-            <div className="text-sm text-muted-foreground">Da Cartella</div>
-          </div>
-          <div className="text-center p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
-            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.uploadedToday}</div>
-            <div className="text-sm text-muted-foreground">Oggi</div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* Stato di caricamento */}
-        {loading && (
-          <div className="flex items-center justify-center py-8">
-            <RefreshCw className="h-6 w-6 animate-spin mr-2" />
-            <span>Caricamento galleria...</span>
-          </div>
-        )}
-
-        {/* Errore */}
-        {error && !loading && (
-          <div className="text-center py-8">
-            <div className="text-red-500 mb-2">⚠️ {error}</div>
-            <Button onClick={loadGalleryData} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Riprova
-            </Button>
-          </div>
-        )}
-
-        {/* Lista immagini */}
-        {!loading && !error && (
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-2">
-              {images.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Nessuna immagine trovata</p>
-                  <p className="text-sm">Aggiungi immagini nella cartella /public/images/gallery</p>
-                </div>
-              ) : (
-                images.map((image) => (
-                  <div key={image.id} className="space-y-2">
-                    <div
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                        selectedImage?.id === image.id
-                          ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
-                          : "hover:bg-gray-50 dark:hover:bg-gray-800/50",
-                      )}
-                      onClick={() => handleImageClick(image)}
-                    >
-                      {/* Thumbnail */}
-                      <div className="flex-shrink-0">
-                        <img
-                          src={image.src || "/placeholder.svg"}
-                          alt={image.title}
-                          className="w-12 h-12 object-cover rounded border"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/placeholder.svg?height=48&width=48"
-                          }}
-                        />
-                      </div>
-
-                      {/* Informazioni */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium truncate">{image.title}</h4>
-                          <Badge variant={image.source === "folder" ? "default" : "secondary"} className="text-xs">
-                            {image.source === "folder" ? (
-                              <>
-                                <Folder className="h-3 w-3 mr-1" />
-                                Cartella
-                              </>
-                            ) : (
-                              <>
-                                <Calendar className="h-3 w-3 mr-1" />
-                                Caricato
-                              </>
-                            )}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">{image.filename}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(image.uploadedAt)}</p>
-                      </div>
-
-                      {/* Azioni */}
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Dettagli espansi */}
-                    {selectedImage?.id === image.id && (
-                      <div className="ml-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border-l-2 border-blue-200 dark:border-blue-800">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {/* Preview immagine */}
-                          <div>
-                            <img
-                              src={image.src || "/placeholder.svg"}
-                              alt={image.title}
-                              className="w-full h-32 object-cover rounded border"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.src = "/placeholder.svg?height=128&width=200"
-                              }}
-                            />
-                          </div>
-
-                          {/* Dettagli */}
-                          <div className="space-y-2">
-                            <div>
-                              <label className="text-sm font-medium">Titolo:</label>
-                              <p className="text-sm text-muted-foreground">{image.title}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Descrizione:</label>
-                              <p className="text-sm text-muted-foreground">{image.description}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">File:</label>
-                              <p className="text-sm text-muted-foreground">{image.filename}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Percorso:</label>
-                              <p className="text-sm text-muted-foreground font-mono">{image.src}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
+        ) : stats ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+              <FileImage className="h-5 w-5 text-blue-600" />
+              <div>
+                <div className="font-semibold text-blue-900">{stats.totalImages}</div>
+                <div className="text-xs text-blue-700">Immagini totali</div>
+              </div>
             </div>
-          </ScrollArea>
+
+            <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+              <Folder className="h-5 w-5 text-green-600" />
+              <div>
+                <div className="font-semibold text-green-900">Gallery</div>
+                <div className="text-xs text-green-700">Cartella attiva</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <RefreshCw className="h-5 w-5 text-gray-600" />
+              <div>
+                <div className="font-semibold text-gray-900 text-xs">{lastRefresh.toLocaleTimeString("it-IT")}</div>
+                <div className="text-xs text-gray-700">Ultimo aggiornamento</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Stato della galleria */}
+        {!isLoading && (
+          <div className="flex items-center gap-2">
+            {error ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Errore: {error}</AlertDescription>
+              </Alert>
+            ) : images.length > 0 ? (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>Galleria caricata correttamente con {images.length} immagini</AlertDescription>
+              </Alert>
+            ) : (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Nessuna immagine trovata nella cartella /public/images/gallery</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+
+        {/* Lista delle immagini */}
+        {!isLoading && images.length > 0 && (
+          <div>
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              <FileImage className="h-4 w-4" />
+              Immagini disponibili
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+              {images.map((image, index) => (
+                <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
+                  <img
+                    src={image.src || "/placeholder.svg"}
+                    alt={image.alt}
+                    className="w-8 h-8 object-cover rounded"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = "/placeholder.svg?height=32&width=32&text=?"
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate font-medium">{image.title}</div>
+                    <div className="text-xs text-gray-500 truncate">{image.src.split("/").pop()}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Anteprima della galleria */}
+        {showPreview && !isLoading && images.length > 0 && (
+          <div>
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Anteprima Slideshow
+            </h4>
+            <ImageGallery autoPlay={true} interval={3000} showControls={true} className="max-w-md mx-auto" />
+          </div>
+        )}
+
+        {/* Istruzioni per aggiungere immagini */}
+        {!isLoading && images.length === 0 && !error && (
+          <div className="text-center py-6 bg-gray-50 rounded-lg">
+            <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+            <h4 className="font-semibold text-gray-700 mb-2">Nessuna immagine trovata</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Per aggiungere immagini alla galleria, inseriscile nella cartella:
+            </p>
+            <Badge variant="outline" className="font-mono text-xs">
+              /public/images/gallery/
+            </Badge>
+            <p className="text-xs text-gray-500 mt-2">Formati supportati: JPG, PNG, GIF, WebP, SVG</p>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -1,88 +1,77 @@
 import { type NextRequest, NextResponse } from "next/server"
-import fs from "fs"
+import { promises as fs } from "fs"
 import path from "path"
 
 export async function GET(request: NextRequest) {
   try {
+    // Percorso della cartella delle immagini
     const galleryPath = path.join(process.cwd(), "public", "images", "gallery")
 
     // Verifica se la cartella esiste
-    if (!fs.existsSync(galleryPath)) {
+    try {
+      await fs.access(galleryPath)
+    } catch {
+      // Se la cartella non esiste, restituisci un array vuoto
       return NextResponse.json({
-        success: false,
-        message: "Cartella gallery non trovata",
+        success: true,
         images: [],
-        stats: {
-          total: 0,
-          fromFolder: 0,
-          uploadedToday: 0,
-        },
+        message: "Cartella gallery non trovata",
       })
     }
 
-    // Legge tutti i file dalla cartella
-    const files = fs.readdirSync(galleryPath)
+    // Leggi i file nella cartella
+    const files = await fs.readdir(galleryPath)
 
     // Filtra solo i file immagine
     const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
     const imageFiles = files.filter((file) => imageExtensions.some((ext) => file.toLowerCase().endsWith(ext)))
 
-    // Crea l'array delle immagini con metadati
-    const images = imageFiles.map((filename, index) => {
-      const filePath = path.join(galleryPath, filename)
-      const stats = fs.statSync(filePath)
-
-      // Genera un titolo dal nome del file
-      const title = filename
-        .replace(/\.[^/.]+$/, "") // Rimuove l'estensione
-        .replace(/[-_]/g, " ") // Sostituisce trattini e underscore con spazi
-        .replace(/\b\w/g, (l) => l.toUpperCase()) // Capitalizza ogni parola
+    // Crea l'array di immagini con i metadati
+    const images = imageFiles.map((file) => {
+      const name = path.parse(file).name
+      const title = name
+        .split(/[-_]/)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
 
       return {
-        id: index + 1,
-        filename,
-        title,
-        src: `/images/gallery/${filename}`,
-        description: `Immagine della galleria: ${title}`,
-        uploadedAt: stats.mtime.toISOString(),
-        source: "folder",
+        src: `/images/gallery/${file}`,
+        alt: title,
+        title: title,
       }
     })
 
-    // Calcola le statistiche
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const uploadedToday = images.filter((img) => {
-      const uploadDate = new Date(img.uploadedAt)
-      uploadDate.setHours(0, 0, 0, 0)
-      return uploadDate.getTime() === today.getTime()
-    }).length
-
-    const stats = {
-      total: images.length,
-      fromFolder: images.length,
-      uploadedToday,
-    }
+    // Ordina le immagini per nome
+    images.sort((a, b) => a.title.localeCompare(b.title))
 
     return NextResponse.json({
       success: true,
-      message: `Trovate ${images.length} immagini nella galleria`,
       images,
-      stats,
+      count: images.length,
+      message: `Trovate ${images.length} immagini`,
     })
   } catch (error) {
-    console.error("Errore nell'API gallery-images:", error)
+    console.error("Errore nel caricamento delle immagini:", error)
 
-    return NextResponse.json({
-      success: false,
-      message: "Errore nel caricamento delle immagini",
-      images: [],
-      stats: {
-        total: 0,
-        fromFolder: 0,
-        uploadedToday: 0,
+    return NextResponse.json(
+      {
+        success: false,
+        images: [],
+        error: "Errore interno del server",
+        message: error instanceof Error ? error.message : "Errore sconosciuto",
       },
-    })
+      { status: 500 },
+    )
   }
+}
+
+// Supporta anche il metodo POST per eventuali future funzionalità
+export async function POST(request: NextRequest) {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Metodo POST non ancora implementato",
+    },
+    { status: 501 },
+  )
 }

@@ -1,58 +1,53 @@
-// File di configurazione per la galleria immagini
-// Questo file viene utilizzato come fallback se l'API non riesce a leggere la cartella
+// Configurazione per la galleria di immagini
+// Questo file può essere utilizzato per configurazioni avanzate della galleria
 
-export interface GalleryImageConfig {
-  filename: string
-  title: string
-  description: string
-  alt: string
+export interface GalleryConfig {
+  // Cartella delle immagini (relativa a /public)
+  imagePath: string
+  // Estensioni supportate
+  supportedExtensions: string[]
+  // Immagini di fallback
+  fallbackImages: Array<{
+    src: string
+    alt: string
+    title: string
+  }>
+  // Configurazioni slideshow
+  defaultInterval: number
+  defaultAutoPlay: boolean
 }
 
-export const galleryImages: GalleryImageConfig[] = [
-  {
-    filename: "business-analytics.jpg",
-    title: "Business Analytics",
-    description: "Professionista in ufficio moderno con grafici analitici",
-    alt: "Professionista che analizza grafici e dati su computer",
-  },
-  {
-    filename: "creative-ai.jpg",
-    title: "Arte Digitale",
-    description: "Arte digitale creata da mani robotiche",
-    alt: "Mani robotiche che creano arte digitale",
-  },
-  {
-    filename: "multitasking.jpg",
-    title: "Multitasking",
-    description: "Illustrazione di multitasking e gestione dello stress lavorativo",
-    alt: "Persona che gestisce multiple attività contemporaneamente",
-  },
-  {
-    filename: "pianist.jpg",
-    title: "Performance Musicale",
-    description: "Pianista che si esibisce in un teatro vuoto",
-    alt: "Pianista che suona in un teatro elegante",
-  },
-  {
-    filename: "team-collaboration.jpg",
-    title: "Collaborazione Team",
-    description: "Team di lavoro collaborativo in ambiente moderno",
-    alt: "Team che collabora in un ufficio moderno",
-  },
-]
-
-// Funzione helper per ottenere il percorso completo dell'immagine
-export function getImagePath(filename: string): string {
-  return `/images/gallery/${filename}`
+export const galleryConfig: GalleryConfig = {
+  imagePath: "/images/gallery",
+  supportedExtensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+  fallbackImages: [
+    {
+      src: "/placeholder.svg?height=400&width=600&text=Galleria+Vuota",
+      alt: "Galleria vuota",
+      title: "Nessuna immagine disponibile",
+    },
+    {
+      src: "/placeholder.svg?height=400&width=600&text=Aggiungi+Immagini",
+      alt: "Aggiungi immagini",
+      title: "Aggiungi immagini alla galleria",
+    },
+  ],
+  defaultInterval: 5000, // 5 secondi
+  defaultAutoPlay: true,
 }
 
-// Funzione helper per ottenere tutte le immagini con percorsi completi
-export function getAllImages() {
-  return galleryImages.map((img, index) => ({
-    id: index + 1,
-    ...img,
-    src: getImagePath(img.filename),
-    uploadedAt: new Date().toISOString(),
-    source: "config",
-  }))
+// Utility per generare nomi di file friendly
+export const generateFriendlyName = (filename: string): string => {
+  return filename
+    .replace(/\.[^/.]+$/, "") // Rimuovi estensione
+    .split(/[-_]/) // Dividi su trattini e underscore
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalizza
+    .join(" ") // Unisci con spazi
 }
+
+// Utility per validare se un file è un'immagine
+export const isImageFile = (filename: string): boolean => {
+  return galleryConfig.supportedExtensions.some((ext) => filename.toLowerCase().endsWith(ext))
+}
+
+export default galleryConfig

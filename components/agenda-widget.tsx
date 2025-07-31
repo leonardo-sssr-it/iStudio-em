@@ -34,6 +34,10 @@ import {
   Globe,
   User,
   Bug,
+  Calendar,
+  CheckSquare,
+  Target,
+  Briefcase,
 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useAgendaItems, type AgendaItem } from "@/hooks/use-agenda-items"
@@ -47,6 +51,38 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-provider"
 import { useDebugConfig } from "@/hooks/use-debug-config"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
+
+// Cookie management per salvare la vista selezionata
+const AGENDA_VIEW_COOKIE = "agenda_view_preference"
+
+const saveViewPreference = (view: "daily" | "weekly" | "monthly") => {
+  const viewCode = view === "daily" ? "1" : view === "weekly" ? "2" : "3"
+  document.cookie = `${AGENDA_VIEW_COOKIE}=${viewCode}; path=/; max-age=${60 * 60 * 24 * 30}` // 30 giorni
+}
+
+const getViewPreference = (): "daily" | "weekly" | "monthly" => {
+  if (typeof document === "undefined") return "daily"
+
+  const cookies = document.cookie.split(";")
+  const viewCookie = cookies.find((cookie) => cookie.trim().startsWith(`${AGENDA_VIEW_COOKIE}=`))
+
+  if (viewCookie) {
+    const viewCode = viewCookie.split("=")[1]
+    switch (viewCode) {
+      case "1":
+        return "daily"
+      case "2":
+        return "weekly"
+      case "3":
+        return "monthly"
+      default:
+        return "daily"
+    }
+  }
+
+  return "daily" // Default se non c'è cookie
+}
 
 // Funzioni di utilità per il debug
 const formatDateForDebug = (date: Date | undefined): string => {
@@ -101,6 +137,51 @@ const conditionalLog = (message: string, data?: any, isDebugEnabled = false) => 
       console.log(message)
     }
   }
+}
+
+// Componente per il menu di creazione nuovo elemento
+const NewItemMenu = ({ day, onClose }: { day: Date; onClose: () => void }) => {
+  const router = useRouter()
+
+  const handleNewItem = (type: string) => {
+    // Formatta la data per il passaggio come parametro
+    const dateParam = format(day, "yyyy-MM-dd")
+
+    // Naviga a data-explorer con parametri per creare nuovo elemento
+    router.push(`/data-explorer?new=${type}&date=${dateParam}`)
+    onClose()
+  }
+
+  return (
+    <div className="space-y-2 p-2">
+      <div className="font-semibold text-sm mb-2">Nuovo elemento per {format(day, "d MMMM yyyy", { locale: it })}</div>
+
+      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleNewItem("appuntamento")}>
+        <Calendar className="h-4 w-4 mr-2" />
+        Nuovo Appuntamento
+      </Button>
+
+      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleNewItem("attivita")}>
+        <Target className="h-4 w-4 mr-2" />
+        Nuova Attività
+      </Button>
+
+      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleNewItem("todolist")}>
+        <CheckSquare className="h-4 w-4 mr-2" />
+        Nuova Todolist
+      </Button>
+
+      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleNewItem("scadenza")}>
+        <AlertCircle className="h-4 w-4 mr-2" />
+        Nuova Scadenza
+      </Button>
+
+      <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleNewItem("progetto")}>
+        <Briefcase className="h-4 w-4 mr-2" />
+        Nuovo Progetto
+      </Button>
+    </div>
+  )
 }
 
 // Componente per visualizzare un singolo elemento dell'agenda
@@ -660,14 +741,36 @@ const MonthlyView = ({
             <div
               key={day.toString()}
               className={`
-                p-1 min-h-[80px] rounded-md border text-sm
+                p-1 rounded-md border text-sm
                 ${isToday(day) ? "bg-blue-50 border-blue-200" : ""}
                 ${!isCurrentMonth ? "bg-gray-100 text-gray-400" : ""}
               `}
+              style={{
+                minHeight: "120px", // ALTEZZA CELLE MENSILI: Modifica questo valore per cambiare l'altezza delle celle (es: 100px, 140px, 160px)
+              }}
             >
-              <div className="text-right font-medium mb-1 text-xs">{format(day, "d")}</div>
+              {/* Numero del giorno con background invertito e menu per nuovo elemento */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div
+                    className={cn(
+                      "text-right font-medium mb-1 text-xs cursor-pointer rounded transition-colors",
+                      "px-1.5 py-0.5", // PADDING NUMERO GIORNO: Modifica questi valori per cambiare il padding (es: px-2 py-1, px-1 py-0.5)
+                      isCurrentMonth
+                        ? "bg-gray-800 text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-800 dark:hover:bg-gray-300" // COLORI INVERTITI: Modifica questi colori per personalizzare l'aspetto
+                        : "bg-gray-400 text-white hover:bg-gray-500",
+                    )}
+                    title="Clicca per aggiungere nuovo elemento"
+                  >
+                    {format(day, "d")}
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-64" side="bottom" align="start">
+                  <NewItemMenu day={day} onClose={() => {}} />
+                </PopoverContent>
+              </Popover>
 
-              <div className="space-y-0.5 max-h-[60px] overflow-y-auto">
+              <div className="space-y-0.5 max-h-[80px] overflow-y-auto">
                 {dayItems.length > 0
                   ? dayItems.slice(0, 3).map((item) => {
                       // Ottieni l'abbreviazione del tipo
@@ -878,11 +981,15 @@ export interface AgendaWidgetProps {
 }
 
 export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProps) {
-  const { user, isAdmin, isLoading: authIsLoading } = useAuth() // user can be null
+  const { user, isAdmin, isLoading: authIsLoading } = useAuth()
   const { isDebugEnabled, isLoading: isDebugConfigLoading } = useDebugConfig()
 
   const [currentDate, setCurrentDate] = useState(initialDate || new Date())
-  const [view, setView] = useState<"daily" | "weekly" | "monthly">(mode === "mobile" ? "daily" : "daily")
+  // Usa la preferenza salvata nei cookie come vista iniziale
+  const [view, setView] = useState<"daily" | "weekly" | "monthly">(() => {
+    if (mode === "mobile") return "daily"
+    return getViewPreference()
+  })
   const [filters, setFilters] = useState({
     attivita: true,
     progetti: true,
@@ -899,6 +1006,12 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
   const [debugItems, setDebugItems] = useState<any[]>([])
 
   const isDebugAllowed = isAdmin && isDebugEnabled && !isDebugConfigLoading
+
+  // Salva la preferenza quando cambia la vista
+  const handleViewChange = (newView: "daily" | "weekly" | "monthly") => {
+    setView(newView)
+    saveViewPreference(newView)
+  }
 
   const { startDate, endDate } = useMemo(() => {
     // Crea date stabili usando solo i valori numerici
@@ -929,7 +1042,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
     }
 
     return { startDate: start, endDate: end }
-  }, [currentDate.getTime(), view]) // Usa getTime() per dipendenza stabile
+  }, [currentDate.getTime(), view])
 
   const addLog = useCallback(
     (message: string) => {
@@ -955,7 +1068,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
       }))
       setDebugItems(debugData)
     }
-  }, [items, items.length, isDebugAllowed]) // Usa items.length invece di items per evitare loop
+  }, [items, items.length, isDebugAllowed])
 
   useMemo(() => {
     if (items.length > 0) {
@@ -967,7 +1080,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
   const filteredItems = useMemo(() => {
     // Guard against user being null during auth loading or if not authenticated
     if (authIsLoading || !user) {
-      return [] // Return empty array if user is not available yet
+      return []
     }
     return items.filter((item) => {
       let passesTypeFilter = false
@@ -983,9 +1096,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
           break
         case "scadenza":
           if (item.generale) {
-            // user is guaranteed to be non-null here due to the guard above
             if (user.id === 1) {
-              // Check user.id directly
               if (isDebugAllowed)
                 console.log("Filtro: utente 1 non dovrebbe vedere scadenze generali qui (già filtrate)")
               passesTypeFilter = false
@@ -1009,7 +1120,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
       const passesClienteFilter = !clienteFilter || item.cliente === clienteFilter
       return passesTypeFilter && passesSearchFilter && passesClienteFilter
     })
-  }, [items, filters, searchTerm, clienteFilter, user, authIsLoading, isDebugAllowed]) // Added authIsLoading and user
+  }, [items, filters, searchTerm, clienteFilter, user, authIsLoading, isDebugAllowed])
 
   const navigatePrevious = () => {
     switch (view) {
@@ -1086,8 +1197,7 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={navigateToday}>
-              {" "}
-              Oggi{" "}
+              Oggi
             </Button>
             <Button variant="outline" size="sm" onClick={navigateNext}>
               <ChevronRight className="h-4 w-4" />
@@ -1110,9 +1220,9 @@ export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProp
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2">
             <Tabs
-              defaultValue={mode === "mobile" ? "daily" : "daily"}
+              defaultValue={mode === "mobile" ? "daily" : getViewPreference()}
               value={view}
-              onValueChange={(v) => setView(v as any)}
+              onValueChange={handleViewChange}
             >
               <TabsList
                 className={cn(
