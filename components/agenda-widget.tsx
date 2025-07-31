@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useMemo } from "react"
 import {
   format,
-  addDays,
   startOfWeek,
   endOfWeek,
   startOfMonth,
@@ -11,77 +10,42 @@ import {
   eachDayOfInterval,
   isSameDay,
   isWithinInterval,
-  addWeeks,
-  addMonths,
-  subWeeks,
-  subMonths,
   isToday,
 } from "date-fns"
 import { it } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  Info,
-  Search,
-  Filter,
-  Download,
-  AlertCircle,
-  Globe,
-  User,
-  Bug,
-  Calendar,
-  CheckSquare,
-  Target,
-  Briefcase,
-} from "lucide-react"
+import { Clock, AlertCircle, Globe, User, Calendar, CheckSquare, Target, Briefcase } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useAgendaItems, type AgendaItem } from "@/hooks/use-agenda-items"
+import type { AgendaItem } from "@/hooks/use-agenda-items"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { useAuth } from "@/lib/auth-provider"
-import { useDebugConfig } from "@/hooks/use-debug-config"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
-// Cookie management per salvare la vista selezionata
-const AGENDA_VIEW_COOKIE = "agenda_view_preference"
+// Cookie management per salvare la vista selezionata - SOSTITUITO CON LOCALSTORAGE
+const AGENDA_VIEW_STORAGE_KEY = "agenda_view_preference"
 
 const saveViewPreference = (view: "daily" | "weekly" | "monthly") => {
-  const viewCode = view === "daily" ? "1" : view === "weekly" ? "2" : "3"
-  document.cookie = `${AGENDA_VIEW_COOKIE}=${viewCode}; path=/; max-age=${60 * 60 * 24 * 30}` // 30 giorni
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(AGENDA_VIEW_STORAGE_KEY, view)
+    }
+  } catch (error) {
+    console.warn("Impossibile salvare la preferenza della vista agenda:", error)
+  }
 }
 
 const getViewPreference = (): "daily" | "weekly" | "monthly" => {
-  if (typeof document === "undefined") return "daily"
-
-  const cookies = document.cookie.split(";")
-  const viewCookie = cookies.find((cookie) => cookie.trim().startsWith(`${AGENDA_VIEW_COOKIE}=`))
-
-  if (viewCookie) {
-    const viewCode = viewCookie.split("=")[1]
-    switch (viewCode) {
-      case "1":
-        return "daily"
-      case "2":
-        return "weekly"
-      case "3":
-        return "monthly"
-      default:
-        return "daily"
+  try {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(AGENDA_VIEW_STORAGE_KEY)
+      if (saved && (saved === "daily" || saved === "weekly" || saved === "monthly")) {
+        return saved
+      }
     }
+  } catch (error) {
+    console.warn("Impossibile leggere la preferenza della vista agenda:", error)
   }
-
-  return "daily" // Default se non c'è cookie
+  return "daily" // Default
 }
 
 // Funzioni di utilità per il debug
@@ -800,775 +764,37 @@ const MonthlyView = ({
                               style={{ backgroundColor: item.colore }}
                             >
                               {/* Tipo in verticale ruotato di 90° */}
-                              <div className="bg-black text-white text-[6px] font-bold flex items-center justify-center px-0.5 w-3">
+                              <div className="bg-black text-white text-[6px] font-bold flex items-center justify-center px-0.5 w-4">
                                 <span className="transform rotate-90 whitespace-nowrap">{typeAbbr}</span>
                               </div>
 
                               {/* Contenuto principale */}
-                              <div className="flex-1 p-0.5 truncate flex items-center">
-                                {item.generale && <Globe className="h-2 w-2 mr-0.5 text-gray-700 flex-shrink-0" />}
-                                {item.titolo}
-                              </div>
-                            </div>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80">
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <h4 className="font-bold flex-1">{item.titolo}</h4>
-                                {item.generale ? (
-                                  <Badge variant="outline" className="ml-2 bg-amber-100">
-                                    <Globe className="h-3 w-3 mr-1" />
-                                    Generale
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="ml-2 bg-blue-100">
-                                    <User className="h-3 w-3 mr-1" />
-                                    Personale
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="flex items-center text-sm">
-                                <Clock className="h-4 w-4 mr-1" />
-                                <span>
-                                  {format(item.data_inizio, "PPP", { locale: it })} {formatTime(item.data_inizio)}
+                              <div className="flex-1 p-1.5">
+                                <div className="font-medium text-gray-800 truncate flex items-center text-xs">
+                                  {item.generale && (
+                                    <Globe className="h-2.5 w-2.5 mr-0.5 text-gray-700 flex-shrink-0" />
+                                  )}
+                                  {item.titolo}
+                                </div>
+                                <div className="text-xs text-gray-700 flex items-center">
+                                  <Clock className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+                                  {formatTime(item.data_inizio)}
                                   {item.data_fine &&
                                     item.data_fine.getTime() !== item.data_inizio.getTime() &&
                                     ` - ${formatTime(item.data_fine)}`}
-                                </span>
-                              </div>
-
-                              {item.cliente && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Cliente:</span> {item.cliente}
                                 </div>
-                              )}
-
-                              {item.stato && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Stato:</span> {item.stato}
-                                </div>
-                              )}
-
-                              {item.priorita && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Priorità:</span> {item.priorita}
-                                </div>
-                              )}
-
-                              {item.descrizione && (
-                                <div className="text-sm mt-2">
-                                  <span className="font-semibold">Descrizione:</span>
-                                  <p className="mt-1">{item.descrizione}</p>
-                                </div>
-                              )}
-
-                              <div className="text-xs text-gray-500 mt-2">
-                                Origine: {item.tabella_origine} (ID: {item.id_origine})
                               </div>
                             </div>
-                          </PopoverContent>
+                          </PopoverTrigger>
                         </Popover>
                       )
                     })
                   : null}
-
-                {dayItems.length > 3 && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <div className="text-[10px] text-center cursor-pointer text-blue-600 hover:underline">
-                        +{dayItems.length - 3} altri
-                      </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64">
-                      <div className="space-y-2">
-                        <h4 className="font-bold">{format(day, "EEEE d MMMM", { locale: it })}</h4>
-                        <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                          {dayItems.map((item) => {
-                            // Ottieni l'abbreviazione del tipo
-                            const typeAbbr = TYPE_ABBR[item.tipo] || item.tipo.substring(0, 3).toUpperCase()
-
-                            return (
-                              <Popover
-                                key={`popup-${item.tabella_origine}-${item.id}-${item.generale ? "gen" : "pers"}`}
-                              >
-                                <PopoverTrigger asChild>
-                                  <div
-                                    className="text-xs rounded overflow-hidden flex items-stretch cursor-pointer hover:opacity-90 transition-opacity"
-                                    style={{ backgroundColor: item.colore }}
-                                  >
-                                    {/* Tipo in verticale ruotato di 90° */}
-                                    <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 w-4">
-                                      <span className="transform rotate-90 whitespace-nowrap">{typeAbbr}</span>
-                                    </div>
-
-                                    {/* Contenuto principale */}
-                                    <div className="flex-1 p-1.5">
-                                      <div className="font-medium flex items-center">
-                                        {item.generale && <Globe className="h-2.5 w-2.5 mr-0.5 text-gray-700" />}
-                                        {item.titolo}
-                                      </div>
-                                      <div className="text-xs">
-                                        {formatTime(item.data_inizio)}
-                                        {item.data_fine &&
-                                          item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                                          ` - ${formatTime(item.data_fine)}`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                  <div className="space-y-2">
-                                    <div className="flex items-center">
-                                      <h4 className="font-bold flex-1">{item.titolo}</h4>
-                                      {item.generale ? (
-                                        <Badge variant="outline" className="ml-2 bg-amber-100">
-                                          <Globe className="h-3 w-3 mr-1" />
-                                          Generale
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="outline" className="ml-2 bg-blue-100">
-                                          <User className="h-3 w-3 mr-1" />
-                                          Personale
-                                        </Badge>
-                                      )}
-                                    </div>
-
-                                    <div className="flex items-center text-sm">
-                                      <Clock className="h-4 w-4 mr-1" />
-                                      <span>
-                                        {format(item.data_inizio, "PPP", { locale: it })} {formatTime(item.data_inizio)}
-                                        {item.data_fine &&
-                                          item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                                          ` - ${formatTime(item.data_fine)}`}
-                                      </span>
-                                    </div>
-
-                                    {item.cliente && (
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Cliente:</span> {item.cliente}
-                                      </div>
-                                    )}
-
-                                    {item.stato && (
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Stato:</span> {item.stato}
-                                      </div>
-                                    )}
-
-                                    {item.priorita && (
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Priorità:</span> {item.priorita}
-                                      </div>
-                                    )}
-
-                                    {item.descrizione && (
-                                      <div className="text-sm mt-2">
-                                        <span className="font-semibold">Descrizione:</span>
-                                        <p className="mt-1">{item.descrizione}</p>
-                                      </div>
-                                    )}
-
-                                    <div className="text-xs text-gray-500 mt-2">
-                                      Origine: {item.tabella_origine} (ID: {item.id_origine})
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
               </div>
             </div>
           )
         })}
       </div>
     </div>
-  )
-}
-
-export interface AgendaWidgetProps {
-  initialDate?: Date
-  mode?: "desktop" | "mobile"
-}
-
-export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProps) {
-  const { user, isAdmin, isLoading: authIsLoading } = useAuth()
-  const { isDebugEnabled, isLoading: isDebugConfigLoading } = useDebugConfig()
-
-  const [currentDate, setCurrentDate] = useState(initialDate || new Date())
-  // Usa la preferenza salvata nei cookie come vista iniziale
-  const [view, setView] = useState<"daily" | "weekly" | "monthly">(() => {
-    if (mode === "mobile") return "daily"
-    return getViewPreference()
-  })
-  const [filters, setFilters] = useState({
-    attivita: true,
-    progetti: true,
-    appuntamenti: true,
-    scadenze: true,
-    scadenze_generali: true,
-    todo: true,
-  })
-  const [searchTerm, setSearchTerm] = useState("")
-  const [clienteFilter, setClienteFilter] = useState<string | null>(null)
-  const [clientiList, setClientiList] = useState<string[]>([])
-  const [showDebug, setShowDebug] = useState(false)
-  const [logs, setLogs] = useState<string[]>([])
-  const [debugItems, setDebugItems] = useState<any[]>([])
-
-  const isDebugAllowed = isAdmin && isDebugEnabled && !isDebugConfigLoading
-
-  // Salva la preferenza quando cambia la vista
-  const handleViewChange = (newView: "daily" | "weekly" | "monthly") => {
-    setView(newView)
-    saveViewPreference(newView)
-  }
-
-  const { startDate, endDate } = useMemo(() => {
-    // Crea date stabili usando solo i valori numerici
-    const currentDateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`
-
-    let start: Date, end: Date
-
-    switch (view) {
-      case "daily":
-        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
-        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
-        break
-      case "weekly":
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
-        start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 1)
-        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
-        end = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999)
-        break
-      case "monthly":
-        const monthStart = startOfMonth(currentDate)
-        start = new Date(monthStart.getFullYear(), monthStart.getMonth(), monthStart.getDate(), 0, 0, 0, 1)
-        const monthEnd = endOfMonth(currentDate)
-        end = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59, 999)
-        break
-      default:
-        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
-        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
-    }
-
-    return { startDate: start, endDate: end }
-  }, [currentDate.getTime(), view])
-
-  const addLog = useCallback(
-    (message: string) => {
-      if (isDebugAllowed) setLogs((prev) => [...prev, `${new Date().toISOString()}: ${message}`])
-    },
-    [isDebugAllowed],
-  )
-
-  const { items, isLoading, error, tableStats } = useAgendaItems(startDate, endDate)
-
-  // Sostituisci con una versione più stabile
-  useEffect(() => {
-    if (items && items.length > 0 && isDebugAllowed) {
-      const debugData = items.map((item) => ({
-        id: item.id,
-        titolo: item.titolo,
-        tipo: item.tipo,
-        generale: item.generale,
-        data_inizio: formatDateForDebug(item.data_inizio),
-        data_fine: formatDateForDebug(item.data_fine),
-        data_scadenza: formatDateForDebug(item.data_scadenza),
-        tabella_origine: item.tabella_origine,
-      }))
-      setDebugItems(debugData)
-    }
-  }, [items, items.length, isDebugAllowed])
-
-  useMemo(() => {
-    if (items.length > 0) {
-      const clienti = [...new Set(items.map((item) => item.cliente).filter(Boolean))] as string[]
-      setClientiList(clienti)
-    }
-  }, [items])
-
-  const filteredItems = useMemo(() => {
-    // Guard against user being null during auth loading or if not authenticated
-    if (authIsLoading || !user) {
-      return []
-    }
-    return items.filter((item) => {
-      let passesTypeFilter = false
-      switch (item.tipo) {
-        case "attivita":
-          passesTypeFilter = filters.attivita
-          break
-        case "progetto":
-          passesTypeFilter = filters.progetti
-          break
-        case "appuntamento":
-          passesTypeFilter = filters.appuntamenti
-          break
-        case "scadenza":
-          if (item.generale) {
-            if (user.id === 1) {
-              if (isDebugAllowed)
-                console.log("Filtro: utente 1 non dovrebbe vedere scadenze generali qui (già filtrate)")
-              passesTypeFilter = false
-            } else {
-              passesTypeFilter = filters.scadenze_generali
-            }
-          } else {
-            passesTypeFilter = filters.scadenze
-          }
-          break
-        case "todolist":
-          passesTypeFilter = filters.todo
-          break
-        default:
-          passesTypeFilter = true
-      }
-      const passesSearchFilter =
-        searchTerm === "" ||
-        (item.titolo && item.titolo.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (item.descrizione && item.descrizione.toLowerCase().includes(searchTerm.toLowerCase()))
-      const passesClienteFilter = !clienteFilter || item.cliente === clienteFilter
-      return passesTypeFilter && passesSearchFilter && passesClienteFilter
-    })
-  }, [items, filters, searchTerm, clienteFilter, user, authIsLoading, isDebugAllowed])
-
-  const navigatePrevious = () => {
-    switch (view) {
-      case "daily":
-        setCurrentDate((prev) => addDays(prev, -1))
-        break
-      case "weekly":
-        setCurrentDate((prev) => subWeeks(prev, 1))
-        break
-      case "monthly":
-        setCurrentDate((prev) => subMonths(prev, 1))
-        break
-    }
-  }
-  const navigateNext = () => {
-    switch (view) {
-      case "daily":
-        setCurrentDate((prev) => addDays(prev, 1))
-        break
-      case "weekly":
-        setCurrentDate((prev) => addWeeks(prev, 1))
-        break
-      case "monthly":
-        setCurrentDate((prev) => addMonths(prev, 1))
-        break
-    }
-  }
-  const navigateToday = () => {
-    setCurrentDate(new Date())
-  }
-  const exportAgenda = () => {
-    alert("Funzionalità di esportazione in fase di sviluppo")
-  }
-
-  useEffect(() => {
-    conditionalLog(
-      "Periodo selezionato:",
-      { view, startDate: startDate.toISOString(), endDate: endDate.toISOString() },
-      isDebugAllowed,
-    )
-  }, [view, startDate, endDate, isDebugAllowed])
-
-  useEffect(() => {
-    conditionalLog(
-      "Elementi filtrati:",
-      {
-        total: filteredItems.length,
-        byType: {
-          attivita: filteredItems.filter((item) => item.tipo === "attivita").length,
-          progetto: filteredItems.filter((item) => item.tipo === "progetto").length,
-          appuntamento: filteredItems.filter((item) => item.tipo === "appuntamento").length,
-          scadenza: filteredItems.filter((item) => item.tipo === "scadenza" && !item.generale).length,
-          scadenza_generale: filteredItems.filter((item) => item.tipo === "scadenza" && item.generale).length,
-          todolist: filteredItems.filter((item) => item.tipo === "todolist").length,
-        },
-      },
-      isDebugAllowed,
-    )
-  }, [filteredItems, isDebugAllowed])
-
-  useEffect(() => {
-    return () => {
-      if (isDebugAllowed) console.log("AgendaWidget unmounted - cleaning up")
-    }
-  }, [isDebugAllowed])
-
-  return (
-    <Card className="w-full">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
-          <CardTitle className="text-xl whitespace-nowrap">Agenda</CardTitle>
-          <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
-            <Button variant="outline" size="sm" onClick={navigatePrevious}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={navigateToday}>
-              Oggi
-            </Button>
-            <Button variant="outline" size="sm" onClick={navigateNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            {isDebugAllowed && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDebug(!showDebug)}
-                className={showDebug ? "bg-blue-100" : ""}
-              >
-                <Bug className="h-4 w-4 mr-1 sm:mr-1" />
-                <span className={mode === "mobile" ? "hidden sm:inline" : ""}>Debug</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2">
-            <Tabs
-              defaultValue={mode === "mobile" ? "daily" : getViewPreference()}
-              value={view}
-              onValueChange={handleViewChange}
-            >
-              <TabsList
-                className={cn(
-                  mode === "mobile"
-                    ? "grid w-full grid-cols-2"
-                    : "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-                )}
-              >
-                <TabsTrigger value="daily" className="flex items-center gap-1 text-xs sm:text-sm">
-                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Giorno
-                </TabsTrigger>
-                <TabsTrigger value="weekly" className="flex items-center gap-1 text-xs sm:text-sm">
-                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Settimana
-                </TabsTrigger>
-                {mode === "desktop" && (
-                  <TabsTrigger value="monthly" className="flex items-center gap-1 text-xs sm:text-sm">
-                    <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Mese
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </Tabs>
-            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
-              <div className="relative w-full sm:w-48">
-                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                <Input
-                  placeholder="Cerca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 text-sm"
-                  aria-label="Cerca nell'agenda"
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 text-xs sm:text-sm bg-transparent"
-                  >
-                    <Filter className="h-3 w-3 sm:h-4 sm:w-4" /> Filtri
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="p-2">
-                    <div className="font-medium mb-2">Tipi di elementi</div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-attivita"
-                          checked={filters.attivita}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, attivita: !!checked }))}
-                        />
-                        <Label htmlFor="filter-attivita" className="text-sm">
-                          Attività
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-progetti"
-                          checked={filters.progetti}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, progetti: !!checked }))}
-                        />
-                        <Label htmlFor="filter-progetti" className="text-sm">
-                          Progetti
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-appuntamenti"
-                          checked={filters.appuntamenti}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, appuntamenti: !!checked }))}
-                        />
-                        <Label htmlFor="filter-appuntamenti" className="text-sm">
-                          Appuntamenti
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-scadenze"
-                          checked={filters.scadenze}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, scadenze: !!checked }))}
-                        />
-                        <Label htmlFor="filter-scadenze" className="text-sm flex items-center">
-                          <User className="h-3 w-3 mr-1" />
-                          Scadenze personali
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-scadenze-generali"
-                          checked={filters.scadenze_generali}
-                          onCheckedChange={(checked) =>
-                            setFilters((prev) => ({ ...prev, scadenze_generali: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="filter-scadenze-generali" className="text-sm flex items-center">
-                          <Globe className="h-3 w-3 mr-1" />
-                          Scadenze generali
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-todo"
-                          checked={filters.todo}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, todo: !!checked }))}
-                        />
-                        <Label htmlFor="filter-todo" className="text-sm">
-                          Todo
-                        </Label>
-                      </div>
-                    </div>
-                    {clientiList.length > 0 && (
-                      <>
-                        <div className="font-medium mt-4 mb-2">Cliente</div>
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="filter-cliente-tutti"
-                              checked={clienteFilter === null}
-                              onCheckedChange={() => setClienteFilter(null)}
-                            />
-                            <Label htmlFor="filter-cliente-tutti" className="text-sm">
-                              Tutti i clienti
-                            </Label>
-                          </div>
-                          {clientiList.map((cliente) => (
-                            <div key={cliente} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`filter-cliente-${cliente}`}
-                                checked={clienteFilter === cliente}
-                                onCheckedChange={() => setClienteFilter(cliente)}
-                              />
-                              <Label htmlFor={`filter-cliente-${cliente}`} className="text-sm">
-                                {cliente}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {mode === "desktop" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportAgenda}
-                  className="flex items-center gap-1 text-xs sm:text-sm bg-transparent"
-                >
-                  <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
-                </Button>
-              )}
-            </div>
-          </div>
-          <ColorLegend />
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Errore</AlertTitle>
-              <AlertDescription>
-                Si è verificato un errore nel caricamento degli elementi: {error.message}
-              </AlertDescription>
-            </Alert>
-          )}
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-64" />
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              {view === "daily" && (
-                <DailyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
-              {view === "weekly" && (
-                <WeeklyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
-              {mode === "desktop" && view === "monthly" && (
-                <MonthlyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
-              <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <div className="flex items-center cursor-pointer hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors">
-                      <Info className="h-3 w-3 mr-1" />
-                      Elementi visualizzati: {filteredItems.length} di {items.length} totali
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64" side="top" align="start">
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm">Dettaglio per tipo</h4>
-                      <div className="space-y-1 text-xs">
-                        <div>Attività: {filteredItems.filter((item) => item.tipo === "attivita").length}</div>
-                        <div>Progetti: {filteredItems.filter((item) => item.tipo === "progetto").length}</div>
-                        <div>Appuntamenti: {filteredItems.filter((item) => item.tipo === "appuntamento").length}</div>
-                        <div>
-                          Scadenze: {filteredItems.filter((item) => item.tipo === "scadenza" && !item.generale).length}
-                        </div>
-                        <div>Todo: {filteredItems.filter((item) => item.tipo === "todolist").length}</div>
-                        <div className="flex items-center">
-                          <Globe className="h-3 w-3 mr-1" />
-                          Scadenze generali:{" "}
-                          {filteredItems.filter((item) => item.tipo === "scadenza" && item.generale).length}
-                        </div>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </>
-          )}
-        </div>
-        {isDebugAllowed && showDebug && (
-          <div className="mt-4 p-2 border rounded bg-gray-50">
-            <h4 className="font-bold mb-2">Debug Info</h4>
-            <div className="mb-4">
-              <h5 className="font-semibold text-sm">Date di Sistema</h5>
-              <div className="text-xs">
-                <div>
-                  <strong>Current Date (ISO):</strong> {currentDate.toISOString()}
-                </div>
-                <div>
-                  <strong>Current Date (Local):</strong> {currentDate.toLocaleString()}
-                </div>
-                <div>
-                  <strong>Start Date:</strong> {startDate.toISOString()}
-                </div>
-                <div>
-                  <strong>End Date:</strong> {endDate.toISOString()}
-                </div>
-                <div>
-                  <strong>Timezone Offset:</strong> {new Date().getTimezoneOffset()} minutes
-                </div>
-              </div>
-            </div>
-            <div className="mb-4">
-              <h5 className="font-semibold text-sm">Statistiche Elementi</h5>
-              <div className="text-xs">
-                <div>
-                  <strong>Totale elementi:</strong> {items.length}
-                </div>
-                <div>
-                  <strong>Elementi filtrati:</strong> {filteredItems.length}
-                </div>
-                <div>
-                  <strong>Elementi per tipo:</strong>
-                </div>
-                <ul className="list-disc pl-5">
-                  <li>Attività: {items.filter((i) => i.tipo === "attivita").length}</li>
-                  <li>Progetti: {items.filter((i) => i.tipo === "progetto").length}</li>
-                  <li>Appuntamenti: {items.filter((i) => i.tipo === "appuntamento").length}</li>
-                  <li>Scadenze personali: {items.filter((i) => i.tipo === "scadenza" && !i.generale).length}</li>
-                  <li>Scadenze generali: {items.filter((i) => i.tipo === "scadenza" && i.generale).length}</li>
-                  <li>Todo: {items.filter((i) => i.tipo === "todolist").length}</li>
-                </ul>
-              </div>
-            </div>
-            <div className="mb-4">
-              <h5 className="font-semibold text-sm">Elementi per la Data Corrente</h5>
-              <div className="text-xs">
-                <div>
-                  <strong>Data corrente:</strong> {currentDate.toLocaleDateString()}
-                </div>
-                <div>
-                  <strong>Elementi che corrispondono:</strong> {debugItems.filter((i) => i.matchesCurrentDate).length}
-                </div>
-                {debugItems.filter((i) => i.matchesCurrentDate).length > 0 ? (
-                  <div className="mt-2 max-h-40 overflow-y-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="p-1 border">ID</th>
-                          <th className="p-1 border">Titolo</th>
-                          <th className="p-1 border">Tipo</th>
-                          <th className="p-1 border">Data Inizio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {debugItems
-                          .filter((i) => i.matchesCurrentDate)
-                          .map((item, idx) => (
-                            <tr key={idx} className="border-t">
-                              <td className="p-1 border">{item.id}</td>
-                              <td className="p-1 border">{item.titolo}</td>
-                              <td className="p-1 border">
-                                {item.tipo}
-                                {item.generale ? " (gen)" : ""}
-                              </td>
-                              <td className="p-1 border">{item.data_inizio}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="italic">Nessun elemento corrisponde alla data corrente</div>
-                )}
-              </div>
-            </div>
-            <div className="max-h-60 overflow-y-auto">
-              <h5 className="font-semibold text-sm">Log</h5>
-              {logs.map((log, index) => (
-                <div key={index} className="text-xs mb-1">
-                  {log}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   )
 }
