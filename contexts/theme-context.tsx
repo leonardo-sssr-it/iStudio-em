@@ -281,7 +281,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database solo quando l'utente è autenticato
+  // Carica i temi dal database solo quando l'autenticazione è completata
   useEffect(() => {
     const loadThemes = async () => {
       // Non caricare i temi se:
