@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(false)
   const isCheckingSessionRef = useRef(false)
   const redirectingRef = useRef(false)
+  const initializationCompleteRef = useRef(false)
 
   const hashPassword = useCallback(async (password: string): Promise<string> => {
     try {
@@ -92,11 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (userId: string) => {
       if (!supabase || !userId) return null
       try {
+        console.log(`AuthProvider: Fetching user data for ID: ${userId}`)
         const { data, error } = await supabase.from("utenti").select("*").eq("id", userId).single()
-        if (error) throw error
+        if (error) {
+          console.error("AuthProvider: Error fetching user data:", error)
+          throw error
+        }
+        console.log(`AuthProvider: User data fetched successfully for: ${data.username}`)
         return data as AuthUser
       } catch (error) {
-        console.error("Errore nel recupero dei dati utente:", error)
+        console.error("AuthProvider: Error in fetchUserData:", error)
         return null
       }
     },
@@ -140,29 +146,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearAllAuthCookies = useCallback(() => {
     if (typeof document === "undefined") return
 
-    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    document.cookie = `sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    document.cookie = `sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    document.cookie = `supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    console.log("AuthProvider: Clearing all auth cookies and storage")
 
-    const domains = [location.hostname, `.${location.hostname}`, ""]
-    const paths = ["/", "/auth", ""]
+    // Clear main auth cookie
+    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+
+    // Clear other potential auth cookies
+    const cookiesToClear = ["sb-access-token", "sb-refresh-token", "supabase-auth-token", "auth-token"]
+
+    cookiesToClear.forEach((cookieName) => {
+      document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    })
+
+    // Clear with different domains and paths
+    const domains = [location.hostname, `.${location.hostname}`]
+    const paths = ["/", "/auth"]
 
     domains.forEach((domain) => {
       paths.forEach((path) => {
-        document.cookie = `${AUTH_COOKIE_NAME}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        document.cookie = `sb-access-token=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        document.cookie = `sb-refresh-token=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+        cookiesToClear.forEach((cookieName) => {
+          document.cookie = `${cookieName}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+        })
       })
     })
 
+    // Clear localStorage and sessionStorage
     try {
-      localStorage.removeItem("supabase.auth.token")
-      localStorage.removeItem("authToken")
-      localStorage.removeItem("authUser")
-      sessionStorage.removeItem("supabase.auth.token")
-      sessionStorage.removeItem("authToken")
-      sessionStorage.removeItem("authUser")
+      const storageKeys = ["supabase.auth.token", "authToken", "authUser", "auth_session", "user_session"]
+
+      storageKeys.forEach((key) => {
+        localStorage.removeItem(key)
+        sessionStorage.removeItem(key)
+      })
     } catch (e) {
       console.error("Errore nella pulizia dello storage:", e)
     }
@@ -174,10 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cookies = document.cookie.split(";")
       const sessionCookie = cookies.find((cookie) => cookie.trim().startsWith(`${AUTH_COOKIE_NAME}=`))
       if (sessionCookie) {
-        return JSON.parse(decodeURIComponent(sessionCookie.split("=")[1]))
+        const cookieValue = sessionCookie.split("=")[1]
+        return JSON.parse(decodeURIComponent(cookieValue))
       }
     } catch (error) {
-      console.error("Errore nel parsing del cookie di sessione:", error)
+      console.error("AuthProvider: Error parsing session cookie:", error)
     }
     return null
   }, [])
@@ -193,51 +209,98 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cookieValue = encodeURIComponent(JSON.stringify(session))
       const isSecure = window.location.protocol === "https:"
       document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${expiresInDays * 24 * 60 * 60}; SameSite=Lax${isSecure ? "; Secure" : ""}`
+      console.log(`AuthProvider: Session cookie saved for user: ${userId}`)
     } catch (error) {
-      console.error("Errore nel salvataggio del cookie di sessione:", error)
+      console.error("AuthProvider: Error saving session cookie:", error)
     }
   }, [])
 
   const checkSession = useCallback(async (): Promise<boolean> => {
-    if (isCheckingSessionRef.current) return !!user
-    isCheckingSessionRef.current = true
-    if (!supabase || supabaseInitializing) {
-      isCheckingSessionRef.current = false
-      return false
+    // Prevent multiple simultaneous session checks
+    if (isCheckingSessionRef.current) {
+      console.log("AuthProvider: Session check already in progress, skipping")
+      return !!user
     }
+
+    isCheckingSessionRef.current = true
+
     try {
-      const session = getSessionFromCookie()
-      if (!session || !session.user_id || new Date(session.expires_at) <= new Date()) {
-        if (session && typeof document !== "undefined") {
-          clearAllAuthCookies()
-        }
-        if (user !== null) setUser(null)
-        isCheckingSessionRef.current = false
+      console.log("AuthProvider: Starting session check", {
+        supabaseReady: !!supabase,
+        supabaseInitializing,
+        hasUser: !!user,
+      })
+
+      if (!supabase || supabaseInitializing) {
+        console.log("AuthProvider: Supabase not ready for session check")
         return false
       }
+
+      const session = getSessionFromCookie()
+
+      if (!session || !session.user_id) {
+        console.log("AuthProvider: No session cookie found")
+        if (user !== null) {
+          console.log("AuthProvider: Clearing user state due to missing session")
+          setUser(null)
+          setIsAdmin(false)
+        }
+        return false
+      }
+
+      // Check if session is expired
+      if (new Date(session.expires_at) <= new Date()) {
+        console.log("AuthProvider: Session expired, clearing cookies")
+        clearAllAuthCookies()
+        if (user !== null) {
+          setUser(null)
+          setIsAdmin(false)
+        }
+        return false
+      }
+
+      // If we already have the user and it matches the session, just refresh the cookie
       if (user && user.id === session.user_id) {
+        console.log("AuthProvider: User already loaded, refreshing session cookie")
         saveSessionToCookie(user.id)
-        isCheckingSessionRef.current = false
         return true
       }
+
+      // Fetch user data
+      console.log(`AuthProvider: Fetching user data for session: ${session.user_id}`)
       const userData = await fetchUserData(session.user_id)
+
       if (!userData) {
+        console.log("AuthProvider: User data not found, clearing session")
         clearAllAuthCookies()
-        if (user !== null) setUser(null)
-        isCheckingSessionRef.current = false
+        if (user !== null) {
+          setUser(null)
+          setIsAdmin(false)
+        }
         return false
       }
+
+      // Update last access
       await updateLastAccess(userData.id)
+
+      // Set user state
+      console.log(`AuthProvider: Setting user state for: ${userData.username}`)
       setUser(userData)
       setIsAdmin(userData.ruolo === "admin")
+
+      // Refresh session cookie
       saveSessionToCookie(userData.id)
-      isCheckingSessionRef.current = false
+
       return true
     } catch (error) {
-      console.error("AuthProvider: Errore nella verifica della sessione:", error)
-      if (user !== null) setUser(null)
-      isCheckingSessionRef.current = false
+      console.error("AuthProvider: Error in session check:", error)
+      if (user !== null) {
+        setUser(null)
+        setIsAdmin(false)
+      }
       return false
+    } finally {
+      isCheckingSessionRef.current = false
     }
   }, [
     supabase,
@@ -248,13 +311,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateLastAccess,
     saveSessionToCookie,
     clearAllAuthCookies,
-    setUser,
-    setIsAdmin,
   ])
 
   const login = useCallback(
     async (usernameOrEmail: string, password: string): Promise<boolean> => {
+      console.log("AuthProvider: Starting login process")
+
       if (!supabase || supabaseInitializing) {
+        console.error("AuthProvider: Supabase not ready for login")
         toast({
           title: "Errore di connessione",
           description: "Impossibile connettersi al database",
@@ -262,16 +326,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         return false
       }
-      if (isCheckingSessionRef.current || redirectingRef.current) return false
+
+      if (isCheckingSessionRef.current || redirectingRef.current) {
+        console.log("AuthProvider: Login blocked - session check or redirect in progress")
+        return false
+      }
+
       setIsLoading(true)
       isCheckingSessionRef.current = true
+
       try {
         const isEmail = usernameOrEmail.includes("@")
         let query = supabase.from("utenti").select("*")
         query = isEmail ? query.eq("email", usernameOrEmail) : query.eq("username", usernameOrEmail)
+
+        console.log(`AuthProvider: Querying user by ${isEmail ? "email" : "username"}: ${usernameOrEmail}`)
         const { data, error } = await query.maybeSingle()
 
         if (error && !error.message.includes("multiple (or no) rows returned")) {
+          console.error("AuthProvider: Database error during login:", error)
           toast({
             title: "Errore di sistema",
             description: "Errore durante il recupero dei dati utente.",
@@ -279,7 +352,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
+
         if (!data) {
+          console.log("AuthProvider: User not found")
           toast({
             title: "Credenziali non valide",
             description: "Username/email o password non corretti.",
@@ -287,9 +362,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
+
         const fetchedUser = data as AuthUser
+        console.log(`AuthProvider: User found: ${fetchedUser.username}`)
+
         const isPasswordValid = await verifyPassword(password, fetchedUser.password)
         if (!isPasswordValid) {
+          console.log("AuthProvider: Invalid password")
           toast({
             title: "Credenziali non valide",
             description: "Username/email o password non corretti.",
@@ -297,21 +376,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
+
+        console.log("AuthProvider: Password verified successfully")
+
+        // Update password to hashed version if it's still plain text
         if (fetchedUser.password === password) {
+          console.log("AuthProvider: Updating password to hashed version")
           await updatePasswordToHashed(fetchedUser.id, password)
         }
+
+        // Update last access
         await updateLastAccess(fetchedUser.id)
+
+        // Save session
         saveSessionToCookie(fetchedUser.id)
+
+        // Set user state
         setUser(fetchedUser)
         setIsAdmin(fetchedUser.ruolo === "admin")
-        setIsLoading(false)
+
+        console.log(`AuthProvider: Login successful for user: ${fetchedUser.username}`)
+
+        // Mark initialization as complete
+        initializationCompleteRef.current = true
+
+        // Redirect
         redirectingRef.current = true
         const destination = "/dashboard-utente"
+        console.log(`AuthProvider: Redirecting to: ${destination}`)
         router.push(destination)
-        toast({ title: "Login effettuato", description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!` })
+
+        toast({
+          title: "Login effettuato",
+          description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!`,
+        })
+
         return true
       } catch (error: any) {
-        console.error("Errore durante il login:", error)
+        console.error("AuthProvider: Login error:", error)
         toast({
           title: "Errore",
           description: error.message || "Si è verificato un errore durante il login.",
@@ -331,82 +433,154 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePasswordToHashed,
       updateLastAccess,
       saveSessionToCookie,
-      setUser,
-      setIsAdmin,
     ],
   )
 
   const logout = useCallback(async (): Promise<void> => {
     if (redirectingRef.current) return
+
+    console.log("AuthProvider: Starting logout process")
     redirectingRef.current = true
 
+    // Clear all auth data
     clearAllAuthCookies()
     setUser(null)
     setIsAdmin(false)
     setSessionChecked(false)
+    initializationCompleteRef.current = false
 
+    // Reset Supabase client if available
     if (resetClient) {
       try {
         await resetClient()
+        console.log("AuthProvider: Supabase client reset successfully")
       } catch (e) {
-        console.error("Errore nel reset del client Supabase:", e)
+        console.error("AuthProvider: Error resetting Supabase client:", e)
       }
     }
 
+    // Redirect to login
     router.push("/")
-    toast({ title: "Logout effettuato", description: "Hai effettuato il logout con successo." })
+    toast({
+      title: "Logout effettuato",
+      description: "Hai effettuato il logout con successo.",
+    })
 
+    // Force page reload to ensure clean state
     setTimeout(() => {
       if (typeof window !== "undefined") {
         window.location.reload()
       }
     }, 100)
-  }, [router, setUser, setIsAdmin, clearAllAuthCookies, resetClient])
+  }, [router, clearAllAuthCookies, resetClient])
 
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!user?.id || !supabase) return
+
+    console.log(`AuthProvider: Refreshing user data for: ${user.username}`)
     try {
       const userData = await fetchUserData(user.id)
       if (userData) {
         setUser(userData)
         setIsAdmin(userData.ruolo === "admin")
+        console.log("AuthProvider: User data refreshed successfully")
       }
     } catch (error) {
-      console.error("Errore nell'aggiornamento dei dati utente:", error)
+      console.error("AuthProvider: Error refreshing user data:", error)
     }
-  }, [user, supabase, fetchUserData, setUser, setIsAdmin])
+  }, [user, supabase, fetchUserData])
 
+  // Reset redirecting flag on pathname change
   useEffect(() => {
-    if (redirectingRef.current) {
-      redirectingRef.current = false
-    }
+    console.log(`AuthProvider: Pathname changed to: ${pathname}`)
+    redirectingRef.current = false
   }, [pathname])
 
+  // Main initialization effect
   useEffect(() => {
     let isMounted = true
-    const checkSessionOnLoad = async () => {
-      if (sessionChecked || isCheckingSessionRef.current || supabaseInitializing) return
+
+    const initializeAuth = async () => {
+      console.log("AuthProvider: Starting initialization", {
+        sessionChecked,
+        isCheckingSession: isCheckingSessionRef.current,
+        supabaseInitializing,
+        supabaseConnected,
+        hasSupabase: !!supabase,
+      })
+
+      // Wait for Supabase to be ready
+      if (supabaseInitializing || !supabase) {
+        console.log("AuthProvider: Waiting for Supabase to initialize")
+        return
+      }
+
+      // Prevent multiple initializations
+      if (sessionChecked || isCheckingSessionRef.current) {
+        console.log("AuthProvider: Initialization already completed or in progress")
+        return
+      }
+
       setIsLoading(true)
+
       try {
-        await checkSession()
+        console.log("AuthProvider: Checking session on initialization")
+        const hasValidSession = await checkSession()
+        console.log(`AuthProvider: Session check result: ${hasValidSession}`)
+
+        if (hasValidSession) {
+          console.log("AuthProvider: Valid session found, user authenticated")
+        } else {
+          console.log("AuthProvider: No valid session, user not authenticated")
+        }
       } catch (error) {
-        console.error("AuthProvider: Errore nella verifica della sessione iniziale:", error)
+        console.error("AuthProvider: Error during initialization:", error)
       } finally {
         if (isMounted) {
           setIsLoading(false)
           setSessionChecked(true)
+          initializationCompleteRef.current = true
+          console.log("AuthProvider: Initialization completed")
         }
       }
     }
-    if (supabase && supabaseConnected) {
-      checkSessionOnLoad()
-    } else if (!supabaseInitializing) {
-      setIsLoading(false)
-    }
+
+    initializeAuth()
+
     return () => {
       isMounted = false
     }
-  }, [supabase, supabaseConnected, supabaseInitializing, checkSession, sessionChecked])
+  }, [supabase, supabaseConnected, supabaseInitializing, sessionChecked, checkSession])
+
+  // Periodic session validation
+  useEffect(() => {
+    if (!initializationCompleteRef.current || !user) return
+
+    console.log("AuthProvider: Setting up periodic session validation")
+
+    const intervalId = setInterval(
+      async () => {
+        if (isCheckingSessionRef.current) return
+
+        console.log("AuthProvider: Performing periodic session check")
+        try {
+          const isValid = await checkSession()
+          if (!isValid && !redirectingRef.current) {
+            console.log("AuthProvider: Periodic check failed, logging out")
+            await logout()
+          }
+        } catch (error) {
+          console.error("AuthProvider: Error in periodic session check:", error)
+        }
+      },
+      5 * 60 * 1000,
+    ) // 5 minutes
+
+    return () => {
+      clearInterval(intervalId)
+      console.log("AuthProvider: Cleared periodic session validation")
+    }
+  }, [user, checkSession, logout])
 
   const contextValue: AuthContextType = {
     user,

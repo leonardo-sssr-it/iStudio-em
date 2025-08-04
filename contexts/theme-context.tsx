@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider"
 
 // Tipi per i temi
 interface Theme {
@@ -74,12 +75,14 @@ export function useSafeCustomTheme(): ThemeContextType {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected } = useSupabase()
+  const { user, isLoading: authLoading } = useAuth()
   const [themes, setThemes] = useState<Theme[]>([defaultTheme])
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
   const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
   const [mounted, setMounted] = useState(false)
+  const [themesLoaded, setThemesLoaded] = useState(false)
 
   // Funzione per convertire colori hex in HSL
   const hexToHsl = useCallback((hex: string): string => {
@@ -278,17 +281,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database
+  // Carica i temi dal database solo quando l'utente è autenticato
   useEffect(() => {
     const loadThemes = async () => {
-      if (!supabase || !isConnected) return
+      // Non caricare i temi se:
+      // - Supabase non è pronto
+      // - L'auth è ancora in caricamento
+      // - I temi sono già stati caricati
+      if (!supabase || !isConnected || authLoading || themesLoaded) {
+        console.log("ThemeProvider: Skipping theme loading", {
+          hasSupabase: !!supabase,
+          isConnected,
+          authLoading,
+          themesLoaded,
+        })
+        return
+      }
 
       try {
-        console.log("Loading themes from database...")
+        console.log("ThemeProvider: Loading themes from database...")
         const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
 
         if (error) {
-          console.error("Error loading themes:", error)
+          console.error("ThemeProvider: Error loading themes:", error)
           return
         }
 
@@ -312,7 +327,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
         const allThemes = [defaultTheme, ...supabaseThemes]
         setThemes(allThemes)
-        console.log("Themes loaded:", allThemes.length)
+        setThemesLoaded(true)
+        console.log("ThemeProvider: Themes loaded:", allThemes.length)
 
         // Applica il tema salvato o quello di default
         const savedThemeId = localStorage.getItem("app-theme")
@@ -328,14 +344,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           applyThemeStyles(defaultTheme)
         }
       } catch (error) {
-        console.error("Error in loadThemes:", error)
+        console.error("ThemeProvider: Error in loadThemes:", error)
       }
     }
 
-    if (mounted) {
+    if (mounted && !authLoading) {
       loadThemes()
     }
-  }, [supabase, isConnected, mounted, applyThemeStyles])
+  }, [supabase, isConnected, mounted, authLoading, themesLoaded, applyThemeStyles])
 
   // Applica le dimensioni del font
   const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
@@ -385,7 +401,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     (themeId: number) => {
       const theme = themes.find((t) => t.id === themeId)
       if (theme) {
-        console.log("Applying theme:", theme.nome_tema)
+        console.log("ThemeProvider: Applying theme:", theme.nome_tema)
         setCurrentTheme(theme)
         applyThemeStyles(theme)
         localStorage.setItem("app-theme", themeId.toString())
@@ -395,7 +411,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   )
 
   const resetToDefault = useCallback(() => {
-    console.log("Resetting to default theme")
+    console.log("ThemeProvider: Resetting to default theme")
     setCurrentTheme(defaultTheme)
     applyThemeStyles(defaultTheme)
     localStorage.setItem("app-theme", "0")
@@ -404,20 +420,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
     setLayoutState(newLayout)
     localStorage.setItem("app-layout", newLayout)
-    console.log("Layout changed to:", newLayout)
+    console.log("ThemeProvider: Layout changed to:", newLayout)
   }, [])
 
   const toggleDarkMode = useCallback(() => {
     const newDarkMode = !isDarkMode
     setIsDarkMode(newDarkMode)
     localStorage.setItem("app-dark-mode", newDarkMode.toString())
-    console.log("Dark mode toggled:", newDarkMode)
+    console.log("ThemeProvider: Dark mode toggled:", newDarkMode)
   }, [isDarkMode])
 
   const setFontSize = useCallback((size: "small" | "normal" | "large") => {
     setFontSizeState(size)
     localStorage.setItem("app-font-size", size)
-    console.log("Font size changed to:", size)
+    console.log("ThemeProvider: Font size changed to:", size)
   }, [])
 
   const value: ThemeContextType = {
