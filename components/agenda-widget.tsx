@@ -33,6 +33,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  MapPin,
   User,
   FileText,
   CheckSquare,
@@ -60,10 +61,10 @@ const saveViewPreference = (view: "daily" | "weekly" | "monthly") => {
   try {
     if (typeof window !== "undefined") {
       localStorage.setItem(AGENDA_VIEW_PREFERENCE_KEY, view)
-      console.log(`Agenda view preference saved: ${view}`)
+      console.log(`📅 AgendaWidget: View preference saved: ${view}`)
     }
   } catch (error) {
-    console.error("Error saving agenda view preference:", error)
+    console.error("❌ AgendaWidget: Error saving view preference:", error)
   }
 }
 
@@ -72,12 +73,12 @@ const getViewPreference = (): "daily" | "weekly" | "monthly" => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(AGENDA_VIEW_PREFERENCE_KEY)
       if (saved && ["daily", "weekly", "monthly"].includes(saved)) {
-        console.log(`Agenda view preference loaded: ${saved}`)
+        console.log(`📅 AgendaWidget: View preference loaded: ${saved}`)
         return saved as "daily" | "weekly" | "monthly"
       }
     }
   } catch (error) {
-    console.error("Error loading agenda view preference:", error)
+    console.error("❌ AgendaWidget: Error loading view preference:", error)
   }
 
   return "daily" // Default
@@ -144,10 +145,10 @@ const NewItemMenu = ({ date }: { date: Date }) => {
     const tableName = tableMap[type]
     if (tableName) {
       const url = `/data-explorer/${tableName}/new?date=${dateParam}`
-      console.log(`Navigating to: ${url}`)
+      console.log(`🔗 AgendaWidget: Navigating to: ${url}`)
       router.push(url)
     } else {
-      console.error(`Unknown item type: ${type}`)
+      console.error(`❌ AgendaWidget: Unknown item type: ${type}`)
     }
   }
 
@@ -204,7 +205,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
   }, [mode])
 
   const handleViewChange = (newView: "daily" | "weekly" | "monthly") => {
-    console.log(`Changing view from ${view} to ${newView}`)
+    console.log(`📅 AgendaWidget: Changing view from ${view} to ${newView}`)
     setView(newView)
     if (mode === "desktop") {
       saveViewPreference(newView)
@@ -300,7 +301,13 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                           {item.data_inizio && (
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {format(item.data_inizio, "HH:mm")}
+                              {format(new Date(item.data_inizio), "HH:mm")}
+                            </div>
+                          )}
+                          {item.luogo && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {item.luogo}
                             </div>
                           )}
                           {item.cliente && (
@@ -344,7 +351,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
       <div className="space-y-4">
         <div className="grid grid-cols-7 gap-2">
           {weekDays.map((day) => {
-            const dayItems = items.filter((item) => isSameDay(item.data_inizio, day))
+            const dayItems = items.filter((item) => item.data_inizio && isSameDay(new Date(item.data_inizio), day))
             const isToday = isSameDay(day, new Date())
             const isSelected = isSameDay(day, selectedDate)
 
@@ -415,7 +422,9 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
             return (
               <div key={weekStart.toISOString()} className="grid grid-cols-7 gap-2">
                 {weekDays.map((day) => {
-                  const dayItems = items.filter((item) => isSameDay(item.data_inizio, day))
+                  const dayItems = items.filter(
+                    (item) => item.data_inizio && isSameDay(new Date(item.data_inizio), day),
+                  )
                   const isToday = isSameDay(day, new Date())
                   const isCurrentMonth = isSameMonth(day, selectedDate)
                   const isSelected = isSameDay(day, selectedDate)
@@ -569,7 +578,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
           <div className="text-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
             <p>Errore nel caricamento dell'agenda</p>
-            <p className="text-sm text-muted-foreground mt-2">{error.message}</p>
+            <p className="text-sm text-muted-foreground mt-2">{error}</p>
           </div>
         ) : (
           <>

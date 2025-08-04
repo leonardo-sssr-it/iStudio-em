@@ -8,13 +8,13 @@ import type { Database } from "@/types/supabase"
 
 interface SupabaseContextType {
   supabase: SupabaseClient<Database> | null
-  isInitialized: boolean
+  isReady: boolean
   resetClient: () => void
 }
 
 const SupabaseContext = createContext<SupabaseContextType>({
   supabase: null,
-  isInitialized: false,
+  isReady: false,
   resetClient: () => {},
 })
 
@@ -32,95 +32,90 @@ interface SupabaseProviderProps {
 
 export function SupabaseProvider({ children }: SupabaseProviderProps) {
   const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [isReady, setIsReady] = useState(false)
   const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const initializationAttemptRef = useRef(0)
+  const initializationAttemptedRef = useRef(false)
 
   const createSupabaseClient = () => {
-    console.log("🔧 SupabaseProvider: Creating new Supabase client...")
-
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("❌ SupabaseProvider: Missing environment variables")
+      console.error("🚨 SupabaseProvider: Missing environment variables")
       console.error("NEXT_PUBLIC_SUPABASE_URL:", !!supabaseUrl)
       console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY:", !!supabaseAnonKey)
       return null
     }
 
-    try {
-      const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          persistSession: false, // Disabilitiamo la persistenza automatica per evitare conflitti
-          autoRefreshToken: true,
-          detectSessionInUrl: false,
-        },
-        realtime: {
-          params: {
-            eventsPerSecond: 10,
-          },
-        },
-      })
+    console.log("🔧 SupabaseProvider: Creating Supabase client...")
 
-      console.log("✅ SupabaseProvider: Client created successfully")
-      return client
-    } catch (error) {
-      console.error("❌ SupabaseProvider: Error creating client:", error)
-      return null
-    }
+    const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false, // Disabilitiamo la persistenza automatica per evitare conflitti
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    })
+
+    return client
   }
 
   const testConnection = async (client: SupabaseClient<Database>) => {
     try {
       console.log("🔍 SupabaseProvider: Testing connection...")
-      const { data, error } = await client.from("utenti").select("count").limit(1).single()
+      const { data, error } = await client.from("profiles").select("count").limit(1).single()
 
       if (error && error.code !== "PGRST116") {
-        // PGRST116 = no rows returned, ma connessione OK
-        console.warn("⚠️ SupabaseProvider: Connection test warning:", error.message)
+        // PGRST116 = no rows returned, che va bene
+        console.error("❌ SupabaseProvider: Connection test failed:", error)
         return false
       }
 
       console.log("✅ SupabaseProvider: Connection test successful")
       return true
     } catch (error) {
-      console.error("❌ SupabaseProvider: Connection test failed:", error)
+      console.error("❌ SupabaseProvider: Connection test error:", error)
       return false
     }
   }
 
   const initializeSupabase = async () => {
-    initializationAttemptRef.current++
-    const attemptNumber = initializationAttemptRef.current
-
-    console.log(`🚀 SupabaseProvider: Initialization attempt #${attemptNumber}`)
-
-    const client = createSupabaseClient()
-    if (!client) {
-      console.error("❌ SupabaseProvider: Failed to create client")
+    if (initializationAttemptedRef.current) {
+      console.log("⏭️ SupabaseProvider: Initialization already attempted")
       return
     }
 
-    // Test della connessione
-    const isConnected = await testConnection(client)
-    if (!isConnected) {
-      console.error("❌ SupabaseProvider: Connection test failed")
+    initializationAttemptedRef.current = true
+    console.log("🚀 SupabaseProvider: Starting initialization...")
 
-      // Retry dopo 5 secondi se è il primo tentativo
-      if (attemptNumber === 1) {
-        console.log("🔄 SupabaseProvider: Retrying in 5 seconds...")
-        setTimeout(() => initializeSupabase(), 5000)
+    try {
+      const client = createSupabaseClient()
+      if (!client) {
+        console.error("❌ SupabaseProvider: Failed to create client")
+        return
       }
-      return
+
+      // Test della connessione
+      const isConnected = await testConnection(client)
+      if (!isConnected) {
+        console.error("❌ SupabaseProvider: Connection test failed")
+        return
+      }
+
+      setSupabase(client)
+      setIsReady(true)
+      console.log("✅ SupabaseProvider: Initialization completed successfully")
+
+      // Avvia il monitoraggio della connessione
+      startConnectionMonitoring(client)
+    } catch (error) {
+      console.error("❌ SupabaseProvider: Initialization error:", error)
     }
-
-    setSupabase(client)
-    setIsInitialized(true)
-    console.log("✅ SupabaseProvider: Initialization completed successfully")
-
-    // Avvia il monitoraggio della connessione
-    startConnectionMonitoring(client)
   }
 
   const startConnectionMonitoring = (client: SupabaseClient<Database>) => {
@@ -129,13 +124,26 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
       clearInterval(connectionCheckIntervalRef.current)
     }
 
-    console.log("🔍 SupabaseProvider: Starting connection monitoring...")
+    console.log("📡 SupabaseProvider: Starting connection monitoring...")
 
     connectionCheckIntervalRef.current = setInterval(async () => {
-      const isConnected = await testConnection(client)
-      if (!isConnected) {
-        console.warn("⚠️ SupabaseProvider: Connection lost, attempting to reconnect...")
-        initializeSupabase()
+      try {
+        const isConnected = await testConnection(client)
+        if (!isConnected) {
+          console.warn("⚠️ SupabaseProvider: Connection lost, attempting to reconnect...")
+
+          // Tenta di ricreare il client
+          const newClient = createSupabaseClient()
+          if (newClient) {
+            const reconnected = await testConnection(newClient)
+            if (reconnected) {
+              setSupabase(newClient)
+              console.log("✅ SupabaseProvider: Reconnection successful")
+            }
+          }
+        }
+      } catch (error) {
+        console.error("❌ SupabaseProvider: Connection monitoring error:", error)
       }
     }, 30000) // Controlla ogni 30 secondi
   }
@@ -143,18 +151,21 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
   const resetClient = () => {
     console.log("🔄 SupabaseProvider: Resetting client...")
 
-    // Pulisci interval
+    // Pulisci gli interval
     if (connectionCheckIntervalRef.current) {
       clearInterval(connectionCheckIntervalRef.current)
       connectionCheckIntervalRef.current = null
     }
 
+    // Reset dello stato
     setSupabase(null)
-    setIsInitialized(false)
-    initializationAttemptRef.current = 0
+    setIsReady(false)
+    initializationAttemptedRef.current = false
 
-    // Reinizializza dopo un breve delay
-    setTimeout(() => initializeSupabase(), 1000)
+    // Reinizializza
+    setTimeout(() => {
+      initializeSupabase()
+    }, 1000)
   }
 
   useEffect(() => {
@@ -162,7 +173,6 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
     // Cleanup
     return () => {
-      console.log("🧹 SupabaseProvider: Cleaning up...")
       if (connectionCheckIntervalRef.current) {
         clearInterval(connectionCheckIntervalRef.current)
       }
@@ -171,7 +181,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
   const value = {
     supabase,
-    isInitialized,
+    isReady,
     resetClient,
   }
 

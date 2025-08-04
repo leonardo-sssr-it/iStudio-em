@@ -1,439 +1,185 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
-import { useSupabase } from "@/lib/supabase-provider"
+
+import { createContext, useContext, useEffect, useState, useRef } from "react"
 import { useAuth } from "@/lib/auth-provider"
 
-type Theme =
-  | "light"
-  | "dark"
-  | "system"
-  | {
-      id: number
-      nome_tema: string
-      colore_titolo?: string
-      colore_sfondo?: string
-      colore_testo?: string
-      colore_accento?: string
-      carattere_tipo?: string
-      carattere_dimensione?: number
-      carattere_colore?: string
-      colore_header?: string
-      colore_footer?: string
-      colore_background?: string
-      colore_card?: string
-      colore_tabs?: string
-      colore_div?: string
-      border_radius?: string
-      css_variables?: Record<string, string> | string | null
-      isDefault?: boolean
-    }
+type Theme = "light" | "dark" | "system"
 
-type ThemeContextType = {
-  themes: Theme[]
-  currentTheme: Theme | null
-  applyTheme: (themeId: number) => void
-  resetToDefault: () => void
-  layout: "default" | "fullWidth" | "sidebar"
-  setLayout: (layout: "default" | "fullWidth" | "sidebar") => void
-  toggleDarkMode: () => void
-  isDarkMode: boolean
-  fontSize: "small" | "normal" | "large"
-  setFontSize: (size: "small" | "normal" | "large") => void
-  mounted: boolean
-  isLoading: boolean
+interface ThemeContextType {
+  theme: Theme
+  setTheme: (theme: Theme) => void
+  actualTheme: "light" | "dark"
+  themesLoaded: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const defaultTheme: Theme = "system"
-
-const ThemeProviderContext = createContext({
-  theme: defaultTheme,
-  setTheme: (theme: Theme) => null,
-  themesLoaded: false,
-})
-
-export function useSafeCustomTheme(): ThemeContextType {
+export function useTheme() {
   const context = useContext(ThemeContext)
-  if (!context) {
-    return {
-      themes: [defaultTheme],
-      currentTheme: defaultTheme,
-      applyTheme: () => {},
-      resetToDefault: () => {},
-      layout: "default",
-      setLayout: () => {},
-      toggleDarkMode: () => {},
-      isDarkMode: false,
-      fontSize: "normal",
-      setFontSize: () => {},
-      mounted: false,
-      isLoading: false,
-    }
+  if (context === undefined) {
+    throw new Error("useTheme must be used within a ThemeProvider")
   }
   return context
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const { supabase, isConnected, isInitializing: supabaseInitializing } = useSupabase()
+interface ThemeProviderProps {
+  children: React.ReactNode
+  defaultTheme?: Theme
+  storageKey?: string
+}
+
+export function ThemeProvider({ children, defaultTheme = "system", storageKey = "ui-theme" }: ThemeProviderProps) {
   const { user, isLoading: authLoading } = useAuth()
-
-  const [themes, setThemes] = useState<Theme[]>(["system"])
-  const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
-  const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
-  const [mounted, setMounted] = useState(false)
+  const [theme, setThemeState] = useState<Theme>(defaultTheme)
+  const [actualTheme, setActualTheme] = useState<"light" | "dark">("light")
   const [themesLoaded, setThemesLoaded] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-
-  const loadingAttempted = useRef(false)
-  const themeLoadTimeout = useRef<NodeJS.Timeout | null>(null)
   const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const hexToHsl = useCallback((hex: string): string => {
-    if (!hex || hex === "") return "0 0% 50%"
+  // Funzione per applicare il tema al DOM
+  const applyTheme = (newTheme: Theme) => {
+    const root = window.document.documentElement
+    root.classList.remove("light", "dark")
 
-    if (hex.includes("hsl") || hex.includes("%")) return hex.replace("hsl(", "").replace(")", "")
+    let resolvedTheme: "light" | "dark"
 
-    hex = hex.replace("#", "")
-
-    if (hex.length === 3) {
-      hex = hex
-        .split("")
-        .map((char) => char + char)
-        .join("")
-    }
-
-    if (hex.length !== 6) {
-      console.warn(`Invalid hex color: ${hex}`)
-      return "0 0% 50%"
-    }
-
-    const r = Number.parseInt(hex.substr(0, 2), 16) / 255
-    const g = Number.parseInt(hex.substr(2, 2), 16) / 255
-    const b = Number.parseInt(hex.substr(4, 2), 16) / 255
-
-    const max = Math.max(r, g, b)
-    const min = Math.min(r, g, b)
-    let h = 0,
-      s = 0,
-      l = (max + min) / 2
-
-    if (max !== min) {
-      const d = max - min
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-
-      switch (max) {
-        case r:
-          h = (g - b) / d + (g < b ? 6 : 0)
-          break
-        case g:
-          h = (b - r) / d + 2
-          break
-        case b:
-          h = (r - g) / d + 4
-          break
-      }
-      h /= 6
-    }
-
-    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
-  }, [])
-
-  const applyThemeStyles = useCallback((theme: Theme) => {
-    if (typeof window === "undefined") return
-
-    const root = document.documentElement
-
-    console.log("ThemeProvider: === APPLICANDO TEMA ===")
-    console.log("ThemeProvider: Nome tema:", theme)
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-      root.classList.add(systemTheme)
-      console.log("ThemeProvider: Applied system theme:", systemTheme)
+    if (newTheme === "system") {
+      resolvedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
     } else {
-      root.classList.add(theme)
-      console.log("ThemeProvider: Applied theme:", theme)
+      resolvedTheme = newTheme
     }
 
-    document.body.classList.add("theme-transition")
-    setTimeout(() => {
-      document.body.classList.remove("theme-transition")
-    }, 300)
+    root.classList.add(resolvedTheme)
+    setActualTheme(resolvedTheme)
 
-    console.log("ThemeProvider: === TEMA APPLICATO CON SUCCESSO ===")
-  }, [])
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      console.log("ThemeProvider: Loading preferences from localStorage")
-
-      const savedLayout = localStorage.getItem("app-layout") as "default" | "fullWidth" | "sidebar" | null
-      const savedDarkMode = localStorage.getItem("app-dark-mode")
-      const savedFontSize = localStorage.getItem("app-font-size") as "small" | "normal" | "large" | null
-
-      if (savedLayout) {
-        setLayoutState(savedLayout)
-        console.log(`ThemeProvider: Loaded layout preference: ${savedLayout}`)
-      }
-      if (savedDarkMode) {
-        setIsDarkMode(savedDarkMode === "true")
-        console.log(`ThemeProvider: Loaded dark mode preference: ${savedDarkMode}`)
-      }
-      if (savedFontSize) {
-        setFontSizeState(savedFontSize)
-        console.log(`ThemeProvider: Loaded font size preference: ${savedFontSize}`)
-      }
-
-      setMounted(true)
-      console.log("ThemeProvider: Component mounted and preferences loaded")
-    }
-  }, [])
-
-  useEffect(() => {
-    const loadThemes = async () => {
-      const shouldLoadThemes =
-        mounted &&
-        !supabaseInitializing &&
-        supabase &&
-        isConnected &&
-        !authLoading &&
-        !themesLoaded &&
-        !loadingAttempted.current
-
-      console.log("ThemeProvider: Evaluating theme loading conditions:", {
-        mounted,
-        supabaseInitializing,
-        hasSupabase: !!supabase,
-        isConnected,
-        authLoading,
-        themesLoaded,
-        loadingAttempted: loadingAttempted.current,
-        shouldLoadThemes,
-      })
-
-      if (!shouldLoadThemes) {
-        return
-      }
-
-      loadingAttempted.current = true
-      setIsLoading(true)
-
-      themeLoadTimeout.current = setTimeout(() => {
-        console.warn("ThemeProvider: Theme loading timeout, applying default theme")
-        setIsLoading(false)
-        setThemesLoaded(true)
-        applyThemeStyles(defaultTheme)
-      }, 10000)
-
-      try {
-        console.log("ThemeProvider: Starting theme loading from database...")
-
-        const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
-
-        if (themeLoadTimeout.current) {
-          clearTimeout(themeLoadTimeout.current)
-          themeLoadTimeout.current = null
-        }
-
-        if (error) {
-          console.error("ThemeProvider: Error loading themes:", error)
-          setThemesLoaded(true)
-          setIsLoading(false)
-          return
-        }
-
-        const supabaseThemes = data
-          ? data.map((theme) => ({
-              ...theme,
-              carattere_colore: theme.carattere_colore || "#111827",
-              colore_header: theme.colore_header || "#F7FAFC",
-              colore_footer: theme.colore_footer || "#2D3748",
-              colore_titolo: theme.colore_titolo || "#1A202C",
-              colore_background: theme.colore_background || "#FFFFFF",
-              colore_card: theme.colore_card || "#E2E8F0",
-              carattere_tipo: theme.carattere_tipo || "Tahoma, sans-serif",
-              border_radius: theme.border_radius || "0.5rem",
-              css_variables:
-                typeof theme.css_variables === "string"
-                  ? (() => {
-                      try {
-                        return JSON.parse(theme.css_variables)
-                      } catch {
-                        return {}
-                      }
-                    })()
-                  : theme.css_variables || {},
-              isDefault: false,
-            }))
-          : []
-
-        const allThemes = ["system", ...supabaseThemes]
-        setThemes(allThemes)
-        setThemesLoaded(true)
-        console.log(`ThemeProvider: Successfully loaded ${allThemes.length} themes`)
-
-        const savedThemeId = localStorage.getItem("app-theme")
-        if (savedThemeId) {
-          const savedTheme = allThemes.find((t) => t === savedThemeId)
-          if (savedTheme) {
-            console.log(`ThemeProvider: Applying saved theme: ${savedTheme}`)
-            setCurrentTheme(savedTheme)
-            applyThemeStyles(savedTheme)
-          } else {
-            console.log("ThemeProvider: Saved theme not found, applying default")
-            setCurrentTheme(defaultTheme)
-            applyThemeStyles(defaultTheme)
-          }
-        } else {
-          console.log("ThemeProvider: No saved theme, applying default")
-          setCurrentTheme(defaultTheme)
-          applyThemeStyles(defaultTheme)
-        }
-      } catch (error) {
-        console.error("ThemeProvider: Error in loadThemes:", error)
-        setThemesLoaded(true)
-
-        if (themeLoadTimeout.current) {
-          clearTimeout(themeLoadTimeout.current)
-          themeLoadTimeout.current = null
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadThemes()
-
-    return () => {
-      if (themeLoadTimeout.current) {
-        clearTimeout(themeLoadTimeout.current)
-        themeLoadTimeout.current = null
-      }
-    }
-  }, [mounted, supabaseInitializing, supabase, isConnected, authLoading, themesLoaded, applyThemeStyles])
-
-  const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
-    if (typeof window === "undefined") return
-
-    const root = document.documentElement
-    const sizes = {
-      small: "14px",
-      normal: "16px",
-      large: "18px",
-    }
-
-    root.style.setProperty("--font-size-base", sizes[size])
-    root.classList.remove("font-small", "font-normal", "font-large")
-    root.classList.add(`font-${size}`)
-    console.log(`ThemeProvider: Font size changed to: ${size} (${sizes[size]})`)
-  }, [])
-
-  const applyDarkMode = useCallback((dark: boolean) => {
-    if (typeof window === "undefined") return
-
-    const root = document.documentElement
-    if (dark) {
-      root.classList.add("dark")
-    } else {
-      root.classList.remove("dark")
-    }
-    console.log(`ThemeProvider: Dark mode: ${dark}`)
-  }, [])
-
-  useEffect(() => {
-    if (mounted) {
-      applyFontSize(fontSize)
-    }
-  }, [fontSize, mounted, applyFontSize])
-
-  useEffect(() => {
-    if (mounted) {
-      applyDarkMode(isDarkMode)
-    }
-  }, [isDarkMode, mounted, applyDarkMode])
-
-  const applyTheme = useCallback(
-    (themeId: number) => {
-      const theme = themes.find((t) => t === themeId)
-      if (theme) {
-        console.log("ThemeProvider: Applying theme:", theme)
-        setCurrentTheme(theme)
-        applyThemeStyles(theme)
-        localStorage.setItem("app-theme", themeId.toString())
-      } else {
-        console.warn(`ThemeProvider: Theme with ID ${themeId} not found`)
-      }
-    },
-    [themes, applyThemeStyles],
-  )
-
-  const resetToDefault = useCallback(() => {
-    console.log("ThemeProvider: Resetting to default theme")
-    setCurrentTheme(defaultTheme)
-    applyThemeStyles(defaultTheme)
-    localStorage.setItem("app-theme", "system")
-  }, [applyThemeStyles])
-
-  const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
-    setLayoutState(newLayout)
-    localStorage.setItem("app-layout", newLayout)
-    console.log("ThemeProvider: Layout changed to:", newLayout)
-  }, [])
-
-  const toggleDarkMode = useCallback(() => {
-    const newDarkMode = !isDarkMode
-    setIsDarkMode(newDarkMode)
-    localStorage.setItem("app-dark-mode", newDarkMode.toString())
-    console.log("ThemeProvider: Dark mode toggled:", newDarkMode)
-  }, [isDarkMode])
-
-  const setFontSize = useCallback((size: "small" | "normal" | "large") => {
-    setFontSizeState(size)
-    localStorage.setItem("app-font-size", size)
-    console.log("ThemeProvider: Font size changed to:", size)
-  }, [])
-
-  const value: ThemeContextType = {
-    themes,
-    currentTheme,
-    applyTheme,
-    resetToDefault,
-    layout,
-    setLayout,
-    toggleDarkMode,
-    isDarkMode,
-    fontSize,
-    setFontSize,
-    mounted,
-    isLoading,
+    console.log(`🎨 ThemeProvider: Applied theme: ${newTheme} (resolved: ${resolvedTheme})`)
   }
 
-  const themeProviderValue = {
-    theme: currentTheme as Theme,
-    setTheme: (theme: Theme) => {
-      console.log("🎨 ThemeProvider: Setting theme:", theme)
-      localStorage.setItem("vite-ui-theme", theme)
-      setCurrentTheme(theme)
-    },
+  // Funzione per caricare il tema salvato
+  const loadSavedTheme = () => {
+    try {
+      if (typeof window === "undefined") return defaultTheme
+
+      const saved = localStorage.getItem(storageKey) as Theme
+      const validThemes: Theme[] = ["light", "dark", "system"]
+
+      if (saved && validThemes.includes(saved)) {
+        console.log(`🎨 ThemeProvider: Loaded saved theme: ${saved}`)
+        return saved
+      }
+
+      console.log(`🎨 ThemeProvider: No valid saved theme, using default: ${defaultTheme}`)
+      return defaultTheme
+    } catch (error) {
+      console.error("🎨 ThemeProvider: Error loading saved theme:", error)
+      return defaultTheme
+    }
+  }
+
+  // Funzione per salvare il tema
+  const saveTheme = (newTheme: Theme) => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(storageKey, newTheme)
+        console.log(`🎨 ThemeProvider: Saved theme: ${newTheme}`)
+      }
+    } catch (error) {
+      console.error("🎨 ThemeProvider: Error saving theme:", error)
+    }
+  }
+
+  // Funzione pubblica per cambiare tema
+  const setTheme = (newTheme: Theme) => {
+    console.log(`🎨 ThemeProvider: Setting theme to: ${newTheme}`)
+    setThemeState(newTheme)
+    applyTheme(newTheme)
+    saveTheme(newTheme)
+  }
+
+  // Effetto per caricare i temi solo dopo che l'autenticazione è completata
+  useEffect(() => {
+    console.log(
+      `🎨 ThemeProvider: Auth state - loading: ${authLoading}, user: ${!!user}, themesLoaded: ${themesLoaded}`,
+    )
+
+    // Se i temi sono già stati caricati, non fare nulla
+    if (themesLoaded) {
+      console.log("🎨 ThemeProvider: Themes already loaded, skipping")
+      return
+    }
+
+    // Se l'autenticazione è ancora in corso, aspetta
+    if (authLoading) {
+      console.log("🎨 ThemeProvider: Auth still loading, waiting...")
+      return
+    }
+
+    // Pulisci eventuali timeout precedenti
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current)
+    }
+
+    // Carica i temi dopo che l'autenticazione è completata
+    console.log("🎨 ThemeProvider: Auth completed, loading themes...")
+
+    loadTimeoutRef.current = setTimeout(() => {
+      try {
+        const savedTheme = loadSavedTheme()
+        setThemeState(savedTheme)
+        applyTheme(savedTheme)
+        setThemesLoaded(true)
+        console.log("✅ ThemeProvider: Themes loaded successfully")
+      } catch (error) {
+        console.error("❌ ThemeProvider: Error during theme loading:", error)
+        // Fallback al tema di default
+        setThemeState(defaultTheme)
+        applyTheme(defaultTheme)
+        setThemesLoaded(true)
+      }
+    }, 100)
+
+    // Timeout di sicurezza per evitare caricamenti infiniti
+    const safetyTimeout = setTimeout(() => {
+      if (!themesLoaded) {
+        console.warn("⚠️ ThemeProvider: Safety timeout reached, forcing theme load")
+        const savedTheme = loadSavedTheme()
+        setThemeState(savedTheme)
+        applyTheme(savedTheme)
+        setThemesLoaded(true)
+      }
+    }, 10000) // 10 secondi
+
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current)
+      }
+      clearTimeout(safetyTimeout)
+    }
+  }, [authLoading, user, themesLoaded, defaultTheme, storageKey])
+
+  // Effetto per gestire i cambiamenti del sistema
+  useEffect(() => {
+    if (!themesLoaded) return
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+
+    const handleChange = () => {
+      if (theme === "system") {
+        applyTheme("system")
+      }
+    }
+
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
+  }, [theme, themesLoaded])
+
+  const value = {
+    theme,
+    setTheme,
+    actualTheme,
     themesLoaded,
   }
 
-  return (
-    <ThemeContext.Provider value={value}>
-      <ThemeProviderContext.Provider value={themeProviderValue}>{children}</ThemeProviderContext.Provider>
-    </ThemeContext.Provider>
-  )
-}
-
-export const useTheme = () => {
-  const context = useContext(ThemeProviderContext)
-
-  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider")
-
-  return context
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }

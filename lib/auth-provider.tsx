@@ -10,23 +10,17 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   isLoading: boolean
-  login: (email: string, password: string) => Promise<{ user: User | null; error: AuthError | null }>
-  logout: () => Promise<void>
-  checkSession: () => Promise<void>
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>
+  signOut: () => Promise<void>
+  refreshSession: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  isLoading: true,
-  login: async () => ({ user: null, error: null }),
-  logout: async () => {},
-  checkSession: async () => {},
-})
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
   return context
@@ -38,10 +32,20 @@ interface AuthProviderProps {
 
 // Costanti per la gestione delle sessioni
 const SESSION_CHECK_INTERVAL = 5 * 60 * 1000 // 5 minuti
-const SESSION_CHECK_THROTTLE = 1000 // 1 secondo
+const THROTTLE_DELAY = 1000 // 1 secondo
+const SESSION_COOKIE_NAMES = [
+  "sb-access-token",
+  "sb-refresh-token",
+  "supabase-auth-token",
+  "supabase.auth.token",
+  "sb-istudio-auth-token",
+  "auth-token",
+  "session",
+  "auth-session",
+]
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const { supabase, isInitialized } = useSupabase()
+  const { supabase, isReady } = useSupabase()
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -52,79 +56,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const sessionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastSessionCheckRef = useRef<number>(0)
 
-  // Funzione per pulire tutti i cookie di autenticazione
-  const clearAuthCookies = () => {
-    console.log("🍪 AuthProvider: Clearing all auth cookies...")
-
-    const cookiesToClear = [
-      "sb-access-token",
-      "sb-refresh-token",
-      "supabase-auth-token",
-      "supabase.auth.token",
-      "sb-localhost-auth-token",
-      "sb-127.0.0.1-auth-token",
-      "auth-token",
-      "session",
-      "user-session",
-      "auth-session",
-    ]
-
-    const domains = ["", ".localhost", ".127.0.0.1", window.location.hostname]
-    const paths = ["/", "/auth", "/dashboard"]
-
-    cookiesToClear.forEach((cookieName) => {
-      domains.forEach((domain) => {
-        paths.forEach((path) => {
-          const cookieString = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}; SameSite=Lax; Secure`
-          document.cookie = cookieString
-
-          // Anche senza domain
-          const cookieStringNoDomain = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; SameSite=Lax`
-          document.cookie = cookieStringNoDomain
-        })
-      })
-    })
-
-    // Pulisci anche localStorage e sessionStorage
-    try {
-      const keysToRemove = []
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && (key.includes("supabase") || key.includes("auth") || key.includes("session"))) {
-          keysToRemove.push(key)
-        }
-      }
-      keysToRemove.forEach((key) => localStorage.removeItem(key))
-
-      const sessionKeysToRemove = []
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i)
-        if (key && (key.includes("supabase") || key.includes("auth") || key.includes("session"))) {
-          sessionKeysToRemove.push(key)
-        }
-      }
-      sessionKeysToRemove.forEach((key) => sessionStorage.removeItem(key))
-
-      console.log("✅ AuthProvider: Auth cookies and storage cleared")
-    } catch (error) {
-      console.error("❌ AuthProvider: Error clearing storage:", error)
-    }
-  }
-
-  // Funzione per validare una sessione
+  // Funzione per validare il formato della sessione
   const isValidSession = (session: Session | null): boolean => {
     if (!session) return false
 
     try {
       // Verifica che la sessione abbia i campi obbligatori
-      if (!session.access_token || !session.user) {
+      const hasRequiredFields = !!(session.access_token && session.refresh_token && session.user && session.expires_at)
+
+      if (!hasRequiredFields) {
         console.warn("⚠️ AuthProvider: Session missing required fields")
         return false
       }
 
       // Verifica che la sessione non sia scaduta
       const now = Math.floor(Date.now() / 1000)
-      if (session.expires_at && session.expires_at < now) {
+      const isExpired = session.expires_at ? session.expires_at < now : true
+
+      if (isExpired) {
         console.warn("⚠️ AuthProvider: Session expired")
         return false
       }
@@ -142,74 +91,92 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // Funzione per pulire tutti i cookie di autenticazione
+  const clearAuthCookies = () => {
+    try {
+      console.log("🧹 AuthProvider: Clearing auth cookies...")
+
+      SESSION_COOKIE_NAMES.forEach((cookieName) => {
+        // Pulisci per il dominio corrente
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+
+        // Pulisci per il dominio con punto
+        const domain = window.location.hostname
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${domain};`
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${domain};`
+      })
+
+      // Pulisci anche localStorage e sessionStorage
+      if (typeof window !== "undefined") {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.includes("supabase") || key.includes("auth")) {
+            localStorage.removeItem(key)
+          }
+        })
+
+        Object.keys(sessionStorage).forEach((key) => {
+          if (key.includes("supabase") || key.includes("auth")) {
+            sessionStorage.removeItem(key)
+          }
+        })
+      }
+
+      console.log("✅ AuthProvider: Auth cookies cleared")
+    } catch (error) {
+      console.error("❌ AuthProvider: Error clearing cookies:", error)
+    }
+  }
+
   // Funzione per controllare la sessione con throttling
-  const checkSession = async () => {
-    if (!supabase || !isInitialized) {
-      console.log("⏳ AuthProvider: Supabase not ready for session check")
+  const checkSession = async (force = false) => {
+    if (!supabase || !isReady) {
+      console.log("⏭️ AuthProvider: Supabase not ready, skipping session check")
       return
     }
 
-    // Throttling: non controllare più di una volta al secondo
+    // Throttling per evitare chiamate eccessive
     const now = Date.now()
-    if (now - lastSessionCheckRef.current < SESSION_CHECK_THROTTLE) {
-      console.log("🚫 AuthProvider: Session check throttled")
+    if (!force && now - lastSessionCheckRef.current < THROTTLE_DELAY) {
+      console.log("⏭️ AuthProvider: Session check throttled")
       return
     }
-    lastSessionCheckRef.current = now
 
-    if (isCheckingSessionRef.current) {
-      console.log("🚫 AuthProvider: Session check already in progress")
+    if (isCheckingSessionRef.current && !force) {
+      console.log("⏭️ AuthProvider: Session check already in progress")
       return
     }
 
     isCheckingSessionRef.current = true
-    console.log("🔍 AuthProvider: Checking session...")
+    lastSessionCheckRef.current = now
 
     try {
+      console.log("🔍 AuthProvider: Checking session...")
+
       const {
-        data: { session },
+        data: { session: currentSession },
         error,
       } = await supabase.auth.getSession()
 
       if (error) {
-        console.error("❌ AuthProvider: Error getting session:", error.message)
+        console.error("❌ AuthProvider: Error getting session:", error)
         setUser(null)
         setSession(null)
         clearAuthCookies()
         return
       }
 
-      if (isValidSession(session)) {
+      if (isValidSession(currentSession)) {
         console.log("✅ AuthProvider: Valid session found")
-        setUser(session.user)
-        setSession(session)
+        setUser(currentSession.user)
+        setSession(currentSession)
       } else {
-        console.log("❌ AuthProvider: Invalid or expired session")
+        console.log("❌ AuthProvider: No valid session found")
         setUser(null)
         setSession(null)
         clearAuthCookies()
-
-        // Tentativo di recupero automatico
-        try {
-          console.log("🔄 AuthProvider: Attempting session recovery...")
-          const {
-            data: { session: recoveredSession },
-            error: recoveryError,
-          } = await supabase.auth.refreshSession()
-
-          if (!recoveryError && isValidSession(recoveredSession)) {
-            console.log("✅ AuthProvider: Session recovered successfully")
-            setUser(recoveredSession.user)
-            setSession(recoveredSession)
-          } else {
-            console.log("❌ AuthProvider: Session recovery failed")
-          }
-        } catch (recoveryError) {
-          console.error("❌ AuthProvider: Session recovery error:", recoveryError)
-        }
       }
     } catch (error) {
-      console.error("❌ AuthProvider: Unexpected error during session check:", error)
+      console.error("❌ AuthProvider: Session check error:", error)
       setUser(null)
       setSession(null)
       clearAuthCookies()
@@ -230,95 +197,162 @@ export function AuthProvider({ children }: AuthProviderProps) {
       clearInterval(sessionCheckIntervalRef.current)
     }
 
-    console.log("⏰ AuthProvider: Starting periodic session checks...")
+    console.log(`📅 AuthProvider: Starting periodic session checks every ${SESSION_CHECK_INTERVAL / 1000}s`)
+
     sessionCheckIntervalRef.current = setInterval(() => {
-      console.log("⏰ AuthProvider: Periodic session check triggered")
+      console.log("⏰ AuthProvider: Periodic session check")
       checkSession()
     }, SESSION_CHECK_INTERVAL)
   }
 
-  const login = async (email: string, password: string) => {
-    if (!supabase) {
-      console.error("❌ AuthProvider: Supabase not available for login")
-      return { user: null, error: { message: "Supabase not available" } as AuthError }
-    }
-
-    console.log("🔐 AuthProvider: Attempting login for:", email)
+  // Funzione per tentare il recupero automatico della sessione
+  const attemptSessionRecovery = async () => {
+    if (!supabase) return
 
     try {
+      console.log("🔄 AuthProvider: Attempting session recovery...")
+
+      const { data, error } = await supabase.auth.refreshSession()
+
+      if (error) {
+        console.error("❌ AuthProvider: Session recovery failed:", error)
+        return false
+      }
+
+      if (isValidSession(data.session)) {
+        console.log("✅ AuthProvider: Session recovered successfully")
+        setUser(data.session.user)
+        setSession(data.session)
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error("❌ AuthProvider: Session recovery error:", error)
+      return false
+    }
+  }
+
+  // Funzioni di autenticazione
+  const signIn = async (email: string, password: string) => {
+    if (!supabase) {
+      return { error: new Error("Supabase not initialized") as AuthError }
+    }
+
+    try {
+      console.log("🔐 AuthProvider: Signing in...")
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error("❌ AuthProvider: Login error:", error.message)
-        return { user: null, error }
+        console.error("❌ AuthProvider: Sign in error:", error)
+        return { error }
       }
 
       if (isValidSession(data.session)) {
-        console.log("✅ AuthProvider: Login successful")
         setUser(data.user)
         setSession(data.session)
+        console.log("✅ AuthProvider: Sign in successful")
+      }
 
-        // Avvia i controlli periodici dopo il login
-        startPeriodicSessionCheck()
+      return { error: null }
+    } catch (error) {
+      console.error("❌ AuthProvider: Sign in exception:", error)
+      return { error: error as AuthError }
+    }
+  }
 
-        return { user: data.user, error: null }
+  const signUp = async (email: string, password: string) => {
+    if (!supabase) {
+      return { error: new Error("Supabase not initialized") as AuthError }
+    }
+
+    try {
+      console.log("📝 AuthProvider: Signing up...")
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+
+      if (error) {
+        console.error("❌ AuthProvider: Sign up error:", error)
+        return { error }
+      }
+
+      console.log("✅ AuthProvider: Sign up successful")
+      return { error: null }
+    } catch (error) {
+      console.error("❌ AuthProvider: Sign up exception:", error)
+      return { error: error as AuthError }
+    }
+  }
+
+  const signOut = async () => {
+    if (!supabase) return
+
+    try {
+      console.log("🚪 AuthProvider: Signing out...")
+
+      // Pulisci lo stato locale prima
+      setUser(null)
+      setSession(null)
+
+      // Pulisci i cookie
+      clearAuthCookies()
+
+      // Esegui il logout su Supabase
+      const { error } = await supabase.auth.signOut()
+
+      if (error) {
+        console.error("❌ AuthProvider: Sign out error:", error)
       } else {
-        console.error("❌ AuthProvider: Invalid session after login")
-        return { user: null, error: { message: "Invalid session" } as AuthError }
+        console.log("✅ AuthProvider: Sign out successful")
       }
     } catch (error) {
-      console.error("❌ AuthProvider: Unexpected login error:", error)
-      return { user: null, error: error as AuthError }
+      console.error("❌ AuthProvider: Sign out exception:", error)
     }
   }
 
-  const logout = async () => {
-    console.log("🚪 AuthProvider: Logging out...")
+  const refreshSession = async () => {
+    if (!supabase) return
 
-    // Ferma i controlli periodici
-    if (sessionCheckIntervalRef.current) {
-      clearInterval(sessionCheckIntervalRef.current)
-      sessionCheckIntervalRef.current = null
-    }
+    try {
+      console.log("🔄 AuthProvider: Refreshing session...")
+      const { data, error } = await supabase.auth.refreshSession()
 
-    if (supabase) {
-      try {
-        const { error } = await supabase.auth.signOut()
-        if (error) {
-          console.error("❌ AuthProvider: Logout error:", error.message)
-        } else {
-          console.log("✅ AuthProvider: Logout successful")
-        }
-      } catch (error) {
-        console.error("❌ AuthProvider: Unexpected logout error:", error)
+      if (error) {
+        console.error("❌ AuthProvider: Refresh session error:", error)
+        return
       }
-    }
 
-    // Pulisci lo stato e i cookie
-    setUser(null)
-    setSession(null)
-    clearAuthCookies()
+      if (isValidSession(data.session)) {
+        setUser(data.session.user)
+        setSession(data.session)
+        console.log("✅ AuthProvider: Session refreshed successfully")
+      }
+    } catch (error) {
+      console.error("❌ AuthProvider: Refresh session exception:", error)
+    }
   }
 
-  // Effetto per l'inizializzazione
+  // Effetto per inizializzare l'autenticazione
   useEffect(() => {
-    if (!isInitialized || !supabase) {
-      console.log("⏳ AuthProvider: Waiting for Supabase initialization...")
+    if (!supabase || !isReady) {
+      console.log("⏳ AuthProvider: Waiting for Supabase to be ready...")
       return
     }
 
     if (initializationCompleteRef.current) {
-      console.log("✅ AuthProvider: Already initialized")
+      console.log("⏭️ AuthProvider: Already initialized")
       return
     }
 
     console.log("🚀 AuthProvider: Starting initialization...")
 
     // Controlla la sessione iniziale
-    checkSession()
+    checkSession(true)
 
     // Avvia i controlli periodici
     startPeriodicSessionCheck()
@@ -327,41 +361,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 AuthProvider: Auth state changed:", event)
+      console.log(`🔔 AuthProvider: Auth state changed: ${event}`)
 
       if (event === "SIGNED_IN" && isValidSession(session)) {
-        console.log("✅ AuthProvider: User signed in")
         setUser(session.user)
         setSession(session)
       } else if (event === "SIGNED_OUT") {
-        console.log("🚪 AuthProvider: User signed out")
         setUser(null)
         setSession(null)
         clearAuthCookies()
       } else if (event === "TOKEN_REFRESHED" && isValidSession(session)) {
-        console.log("🔄 AuthProvider: Token refreshed")
         setUser(session.user)
         setSession(session)
       }
     })
 
-    // Cleanup
     return () => {
       console.log("🧹 AuthProvider: Cleaning up...")
       subscription.unsubscribe()
+
       if (sessionCheckIntervalRef.current) {
         clearInterval(sessionCheckIntervalRef.current)
       }
     }
-  }, [isInitialized, supabase])
+  }, [supabase, isReady])
 
   const value = {
     user,
     session,
     isLoading,
-    login,
-    logout,
-    checkSession,
+    signIn,
+    signUp,
+    signOut,
+    refreshSession,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
