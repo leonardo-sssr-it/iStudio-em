@@ -5,30 +5,32 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 
-// Tipi per i temi
-interface Theme {
-  id: number
-  nome_tema: string
-  colore_titolo?: string
-  colore_sfondo?: string
-  colore_testo?: string
-  colore_accento?: string
-  carattere_tipo?: string
-  carattere_dimensione?: number
-  carattere_colore?: string
-  colore_header?: string
-  colore_footer?: string
-  colore_background?: string
-  colore_card?: string
-  colore_tabs?: string
-  colore_div?: string
-  border_radius?: string
-  css_variables?: Record<string, string> | string | null
-  isDefault?: boolean
-}
+type Theme =
+  | "light"
+  | "dark"
+  | "system"
+  | {
+      id: number
+      nome_tema: string
+      colore_titolo?: string
+      colore_sfondo?: string
+      colore_testo?: string
+      colore_accento?: string
+      carattere_tipo?: string
+      carattere_dimensione?: number
+      carattere_colore?: string
+      colore_header?: string
+      colore_footer?: string
+      colore_background?: string
+      colore_card?: string
+      colore_tabs?: string
+      colore_div?: string
+      border_radius?: string
+      css_variables?: Record<string, string> | string | null
+      isDefault?: boolean
+    }
 
-// Tipi per il context
-interface ThemeContextType {
+type ThemeContextType = {
   themes: Theme[]
   currentTheme: Theme | null
   applyTheme: (themeId: number) => void
@@ -45,18 +47,17 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-// Tema predefinito
-const defaultTheme: Theme = {
-  id: 0,
-  nome_tema: "Sistema",
-  isDefault: true,
-}
+const defaultTheme: Theme = "system"
 
-// Hook sicuro per usare il context
+const ThemeProviderContext = createContext({
+  theme: defaultTheme,
+  setTheme: (theme: Theme) => null,
+  themesLoaded: false,
+})
+
 export function useSafeCustomTheme(): ThemeContextType {
   const context = useContext(ThemeContext)
   if (!context) {
-    // Fallback sicuro se il context non è disponibile
     return {
       themes: [defaultTheme],
       currentTheme: defaultTheme,
@@ -79,7 +80,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected, isInitializing: supabaseInitializing } = useSupabase()
   const { user, isLoading: authLoading } = useAuth()
 
-  const [themes, setThemes] = useState<Theme[]>([defaultTheme])
+  const [themes, setThemes] = useState<Theme[]>(["system"])
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
   const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -90,18 +91,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const loadingAttempted = useRef(false)
   const themeLoadTimeout = useRef<NodeJS.Timeout | null>(null)
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Funzione per convertire colori hex in HSL
   const hexToHsl = useCallback((hex: string): string => {
     if (!hex || hex === "") return "0 0% 50%"
 
-    // Se il colore è già in formato HSL, restituiscilo così com'è
     if (hex.includes("hsl") || hex.includes("%")) return hex.replace("hsl(", "").replace(")", "")
 
-    // Rimuovi il # se presente
     hex = hex.replace("#", "")
 
-    // Assicurati che sia un hex valido a 6 caratteri
     if (hex.length === 3) {
       hex = hex
         .split("")
@@ -114,7 +112,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return "0 0% 50%"
     }
 
-    // Converti hex in RGB
     const r = Number.parseInt(hex.substr(0, 2), 16) / 255
     const g = Number.parseInt(hex.substr(2, 2), 16) / 255
     const b = Number.parseInt(hex.substr(4, 2), 16) / 255
@@ -146,146 +143,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
   }, [])
 
-  // Applica gli stili del tema
-  const applyThemeStyles = useCallback(
-    (theme: Theme) => {
-      if (typeof window === "undefined") return
+  const applyThemeStyles = useCallback((theme: Theme) => {
+    if (typeof window === "undefined") return
 
-      const root = document.documentElement
+    const root = document.documentElement
 
-      console.log("ThemeProvider: === APPLICANDO TEMA ===")
-      console.log("ThemeProvider: Nome tema:", theme.nome_tema)
+    console.log("ThemeProvider: === APPLICANDO TEMA ===")
+    console.log("ThemeProvider: Nome tema:", theme)
 
-      if (theme.isDefault) {
-        // Resetta al tema predefinito
-        console.log("ThemeProvider: Resettando al tema predefinito")
-        const customProperties = [
-          "--primary",
-          "--secondary",
-          "--accent",
-          "--background",
-          "--foreground",
-          "--card",
-          "--card-foreground",
-          "--popover",
-          "--popover-foreground",
-          "--header",
-          "--footer",
-          "--div",
-        ]
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      root.classList.add(systemTheme)
+      console.log("ThemeProvider: Applied system theme:", systemTheme)
+    } else {
+      root.classList.add(theme)
+      console.log("ThemeProvider: Applied theme:", theme)
+    }
 
-        customProperties.forEach((prop) => {
-          root.style.removeProperty(prop)
-        })
+    document.body.classList.add("theme-transition")
+    setTimeout(() => {
+      document.body.classList.remove("theme-transition")
+    }, 300)
 
-        // Resetta il font family
-        document.body.style.fontFamily = ""
+    console.log("ThemeProvider: === TEMA APPLICATO CON SUCCESSO ===")
+  }, [])
 
-        // Resetta il border radius
-        root.style.removeProperty("--radius")
-      } else {
-        // Applica i colori del tema personalizzato
-        console.log("ThemeProvider: Applicando tema personalizzato")
-
-        if (theme.colore_titolo) {
-          const titleHsl = hexToHsl(theme.colore_titolo)
-          root.style.setProperty("--primary", titleHsl)
-          console.log(`ThemeProvider: ✓ Primary color applicato: ${titleHsl}`)
-        }
-
-        if (theme.colore_card) {
-          const cardHsl = hexToHsl(theme.colore_card)
-          root.style.setProperty("--secondary", cardHsl)
-          console.log(`ThemeProvider: ✓ Secondary color applicato: ${cardHsl}`)
-        }
-
-        if (theme.colore_tabs) {
-          const tabsHsl = hexToHsl(theme.colore_tabs)
-          root.style.setProperty("--accent", tabsHsl)
-          console.log(`ThemeProvider: ✓ Accent color applicato: ${tabsHsl}`)
-        }
-
-        if (theme.colore_background) {
-          const bgHsl = hexToHsl(theme.colore_background)
-          root.style.setProperty("--background", bgHsl)
-          root.style.setProperty("--card", bgHsl)
-          root.style.setProperty("--popover", bgHsl)
-          console.log(`ThemeProvider: ✓ Background color applicato: ${bgHsl}`)
-        }
-
-        if (theme.carattere_colore) {
-          const textHsl = hexToHsl(theme.carattere_colore)
-          root.style.setProperty("--foreground", textHsl)
-          root.style.setProperty("--card-foreground", textHsl)
-          root.style.setProperty("--popover-foreground", textHsl)
-          console.log(`ThemeProvider: ✓ Text color applicato: ${textHsl}`)
-        }
-
-        if (theme.colore_header) {
-          const headerHsl = hexToHsl(theme.colore_header)
-          root.style.setProperty("--header", headerHsl)
-          console.log(`ThemeProvider: ✓ Header color applicato: ${headerHsl}`)
-        }
-
-        if (theme.colore_footer) {
-          const footerHsl = hexToHsl(theme.colore_footer)
-          root.style.setProperty("--footer", footerHsl)
-          console.log(`ThemeProvider: ✓ Footer color applicato: ${footerHsl}`)
-        }
-
-        if (theme.colore_div) {
-          const divHsl = hexToHsl(theme.colore_div)
-          root.style.setProperty("--div", divHsl)
-          console.log(`ThemeProvider: ✓ Div color applicato: ${divHsl}`)
-        }
-
-        // Applica le variabili CSS personalizzate se presenti
-        if (theme.css_variables) {
-          let cssVars: Record<string, string> = {}
-
-          if (typeof theme.css_variables === "string") {
-            try {
-              cssVars = JSON.parse(theme.css_variables)
-            } catch (e) {
-              console.error("ThemeProvider: Errore nel parsing delle CSS variables:", e)
-            }
-          } else if (typeof theme.css_variables === "object") {
-            cssVars = theme.css_variables
-          }
-
-          Object.entries(cssVars).forEach(([key, value]) => {
-            if (value && typeof value === "string") {
-              root.style.setProperty(`--${key}`, value)
-              console.log(`ThemeProvider: ✓ Variabile CSS personalizzata applicata: --${key} = ${value}`)
-            }
-          })
-        }
-
-        // Applica il font family
-        if (theme.carattere_tipo) {
-          document.body.style.fontFamily = theme.carattere_tipo
-          console.log(`ThemeProvider: ✓ Font family applicato: ${theme.carattere_tipo}`)
-        }
-
-        // Applica il border radius
-        if (theme.border_radius) {
-          root.style.setProperty("--radius", theme.border_radius)
-          console.log(`ThemeProvider: ✓ Border radius applicato: ${theme.border_radius}`)
-        }
-      }
-
-      // Forza il re-render aggiungendo una classe temporanea
-      document.body.classList.add("theme-transition")
-      setTimeout(() => {
-        document.body.classList.remove("theme-transition")
-      }, 300)
-
-      console.log("ThemeProvider: === TEMA APPLICATO CON SUCCESSO ===")
-    },
-    [hexToHsl],
-  )
-
-  // Carica le preferenze dal localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       console.log("ThemeProvider: Loading preferences from localStorage")
@@ -312,10 +194,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database solo quando tutte le condizioni sono soddisfatte
   useEffect(() => {
     const loadThemes = async () => {
-      // Condizioni per il caricamento dei temi
       const shouldLoadThemes =
         mounted &&
         !supabaseInitializing &&
@@ -343,13 +223,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       loadingAttempted.current = true
       setIsLoading(true)
 
-      // Set timeout per evitare caricamenti infiniti
       themeLoadTimeout.current = setTimeout(() => {
         console.warn("ThemeProvider: Theme loading timeout, applying default theme")
         setIsLoading(false)
         setThemesLoaded(true)
         applyThemeStyles(defaultTheme)
-      }, 10000) // 10 secondi timeout
+      }, 10000)
 
       try {
         console.log("ThemeProvider: Starting theme loading from database...")
@@ -363,13 +242,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("ThemeProvider: Error loading themes:", error)
-          // Anche in caso di errore, impostiamo i temi come caricati per evitare loop
           setThemesLoaded(true)
           setIsLoading(false)
           return
         }
 
-        // Processa i temi da Supabase
         const supabaseThemes = data
           ? data.map((theme) => ({
               ...theme,
@@ -395,17 +272,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             }))
           : []
 
-        const allThemes = [defaultTheme, ...supabaseThemes]
+        const allThemes = ["system", ...supabaseThemes]
         setThemes(allThemes)
         setThemesLoaded(true)
         console.log(`ThemeProvider: Successfully loaded ${allThemes.length} themes`)
 
-        // Applica il tema salvato o quello di default
         const savedThemeId = localStorage.getItem("app-theme")
         if (savedThemeId) {
-          const savedTheme = allThemes.find((t) => t.id.toString() === savedThemeId)
+          const savedTheme = allThemes.find((t) => t === savedThemeId)
           if (savedTheme) {
-            console.log(`ThemeProvider: Applying saved theme: ${savedTheme.nome_tema}`)
+            console.log(`ThemeProvider: Applying saved theme: ${savedTheme}`)
             setCurrentTheme(savedTheme)
             applyThemeStyles(savedTheme)
           } else {
@@ -420,7 +296,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("ThemeProvider: Error in loadThemes:", error)
-        setThemesLoaded(true) // Evita loop infiniti
+        setThemesLoaded(true)
 
         if (themeLoadTimeout.current) {
           clearTimeout(themeLoadTimeout.current)
@@ -433,7 +309,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     loadThemes()
 
-    // Cleanup timeout on unmount
     return () => {
       if (themeLoadTimeout.current) {
         clearTimeout(themeLoadTimeout.current)
@@ -442,7 +317,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [mounted, supabaseInitializing, supabase, isConnected, authLoading, themesLoaded, applyThemeStyles])
 
-  // Applica le dimensioni del font
   const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
     if (typeof window === "undefined") return
 
@@ -459,7 +333,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     console.log(`ThemeProvider: Font size changed to: ${size} (${sizes[size]})`)
   }, [])
 
-  // Applica il dark mode
   const applyDarkMode = useCallback((dark: boolean) => {
     if (typeof window === "undefined") return
 
@@ -472,7 +345,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     console.log(`ThemeProvider: Dark mode: ${dark}`)
   }, [])
 
-  // Effetti per applicare le impostazioni quando cambiano
   useEffect(() => {
     if (mounted) {
       applyFontSize(fontSize)
@@ -485,12 +357,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isDarkMode, mounted, applyDarkMode])
 
-  // Funzioni per cambiare le impostazioni
   const applyTheme = useCallback(
     (themeId: number) => {
-      const theme = themes.find((t) => t.id === themeId)
+      const theme = themes.find((t) => t === themeId)
       if (theme) {
-        console.log("ThemeProvider: Applying theme:", theme.nome_tema)
+        console.log("ThemeProvider: Applying theme:", theme)
         setCurrentTheme(theme)
         applyThemeStyles(theme)
         localStorage.setItem("app-theme", themeId.toString())
@@ -505,7 +376,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     console.log("ThemeProvider: Resetting to default theme")
     setCurrentTheme(defaultTheme)
     applyThemeStyles(defaultTheme)
-    localStorage.setItem("app-theme", "0")
+    localStorage.setItem("app-theme", "system")
   }, [applyThemeStyles])
 
   const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
@@ -542,5 +413,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     isLoading,
   }
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  const themeProviderValue = {
+    theme: currentTheme as Theme,
+    setTheme: (theme: Theme) => {
+      console.log("🎨 ThemeProvider: Setting theme:", theme)
+      localStorage.setItem("vite-ui-theme", theme)
+      setCurrentTheme(theme)
+    },
+    themesLoaded,
+  }
+
+  return (
+    <ThemeContext.Provider value={value}>
+      <ThemeProviderContext.Provider value={themeProviderValue}>{children}</ThemeProviderContext.Provider>
+    </ThemeContext.Provider>
+  )
+}
+
+export const useTheme = () => {
+  const context = useContext(ThemeProviderContext)
+
+  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider")
+
+  return context
 }

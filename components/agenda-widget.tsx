@@ -33,7 +33,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  MapPin,
   User,
   FileText,
   CheckSquare,
@@ -82,6 +81,49 @@ const getViewPreference = (): "daily" | "weekly" | "monthly" => {
   }
 
   return "daily" // Default
+}
+
+// Funzione per calcolare le date in base alla vista
+const calculateDateRange = (selectedDate: Date, view: "daily" | "weekly" | "monthly") => {
+  let startDate: Date
+  let endDate: Date
+
+  switch (view) {
+    case "daily":
+      startDate = new Date(selectedDate)
+      startDate.setHours(0, 0, 0, 0)
+      endDate = new Date(selectedDate)
+      endDate.setHours(23, 59, 59, 999)
+      break
+
+    case "weekly":
+      startDate = startOfWeek(selectedDate, { weekStartsOn: 1 })
+      startDate.setHours(0, 0, 0, 0)
+      endDate = endOfWeek(selectedDate, { weekStartsOn: 1 })
+      endDate.setHours(23, 59, 59, 999)
+      break
+
+    case "monthly":
+      startDate = startOfMonth(selectedDate)
+      startDate.setHours(0, 0, 0, 0)
+      endDate = endOfMonth(selectedDate)
+      endDate.setHours(23, 59, 59, 999)
+      break
+
+    default:
+      startDate = new Date(selectedDate)
+      startDate.setHours(0, 0, 0, 0)
+      endDate = new Date(selectedDate)
+      endDate.setHours(23, 59, 59, 999)
+  }
+
+  console.log(`📅 AgendaWidget: Date range for ${view} view:`, {
+    selectedDate: selectedDate.toISOString(),
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+  })
+
+  return { startDate, endDate }
 }
 
 // Componente per il menu di creazione nuovo elemento
@@ -146,7 +188,11 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
   const [mounted, setMounted] = useState(false)
 
-  const { items, isLoading, error } = useAgendaItems(selectedDate, view)
+  // Calcola le date corrette in base alla vista
+  const { startDate, endDate } = calculateDateRange(selectedDate, view)
+
+  // Ora passiamo le date corrette al hook
+  const { items, isLoading, error } = useAgendaItems(startDate, endDate)
 
   // Carica la preferenza di visualizzazione dopo il mount del componente
   useEffect(() => {
@@ -240,49 +286,41 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
         <ScrollArea className="h-[400px]">
           <div className="space-y-3">
             {items.map((item) => (
-              <Card key={`${item.type}-${item.id}`} className="hover:shadow-md transition-shadow">
+              <Card key={`${item.tipo}-${item.id}`} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3 flex-1">
-                      {getItemIcon(item.type)}
+                      {getItemIcon(item.tipo)}
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{item.title}</h4>
-                        {item.description && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                        <h4 className="font-medium truncate">{item.titolo}</h4>
+                        {item.descrizione && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.descrizione}</p>
                         )}
                         <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          {item.time && (
+                          {item.data_inizio && (
                             <div className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {item.time}
+                              {format(item.data_inizio, "HH:mm")}
                             </div>
                           )}
-                          {item.location && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {item.location}
-                            </div>
-                          )}
-                          {item.assignee && (
+                          {item.cliente && (
                             <div className="flex items-center gap-1">
                               <User className="h-3 w-3" />
-                              {item.assignee}
+                              {item.cliente}
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 ml-2">
-                      <Badge variant="outline" className={cn("text-xs", getItemColor(item.type))}>
-                        {item.type}
+                      <Badge variant="outline" className={cn("text-xs", getItemColor(item.tipo))}>
+                        {item.tipo}
                       </Badge>
-                      {item.tableUrl && (
-                        <Link href={item.tableUrl}>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                        </Link>
-                      )}
+                      <Link href={`/data-explorer/${item.tabella_origine}/${item.id_origine}`}>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </CardContent>
@@ -306,7 +344,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
       <div className="space-y-4">
         <div className="grid grid-cols-7 gap-2">
           {weekDays.map((day) => {
-            const dayItems = items.filter((item) => isSameDay(new Date(item.date), day))
+            const dayItems = items.filter((item) => isSameDay(item.data_inizio, day))
             const isToday = isSameDay(day, new Date())
             const isSelected = isSameDay(day, selectedDate)
 
@@ -330,11 +368,11 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                 <div className="space-y-1">
                   {dayItems.slice(0, 3).map((item) => (
                     <div
-                      key={`${item.type}-${item.id}`}
-                      className={cn("text-xs p-1 rounded border truncate", getItemColor(item.type))}
-                      title={item.title}
+                      key={`${item.tipo}-${item.id}`}
+                      className={cn("text-xs p-1 rounded border truncate", getItemColor(item.tipo))}
+                      title={item.titolo}
                     >
-                      {item.title}
+                      {item.titolo}
                     </div>
                   ))}
                   {dayItems.length > 3 && (
@@ -377,7 +415,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
             return (
               <div key={weekStart.toISOString()} className="grid grid-cols-7 gap-2">
                 {weekDays.map((day) => {
-                  const dayItems = items.filter((item) => isSameDay(new Date(item.date), day))
+                  const dayItems = items.filter((item) => isSameDay(item.data_inizio, day))
                   const isToday = isSameDay(day, new Date())
                   const isCurrentMonth = isSameMonth(day, selectedDate)
                   const isSelected = isSameDay(day, selectedDate)
@@ -409,11 +447,11 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                       <div className="space-y-1">
                         {dayItems.slice(0, 2).map((item) => (
                           <div
-                            key={`${item.type}-${item.id}`}
-                            className={cn("text-xs p-1 rounded border truncate", getItemColor(item.type))}
-                            title={item.title}
+                            key={`${item.tipo}-${item.id}`}
+                            className={cn("text-xs p-1 rounded border truncate", getItemColor(item.tipo))}
+                            title={item.titolo}
                           >
-                            {item.title}
+                            {item.titolo}
                           </div>
                         ))}
                         {dayItems.length > 2 && (
@@ -531,7 +569,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
           <div className="text-center py-8 text-destructive">
             <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
             <p>Errore nel caricamento dell'agenda</p>
-            <p className="text-sm text-muted-foreground mt-2">{error}</p>
+            <p className="text-sm text-muted-foreground mt-2">{error.message}</p>
           </div>
         ) : (
           <>

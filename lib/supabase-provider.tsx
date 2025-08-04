@@ -1,194 +1,179 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react"
-import { createClient } from "@/lib/supabase/client"
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type React from "react"
+
+import { createContext, useContext, useEffect, useState, useRef } from "react"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
 interface SupabaseContextType {
   supabase: SupabaseClient<Database> | null
-  isConnected: boolean
-  isInitializing: boolean
-  connectionError: string | null
-  resetClient: () => Promise<void>
+  isInitialized: boolean
+  resetClient: () => void
 }
 
 const SupabaseContext = createContext<SupabaseContextType>({
   supabase: null,
-  isConnected: false,
-  isInitializing: true,
-  connectionError: null,
-  resetClient: async () => {},
+  isInitialized: false,
+  resetClient: () => {},
 })
 
-export function SupabaseProvider({ children }: { children: ReactNode }) {
+export const useSupabase = () => {
+  const context = useContext(SupabaseContext)
+  if (!context) {
+    throw new Error("useSupabase must be used within a SupabaseProvider")
+  }
+  return context
+}
+
+interface SupabaseProviderProps {
+  children: React.ReactNode
+}
+
+export function SupabaseProvider({ children }: SupabaseProviderProps) {
   const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
-  const [isInitializing, setIsInitializing] = useState(true)
-  const [connectionError, setConnectionError] = useState<string | null>(null)
-  const initializationAttempted = useRef(false)
-  const connectionCheckInterval = useRef<NodeJS.Timeout | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
+  const connectionCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const initializationAttemptRef = useRef(0)
 
-  const testConnection = useCallback(async (client: SupabaseClient<Database>): Promise<boolean> => {
+  const createSupabaseClient = () => {
+    console.log("🔧 SupabaseProvider: Creating new Supabase client...")
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("❌ SupabaseProvider: Missing environment variables")
+      console.error("NEXT_PUBLIC_SUPABASE_URL:", !!supabaseUrl)
+      console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY:", !!supabaseAnonKey)
+      return null
+    }
+
     try {
-      console.log("SupabaseProvider: Testing database connection...")
+      const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: false, // Disabilitiamo la persistenza automatica per evitare conflitti
+          autoRefreshToken: true,
+          detectSessionInUrl: false,
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+          },
+        },
+      })
 
-      // Test basic connectivity with a simple query
-      const { data, error } = await client.from("utenti").select("id").limit(1).maybeSingle()
+      console.log("✅ SupabaseProvider: Client created successfully")
+      return client
+    } catch (error) {
+      console.error("❌ SupabaseProvider: Error creating client:", error)
+      return null
+    }
+  }
 
-      if (error) {
-        // If it's a "no rows" error, that's actually fine - it means we can connect
-        if (error.message.includes("multiple (or no) rows returned")) {
-          console.log("SupabaseProvider: Connection test successful (no rows returned)")
-          return true
-        }
-        console.error("SupabaseProvider: Connection test failed:", error.message)
+  const testConnection = async (client: SupabaseClient<Database>) => {
+    try {
+      console.log("🔍 SupabaseProvider: Testing connection...")
+      const { data, error } = await client.from("utenti").select("count").limit(1).single()
+
+      if (error && error.code !== "PGRST116") {
+        // PGRST116 = no rows returned, ma connessione OK
+        console.warn("⚠️ SupabaseProvider: Connection test warning:", error.message)
         return false
       }
 
-      console.log("SupabaseProvider: Connection test successful")
+      console.log("✅ SupabaseProvider: Connection test successful")
       return true
     } catch (error) {
-      console.error("SupabaseProvider: Connection test error:", error)
+      console.error("❌ SupabaseProvider: Connection test failed:", error)
       return false
     }
-  }, [])
+  }
 
-  const initializeClient = useCallback(async () => {
-    if (initializationAttempted.current) {
-      console.log("SupabaseProvider: Initialization already attempted")
+  const initializeSupabase = async () => {
+    initializationAttemptRef.current++
+    const attemptNumber = initializationAttemptRef.current
+
+    console.log(`🚀 SupabaseProvider: Initialization attempt #${attemptNumber}`)
+
+    const client = createSupabaseClient()
+    if (!client) {
+      console.error("❌ SupabaseProvider: Failed to create client")
       return
     }
 
-    initializationAttempted.current = true
-    console.log("SupabaseProvider: Starting client initialization...")
+    // Test della connessione
+    const isConnected = await testConnection(client)
+    if (!isConnected) {
+      console.error("❌ SupabaseProvider: Connection test failed")
 
-    try {
-      // Verify environment variables
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error("Missing Supabase environment variables")
+      // Retry dopo 5 secondi se è il primo tentativo
+      if (attemptNumber === 1) {
+        console.log("🔄 SupabaseProvider: Retrying in 5 seconds...")
+        setTimeout(() => initializeSupabase(), 5000)
       }
-
-      console.log("SupabaseProvider: Environment variables verified")
-      console.log("SupabaseProvider: Supabase URL:", supabaseUrl)
-
-      // Create client
-      const client = createClient()
-      console.log("SupabaseProvider: Client created successfully")
-
-      // Test connection
-      const connectionSuccessful = await testConnection(client)
-
-      if (connectionSuccessful) {
-        setSupabase(client)
-        setIsConnected(true)
-        setConnectionError(null)
-        console.log("SupabaseProvider: Client initialized and connected successfully")
-      } else {
-        throw new Error("Failed to establish database connection")
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown initialization error"
-      console.error("SupabaseProvider: Initialization failed:", errorMessage)
-      setConnectionError(errorMessage)
-      setIsConnected(false)
-      setSupabase(null)
-    } finally {
-      setIsInitializing(false)
-    }
-  }, [testConnection])
-
-  const resetClient = useCallback(async () => {
-    console.log("SupabaseProvider: Resetting client...")
-
-    // Clear connection check interval
-    if (connectionCheckInterval.current) {
-      clearInterval(connectionCheckInterval.current)
-      connectionCheckInterval.current = null
+      return
     }
 
-    // Reset state
+    setSupabase(client)
+    setIsInitialized(true)
+    console.log("✅ SupabaseProvider: Initialization completed successfully")
+
+    // Avvia il monitoraggio della connessione
+    startConnectionMonitoring(client)
+  }
+
+  const startConnectionMonitoring = (client: SupabaseClient<Database>) => {
+    // Pulisci eventuali interval esistenti
+    if (connectionCheckIntervalRef.current) {
+      clearInterval(connectionCheckIntervalRef.current)
+    }
+
+    console.log("🔍 SupabaseProvider: Starting connection monitoring...")
+
+    connectionCheckIntervalRef.current = setInterval(async () => {
+      const isConnected = await testConnection(client)
+      if (!isConnected) {
+        console.warn("⚠️ SupabaseProvider: Connection lost, attempting to reconnect...")
+        initializeSupabase()
+      }
+    }, 30000) // Controlla ogni 30 secondi
+  }
+
+  const resetClient = () => {
+    console.log("🔄 SupabaseProvider: Resetting client...")
+
+    // Pulisci interval
+    if (connectionCheckIntervalRef.current) {
+      clearInterval(connectionCheckIntervalRef.current)
+      connectionCheckIntervalRef.current = null
+    }
+
     setSupabase(null)
-    setIsConnected(false)
-    setConnectionError(null)
-    setIsInitializing(true)
-    initializationAttempted.current = false
+    setIsInitialized(false)
+    initializationAttemptRef.current = 0
 
-    // Reinitialize
-    await initializeClient()
-  }, [initializeClient])
+    // Reinizializza dopo un breve delay
+    setTimeout(() => initializeSupabase(), 1000)
+  }
 
-  const startConnectionMonitoring = useCallback(() => {
-    if (connectionCheckInterval.current) {
-      clearInterval(connectionCheckInterval.current)
-    }
-
-    console.log("SupabaseProvider: Starting connection monitoring...")
-
-    connectionCheckInterval.current = setInterval(async () => {
-      if (supabase && isConnected) {
-        const isStillConnected = await testConnection(supabase)
-        if (!isStillConnected) {
-          console.warn("SupabaseProvider: Connection lost, attempting to reconnect...")
-          setIsConnected(false)
-          await resetClient()
-        }
-      }
-    }, 30000) // Check every 30 seconds
-  }, [supabase, isConnected, testConnection, resetClient])
-
-  // Initialize client on mount
   useEffect(() => {
-    console.log("SupabaseProvider: Component mounted, initializing...")
-    initializeClient()
+    initializeSupabase()
 
+    // Cleanup
     return () => {
-      if (connectionCheckInterval.current) {
-        clearInterval(connectionCheckInterval.current)
+      console.log("🧹 SupabaseProvider: Cleaning up...")
+      if (connectionCheckIntervalRef.current) {
+        clearInterval(connectionCheckIntervalRef.current)
       }
     }
-  }, [initializeClient])
+  }, [])
 
-  // Start monitoring when connected
-  useEffect(() => {
-    if (isConnected && supabase) {
-      startConnectionMonitoring()
-    }
-
-    return () => {
-      if (connectionCheckInterval.current) {
-        clearInterval(connectionCheckInterval.current)
-        connectionCheckInterval.current = null
-      }
-    }
-  }, [isConnected, supabase, startConnectionMonitoring])
-
-  const contextValue: SupabaseContextType = {
+  const value = {
     supabase,
-    isConnected,
-    isInitializing,
-    connectionError,
+    isInitialized,
     resetClient,
   }
 
-  return <SupabaseContext.Provider value={contextValue}>{children}</SupabaseContext.Provider>
-}
-
-export function useSupabase() {
-  const context = useContext(SupabaseContext)
-  if (context === undefined) {
-    console.error("useSupabase: SupabaseContext is undefined. Make sure SupabaseProvider is wrapping your component.")
-    // Return a safe default instead of throwing
-    return {
-      supabase: null,
-      isConnected: false,
-      isInitializing: true,
-      connectionError: "Context not available",
-      resetClient: async () => {},
-    }
-  }
-  return context
+  return <SupabaseContext.Provider value={value}>{children}</SupabaseContext.Provider>
 }
