@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAgendaItems } from "@/hooks/use-agenda-items"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-provider"
 import {
   format,
   startOfWeek,
@@ -140,6 +141,7 @@ const NewItemMenu = ({ date }: { date: Date }) => {
 }
 
 export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps) {
+  const { user, isLoading: authLoading } = useAuth()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
   const [mounted, setMounted] = useState(false)
@@ -430,7 +432,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
   }
 
   // Non renderizzare fino a quando il componente non è montato (per evitare hydration mismatch)
-  if (!mounted) {
+  if (!mounted || authLoading) {
     return (
       <Card className={className}>
         <CardHeader>
@@ -441,6 +443,26 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
         </CardHeader>
         <CardContent>
           <div className="h-[400px] bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se l'utente non è autenticato, mostra un messaggio
+  if (!user) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            Agenda
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Accesso richiesto per visualizzare l'agenda</p>
+          </div>
         </CardContent>
       </Card>
     )

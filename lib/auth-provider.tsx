@@ -48,6 +48,7 @@ const AuthContext = createContext<AuthContextType>({
 const AUTH_COOKIE_NAME = "auth_session"
 const SESSION_DURATION_DAYS = 7
 const HASH_PREFIX = "hashed_"
+const SESSION_CHECK_INTERVAL = 5 * 60 * 1000 // 5 minutes
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing, resetClient } = useSupabase()
@@ -57,15 +58,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [sessionChecked, setSessionChecked] = useState(false)
+
   const isCheckingSessionRef = useRef(false)
   const redirectingRef = useRef(false)
   const initializationCompleteRef = useRef(false)
+  const sessionCheckInterval = useRef<NodeJS.Timeout | null>(null)
+  const lastSessionCheck = useRef<number>(0)
 
   const hashPassword = useCallback(async (password: string): Promise<string> => {
     try {
       return await bcrypt.hash(password, 10)
     } catch (error) {
-      console.error("Errore nell'hashing della password:", error)
+      console.error("AuthProvider: Errore nell'hashing della password:", error)
       throw new Error("Impossibile eseguire l'hashing della password")
     }
   }, [])
@@ -84,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return password === hashedPassword
       }
     } catch (error) {
-      console.error("Errore durante la verifica della password:", error)
+      console.error("AuthProvider: Errore durante la verifica della password:", error)
       return password === hashedPassword
     }
   }, [])
@@ -117,9 +121,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("utenti")
           .update({ ultimo_accesso: new Date().toISOString() })
           .eq("id", userId)
-        if (error) console.error("Errore nell'aggiornamento dell'ultimo accesso:", error)
+        if (error) console.error("AuthProvider: Errore nell'aggiornamento dell'ultimo accesso:", error)
+        else console.log("AuthProvider: Last access updated successfully")
       } catch (error) {
-        console.error("Errore nell'aggiornamento dell'ultimo accesso:", error)
+        console.error("AuthProvider: Errore nell'aggiornamento dell'ultimo accesso:", error)
       }
     },
     [supabase],
@@ -134,10 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("utenti")
           .update({ password: HASH_PREFIX + hashedPassword })
           .eq("id", userId)
-        if (error) console.error("Errore nell'aggiornamento della password:", error)
-        else console.log("Password aggiornata con successo alla versione hashata")
+        if (error) console.error("AuthProvider: Errore nell'aggiornamento della password:", error)
+        else console.log("AuthProvider: Password aggiornata con successo alla versione hashata")
       } catch (error) {
-        console.error("Errore nell'aggiornamento della password:", error)
+        console.error("AuthProvider: Errore nell'aggiornamento della password:", error)
       }
     },
     [supabase, hashPassword],
@@ -148,19 +153,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log("AuthProvider: Clearing all auth cookies and storage")
 
-    // Clear main auth cookie
-    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    // Lista completa di cookie da pulire
+    const cookiesToClear = [
+      AUTH_COOKIE_NAME,
+      "sb-access-token",
+      "sb-refresh-token",
+      "supabase-auth-token",
+      "auth-token",
+      "user-session",
+      "session-token",
+    ]
 
-    // Clear other potential auth cookies
-    const cookiesToClear = ["sb-access-token", "sb-refresh-token", "supabase-auth-token", "auth-token"]
-
+    // Clear main cookies
     cookiesToClear.forEach((cookieName) => {
       document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
     })
 
-    // Clear with different domains and paths
+    // Clear with different domains and paths per maggiore sicurezza
     const domains = [location.hostname, `.${location.hostname}`]
-    const paths = ["/", "/auth"]
+    const paths = ["/", "/auth", "/dashboard", "/dashboard-utente"]
 
     domains.forEach((domain) => {
       paths.forEach((path) => {
@@ -172,14 +183,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Clear localStorage and sessionStorage
     try {
-      const storageKeys = ["supabase.auth.token", "authToken", "authUser", "auth_session", "user_session"]
+      const storageKeys = [
+        "supabase.auth.token",
+        "authToken",
+        "authUser",
+        "auth_session",
+        "user_session",
+        "app-theme",
+        "app-layout",
+        "app-dark-mode",
+        "app-font-size",
+      ]
 
       storageKeys.forEach((key) => {
         localStorage.removeItem(key)
         sessionStorage.removeItem(key)
       })
+
+      console.log("AuthProvider: Storage cleared successfully")
     } catch (e) {
-      console.error("Errore nella pulizia dello storage:", e)
+      console.error("AuthProvider: Errore nella pulizia dello storage:", e)
     }
   }, [])
 
@@ -190,7 +213,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const sessionCookie = cookies.find((cookie) => cookie.trim().startsWith(`${AUTH_COOKIE_NAME}=`))
       if (sessionCookie) {
         const cookieValue = sessionCookie.split("=")[1]
-        return JSON.parse(decodeURIComponent(cookieValue))
+        const session = JSON.parse(decodeURIComponent(cookieValue))
+
+        // Verifica che la sessione abbia tutti i campi necessari
+        if (session && session.user_id && session.expires_at && session.token) {
+          return session
+        } else {
+          console.warn("AuthProvider: Invalid session cookie format")
+          return null
+        }
       }
     } catch (error) {
       console.error("AuthProvider: Error parsing session cookie:", error)
@@ -202,17 +233,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof document === "undefined" || typeof crypto === "undefined") return
     try {
       const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-      const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("")
-      const session = { user_id: userId, expires_at: expiresAt, token: randomToken }
+
+      const session = {
+        user_id: userId,
+        expires_at: expiresAt,
+        token: randomToken,
+        created_at: new Date().toISOString(),
+      }
+
       const cookieValue = encodeURIComponent(JSON.stringify(session))
       const isSecure = window.location.protocol === "https:"
-      document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${expiresInDays * 24 * 60 * 60}; SameSite=Lax${isSecure ? "; Secure" : ""}`
-      console.log(`AuthProvider: Session cookie saved for user: ${userId}`)
+      const maxAge = expiresInDays * 24 * 60 * 60
+
+      document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax${isSecure ? "; Secure" : ""}`
+      console.log(`AuthProvider: Session cookie saved for user: ${userId}, expires: ${expiresAt}`)
     } catch (error) {
       console.error("AuthProvider: Error saving session cookie:", error)
     }
+  }, [])
+
+  const isSessionValid = useCallback((session: any): boolean => {
+    if (!session || !session.user_id || !session.expires_at) {
+      return false
+    }
+
+    const expiresAt = new Date(session.expires_at)
+    const now = new Date()
+
+    if (expiresAt <= now) {
+      console.log("AuthProvider: Session expired")
+      return false
+    }
+
+    return true
   }, [])
 
   const checkSession = useCallback(async (): Promise<boolean> => {
@@ -222,13 +278,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return !!user
     }
 
+    // Throttle session checks to prevent excessive calls
+    const now = Date.now()
+    if (now - lastSessionCheck.current < 1000) {
+      // 1 second throttle
+      console.log("AuthProvider: Session check throttled")
+      return !!user
+    }
+
     isCheckingSessionRef.current = true
+    lastSessionCheck.current = now
 
     try {
       console.log("AuthProvider: Starting session check", {
         supabaseReady: !!supabase,
         supabaseInitializing,
         hasUser: !!user,
+        timestamp: new Date().toISOString(),
       })
 
       if (!supabase || supabaseInitializing) {
@@ -238,7 +304,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const session = getSessionFromCookie()
 
-      if (!session || !session.user_id) {
+      if (!session) {
         console.log("AuthProvider: No session cookie found")
         if (user !== null) {
           console.log("AuthProvider: Clearing user state due to missing session")
@@ -248,9 +314,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false
       }
 
-      // Check if session is expired
-      if (new Date(session.expires_at) <= new Date()) {
-        console.log("AuthProvider: Session expired, clearing cookies")
+      if (!isSessionValid(session)) {
+        console.log("AuthProvider: Session invalid or expired, clearing cookies")
         clearAllAuthCookies()
         if (user !== null) {
           setUser(null)
@@ -307,11 +372,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabaseInitializing,
     user,
     getSessionFromCookie,
+    isSessionValid,
     fetchUserData,
     updateLastAccess,
     saveSessionToCookie,
     clearAllAuthCookies,
   ])
+
+  const startPeriodicSessionCheck = useCallback(() => {
+    // Clear existing interval
+    if (sessionCheckInterval.current) {
+      clearInterval(sessionCheckInterval.current)
+    }
+
+    console.log("AuthProvider: Starting periodic session validation")
+
+    sessionCheckInterval.current = setInterval(async () => {
+      if (isCheckingSessionRef.current || redirectingRef.current) return
+
+      console.log("AuthProvider: Performing periodic session check")
+      try {
+        const isValid = await checkSession()
+        if (!isValid && user && !redirectingRef.current) {
+          console.log("AuthProvider: Periodic check failed, logging out")
+          await logout()
+        }
+      } catch (error) {
+        console.error("AuthProvider: Error in periodic session check:", error)
+      }
+    }, SESSION_CHECK_INTERVAL)
+  }, [checkSession, user])
+
+  const stopPeriodicSessionCheck = useCallback(() => {
+    if (sessionCheckInterval.current) {
+      clearInterval(sessionCheckInterval.current)
+      sessionCheckInterval.current = null
+      console.log("AuthProvider: Stopped periodic session validation")
+    }
+  }, [])
 
   const login = useCallback(
     async (usernameOrEmail: string, password: string): Promise<boolean> => {
@@ -400,6 +498,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Mark initialization as complete
         initializationCompleteRef.current = true
 
+        // Start periodic session checks
+        startPeriodicSessionCheck()
+
         // Redirect
         redirectingRef.current = true
         const destination = "/dashboard-utente"
@@ -433,6 +534,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePasswordToHashed,
       updateLastAccess,
       saveSessionToCookie,
+      startPeriodicSessionCheck,
     ],
   )
 
@@ -441,6 +543,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     console.log("AuthProvider: Starting logout process")
     redirectingRef.current = true
+
+    // Stop periodic session checks
+    stopPeriodicSessionCheck()
 
     // Clear all auth data
     clearAllAuthCookies()
@@ -472,7 +577,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.location.reload()
       }
     }, 100)
-  }, [router, clearAllAuthCookies, resetClient])
+  }, [router, clearAllAuthCookies, resetClient, stopPeriodicSessionCheck])
 
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!user?.id || !supabase) return
@@ -530,6 +635,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (hasValidSession) {
           console.log("AuthProvider: Valid session found, user authenticated")
+          // Start periodic session checks for authenticated users
+          startPeriodicSessionCheck()
         } else {
           console.log("AuthProvider: No valid session, user not authenticated")
         }
@@ -550,37 +657,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false
     }
-  }, [supabase, supabaseConnected, supabaseInitializing, sessionChecked, checkSession])
+  }, [supabase, supabaseConnected, supabaseInitializing, sessionChecked, checkSession, startPeriodicSessionCheck])
 
-  // Periodic session validation
+  // Cleanup on unmount
   useEffect(() => {
-    if (!initializationCompleteRef.current || !user) return
-
-    console.log("AuthProvider: Setting up periodic session validation")
-
-    const intervalId = setInterval(
-      async () => {
-        if (isCheckingSessionRef.current) return
-
-        console.log("AuthProvider: Performing periodic session check")
-        try {
-          const isValid = await checkSession()
-          if (!isValid && !redirectingRef.current) {
-            console.log("AuthProvider: Periodic check failed, logging out")
-            await logout()
-          }
-        } catch (error) {
-          console.error("AuthProvider: Error in periodic session check:", error)
-        }
-      },
-      5 * 60 * 1000,
-    ) // 5 minutes
-
     return () => {
-      clearInterval(intervalId)
-      console.log("AuthProvider: Cleared periodic session validation")
+      stopPeriodicSessionCheck()
     }
-  }, [user, checkSession, logout])
+  }, [stopPeriodicSessionCheck])
 
   const contextValue: AuthContextType = {
     user,
