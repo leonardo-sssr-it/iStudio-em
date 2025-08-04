@@ -32,11 +32,12 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const connectionCheckInterval = useRef<NodeJS.Timeout | null>(null)
   const initializationTimeout = useRef<NodeJS.Timeout | null>(null)
 
-  // Funzione per testare la connessione
+  // Funzione per testare la connessione usando la tabella "utenti" che esiste
   const testConnection = useCallback(async (client: SupabaseClient<Database>) => {
     try {
       console.log("🔌 SupabaseProvider: Testing connection...")
-      const { data, error } = await client.from("profiles").select("count").limit(1).single()
+      // Usa la tabella "utenti" che esiste nel database
+      const { data, error } = await client.from("utenti").select("id").limit(1).maybeSingle()
 
       if (error && error.code !== "PGRST116") {
         // PGRST116 è "no rows returned", che è OK per il test di connessione
@@ -63,6 +64,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       if (!supabaseUrl || !supabaseAnonKey) {
         throw new Error("Missing Supabase environment variables")
       }
+
+      console.log("🔧 SupabaseProvider: Creating client with URL:", supabaseUrl)
 
       const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
         auth: {

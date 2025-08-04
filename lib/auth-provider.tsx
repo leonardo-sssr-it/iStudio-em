@@ -2,17 +2,19 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react"
-import type { User, Session, AuthError } from "@supabase/supabase-js"
 import { useSupabase } from "@/lib/supabase-provider"
+import type { Database } from "@/types/supabase"
+
+type User = Database["public"]["Tables"]["utenti"]["Row"]
 
 interface AuthContextType {
   user: User | null
-  session: Session | null
   isLoading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>
-  signOut: () => Promise<void>
-  resetPassword: (email: string) => Promise<{ error: AuthError | null }>
+  isAuthenticated: boolean
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+  logout: () => Promise<void>
+  refreshUser: () => Promise<void>
+  hashPassword: (password: string) => Promise<string>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -25,441 +27,334 @@ export function useAuth() {
   return context
 }
 
-// Configurazione per la gestione delle sessioni
-const SESSION_CHECK_INTERVAL = 5 * 60 * 1000 // 5 minuti
-const SESSION_CHECK_THROTTLE = 1000 // 1 secondo
+// Nomi dei cookie di sessione da pulire
 const SESSION_COOKIE_NAMES = [
+  "session",
+  "auth-token",
+  "user-session",
   "sb-access-token",
   "sb-refresh-token",
   "supabase-auth-token",
-  "supabase.auth.token",
-  "sb-localhost-auth-token",
-  "supabase-auth",
-  "auth-token",
-  "session",
-  "access_token",
-  "refresh_token",
+  "next-auth.session-token",
+  "next-auth.csrf-token",
+  "istudio-session",
+  "istudio-auth",
 ]
+
+// Intervallo per il controllo periodico delle sessioni (5 minuti)
+const SESSION_CHECK_INTERVAL = 5 * 60 * 1000
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected } = useSupabase()
+
   const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   const sessionCheckInterval = useRef<NodeJS.Timeout | null>(null)
   const lastSessionCheck = useRef<number>(0)
-  const isCheckingSessionRef = useRef(false)
-  const initializationCompleteRef = useRef(false)
+  const isCheckingSession = useRef(false)
+
+  // Funzione per l'hash delle password
+  const hashPassword = useCallback(async (password: string): Promise<string> => {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(password)
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
+  }, [])
 
   // Funzione per pulire tutti i cookie di autenticazione
   const clearAuthCookies = useCallback(() => {
-    console.log("🍪 AuthProvider: Clearing all auth cookies...")
+    console.log("🍪 AuthProvider: Clearing authentication cookies...")
 
     SESSION_COOKIE_NAMES.forEach((cookieName) => {
       // Pulisci per il dominio corrente
       document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`
 
-      // Pulisci per domini parent
-      const hostParts = window.location.hostname.split(".")
-      if (hostParts.length > 1) {
-        const parentDomain = hostParts.slice(-2).join(".")
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${parentDomain};`
-      }
-
-      console.log(`🍪 AuthProvider: Cleared cookie: ${cookieName}`)
+      // Pulisci per il dominio con punto
+      const domain = window.location.hostname
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${domain};`
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${domain};`
     })
 
     // Pulisci anche localStorage e sessionStorage
     try {
-      localStorage.removeItem("supabase.auth.token")
-      localStorage.removeItem("sb-localhost-auth-token")
-      sessionStorage.removeItem("supabase.auth.token")
-      sessionStorage.removeItem("sb-localhost-auth-token")
-      console.log("🍪 AuthProvider: Cleared localStorage and sessionStorage")
+      localStorage.removeItem("user")
+      localStorage.removeItem("session")
+      localStorage.removeItem("auth-token")
+      sessionStorage.removeItem("user")
+      sessionStorage.removeItem("session")
+      sessionStorage.removeItem("auth-token")
     } catch (error) {
-      console.error("🍪 AuthProvider: Error clearing storage:", error)
+      console.warn("🍪 AuthProvider: Error clearing storage:", error)
     }
+
+    console.log("✅ AuthProvider: Authentication cookies cleared")
   }, [])
 
   // Funzione per validare una sessione
-  const validateSession = useCallback((session: Session | null): boolean => {
-    if (!session) {
-      console.log("🔍 AuthProvider: No session to validate")
+  const validateSession = useCallback((sessionData: any): boolean => {
+    if (!sessionData || typeof sessionData !== "object") {
       return false
     }
 
-    // Controlla che la sessione abbia i campi obbligatori
-    if (!session.access_token || !session.user) {
-      console.warn("🔍 AuthProvider: Session missing required fields")
+    // Controlla che abbia i campi necessari
+    const requiredFields = ["id", "username", "email"]
+    const hasRequiredFields = requiredFields.every((field) => sessionData[field])
+
+    if (!hasRequiredFields) {
+      console.warn("🔐 AuthProvider: Session missing required fields")
       return false
     }
 
-    // Controlla la scadenza
-    const now = Math.floor(Date.now() / 1000)
-    if (session.expires_at && session.expires_at < now) {
-      console.warn("🔍 AuthProvider: Session expired")
+    // Controlla la scadenza se presente
+    if (sessionData.expires) {
+      const expirationTime = new Date(sessionData.expires).getTime()
+      const currentTime = Date.now()
+
+      if (currentTime > expirationTime) {
+        console.warn("🔐 AuthProvider: Session expired")
+        return false
+      }
+    }
+
+    // Controlla la lunghezza del token se presente
+    if (sessionData.token && sessionData.token.length < 32) {
+      console.warn("🔐 AuthProvider: Session token too short")
       return false
     }
 
-    // Controlla la lunghezza del token (dovrebbe essere abbastanza lungo)
-    if (session.access_token.length < 32) {
-      console.warn("🔍 AuthProvider: Access token too short")
-      return false
-    }
-
-    console.log("✅ AuthProvider: Session validation passed")
     return true
   }, [])
 
-  // Funzione per controllare la sessione corrente
-  const checkSession = useCallback(async () => {
-    if (!supabase || !isConnected) {
-      console.log("🔍 AuthProvider: Supabase not ready for session check")
-      return
-    }
-
-    // Throttling per evitare chiamate eccessive
+  // Funzione per controllare la sessione esistente
+  const checkExistingSession = useCallback(async () => {
+    // Throttling: non controllare più di una volta al secondo
     const now = Date.now()
-    if (now - lastSessionCheck.current < SESSION_CHECK_THROTTLE) {
-      console.log("🔍 AuthProvider: Session check throttled")
+    if (now - lastSessionCheck.current < 1000) {
+      console.log("🔐 AuthProvider: Session check throttled")
       return
     }
 
-    // Evita chiamate multiple simultanee
-    if (isCheckingSessionRef.current) {
-      console.log("🔍 AuthProvider: Session check already in progress")
+    if (isCheckingSession.current) {
+      console.log("🔐 AuthProvider: Session check already in progress")
       return
     }
 
-    isCheckingSessionRef.current = true
+    isCheckingSession.current = true
     lastSessionCheck.current = now
 
+    console.log("🔐 AuthProvider: Checking existing session...")
+
     try {
-      console.log("🔍 AuthProvider: Checking current session...")
+      // Controlla se c'è una sessione nei cookie
+      const cookies = document.cookie.split(";").reduce(
+        (acc, cookie) => {
+          const [key, value] = cookie.trim().split("=")
+          if (key && value) {
+            acc[key] = decodeURIComponent(value)
+          }
+          return acc
+        },
+        {} as Record<string, string>,
+      )
 
-      const {
-        data: { session: currentSession },
-        error,
-      } = await supabase.auth.getSession()
-
-      if (error) {
-        console.error("🔍 AuthProvider: Error getting session:", error)
-        setUser(null)
-        setSession(null)
-        clearAuthCookies()
-        return
+      // Cerca una sessione valida
+      let sessionData = null
+      for (const cookieName of SESSION_COOKIE_NAMES) {
+        if (cookies[cookieName]) {
+          try {
+            sessionData = JSON.parse(cookies[cookieName])
+            if (validateSession(sessionData)) {
+              console.log("🔐 AuthProvider: Valid session found in cookie:", cookieName)
+              break
+            }
+          } catch (error) {
+            console.warn("🔐 AuthProvider: Invalid session data in cookie:", cookieName)
+          }
+        }
       }
 
-      if (currentSession && validateSession(currentSession)) {
-        console.log("✅ AuthProvider: Valid session found")
-        setUser(currentSession.user)
-        setSession(currentSession)
-      } else {
-        console.log("❌ AuthProvider: No valid session found")
+      // Se non c'è sessione nei cookie, controlla localStorage
+      if (!sessionData) {
+        try {
+          const storedUser = localStorage.getItem("user")
+          if (storedUser) {
+            const parsedUser = JSON.parse(storedUser)
+            if (validateSession(parsedUser)) {
+              sessionData = parsedUser
+              console.log("🔐 AuthProvider: Valid session found in localStorage")
+            }
+          }
+        } catch (error) {
+          console.warn("🔐 AuthProvider: Invalid session data in localStorage")
+        }
+      }
+
+      if (sessionData && supabase && isConnected) {
+        // Verifica che l'utente esista ancora nel database
+        const { data: userData, error } = await supabase
+          .from("utenti")
+          .select("*")
+          .eq("id", sessionData.id)
+          .eq("attivo", true)
+          .single()
+
+        if (userData && !error) {
+          console.log("✅ AuthProvider: Session validated successfully")
+          setUser(userData)
+          setIsAuthenticated(true)
+
+          // Aggiorna la sessione nei cookie
+          const sessionCookie = JSON.stringify({
+            ...userData,
+            expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 ore
+            token: crypto.getRandomValues(new Uint8Array(32)).join(""),
+          })
+
+          document.cookie = `session=${encodeURIComponent(sessionCookie)}; path=/; max-age=${24 * 60 * 60}; SameSite=Strict`
+          localStorage.setItem("user", JSON.stringify(userData))
+        } else {
+          console.warn("🔐 AuthProvider: Session validation failed - user not found or inactive")
+          await logout()
+        }
+      } else if (!sessionData) {
+        console.log("🔐 AuthProvider: No existing session found")
         setUser(null)
-        setSession(null)
-        clearAuthCookies()
+        setIsAuthenticated(false)
       }
     } catch (error) {
-      console.error("🔍 AuthProvider: Error in checkSession:", error)
+      console.error("❌ AuthProvider: Error checking session:", error)
       setUser(null)
-      setSession(null)
-      clearAuthCookies()
+      setIsAuthenticated(false)
     } finally {
-      isCheckingSessionRef.current = false
-    }
-  }, [supabase, isConnected, validateSession, clearAuthCookies])
-
-  // Funzione per tentare il recupero della sessione
-  const attemptSessionRecovery = useCallback(async () => {
-    if (!supabase || !isConnected) return
-
-    try {
-      console.log("🔄 AuthProvider: Attempting session recovery...")
-
-      const {
-        data: { session: recoveredSession },
-        error,
-      } = await supabase.auth.refreshSession()
-
-      if (error) {
-        console.error("🔄 AuthProvider: Session recovery failed:", error)
-        return false
-      }
-
-      if (recoveredSession && validateSession(recoveredSession)) {
-        console.log("✅ AuthProvider: Session recovered successfully")
-        setUser(recoveredSession.user)
-        setSession(recoveredSession)
-        return true
-      }
-
-      console.log("❌ AuthProvider: Session recovery failed - invalid session")
-      return false
-    } catch (error) {
-      console.error("🔄 AuthProvider: Error during session recovery:", error)
-      return false
+      setIsLoading(false)
+      isCheckingSession.current = false
     }
   }, [supabase, isConnected, validateSession])
 
-  // Inizializzazione dell'AuthProvider
-  useEffect(() => {
-    if (!supabase || !isConnected || initializationCompleteRef.current) {
-      console.log("🚀 AuthProvider: Skipping initialization", {
-        hasSupabase: !!supabase,
-        isConnected,
-        initializationComplete: initializationCompleteRef.current,
-      })
-      return
-    }
+  // Funzione di login
+  const login = useCallback(
+    async (username: string, password: string) => {
+      if (!supabase) {
+        return { success: false, error: "Database connection not available" }
+      }
 
-    console.log("🚀 AuthProvider: Starting initialization...")
+      console.log("🔐 AuthProvider: Attempting login for user:", username)
+      setIsLoading(true)
 
-    const initializeAuth = async () => {
       try {
-        setIsLoading(true)
+        const hashedPassword = await hashPassword(password)
 
-        // Controlla la sessione corrente
-        await checkSession()
+        const { data: userData, error } = await supabase
+          .from("utenti")
+          .select("*")
+          .eq("username", username)
+          .eq("password", hashedPassword)
+          .eq("attivo", true)
+          .single()
 
-        // Imposta il listener per i cambiamenti di autenticazione
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log(`🔄 AuthProvider: Auth state changed: ${event}`)
-
-          switch (event) {
-            case "SIGNED_IN":
-              if (session && validateSession(session)) {
-                console.log("✅ AuthProvider: User signed in")
-                setUser(session.user)
-                setSession(session)
-              }
-              break
-
-            case "SIGNED_OUT":
-              console.log("👋 AuthProvider: User signed out")
-              setUser(null)
-              setSession(null)
-              clearAuthCookies()
-              break
-
-            case "TOKEN_REFRESHED":
-              if (session && validateSession(session)) {
-                console.log("🔄 AuthProvider: Token refreshed")
-                setUser(session.user)
-                setSession(session)
-              }
-              break
-
-            case "USER_UPDATED":
-              if (session && validateSession(session)) {
-                console.log("👤 AuthProvider: User updated")
-                setUser(session.user)
-                setSession(session)
-              }
-              break
-
-            default:
-              console.log(`🔄 AuthProvider: Unhandled auth event: ${event}`)
-          }
-        })
-
-        initializationCompleteRef.current = true
-        console.log("✅ AuthProvider: Initialization completed")
-
-        return () => {
-          console.log("🧹 AuthProvider: Cleaning up auth subscription")
-          subscription.unsubscribe()
+        if (error || !userData) {
+          console.warn("🔐 AuthProvider: Login failed - invalid credentials")
+          return { success: false, error: "Credenziali non valide" }
         }
+
+        // Aggiorna ultimo accesso
+        await supabase.from("utenti").update({ ultimo_accesso: new Date().toISOString() }).eq("id", userData.id)
+
+        // Crea la sessione
+        const sessionData = {
+          ...userData,
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 ore
+          token: crypto.getRandomValues(new Uint8Array(32)).join(""),
+        }
+
+        // Salva la sessione
+        const sessionCookie = JSON.stringify(sessionData)
+        document.cookie = `session=${encodeURIComponent(sessionCookie)}; path=/; max-age=${24 * 60 * 60}; SameSite=Strict`
+        localStorage.setItem("user", JSON.stringify(userData))
+
+        setUser(userData)
+        setIsAuthenticated(true)
+
+        console.log("✅ AuthProvider: Login successful")
+        return { success: true }
       } catch (error) {
-        console.error("❌ AuthProvider: Initialization error:", error)
+        console.error("❌ AuthProvider: Login error:", error)
+        return { success: false, error: "Errore durante il login" }
       } finally {
         setIsLoading(false)
       }
-    }
+    },
+    [supabase, hashPassword],
+  )
 
-    const cleanup = initializeAuth()
+  // Funzione di logout
+  const logout = useCallback(async () => {
+    console.log("🔐 AuthProvider: Logging out...")
 
-    return () => {
-      cleanup.then((cleanupFn) => {
-        if (cleanupFn) cleanupFn()
-      })
-    }
-  }, [supabase, isConnected, checkSession, validateSession, clearAuthCookies])
+    clearAuthCookies()
+    setUser(null)
+    setIsAuthenticated(false)
 
-  // Controllo periodico della sessione
-  useEffect(() => {
-    if (!supabase || !isConnected || !initializationCompleteRef.current) {
-      return
-    }
+    console.log("✅ AuthProvider: Logout completed")
+  }, [clearAuthCookies])
 
-    console.log("⏰ AuthProvider: Starting periodic session validation...")
+  // Funzione per aggiornare i dati dell'utente
+  const refreshUser = useCallback(async () => {
+    if (!user || !supabase) return
 
-    sessionCheckInterval.current = setInterval(async () => {
-      console.log("⏰ AuthProvider: Periodic session check...")
+    console.log("🔐 AuthProvider: Refreshing user data...")
 
-      if (session && !validateSession(session)) {
-        console.warn("⚠️ AuthProvider: Current session invalid, attempting recovery...")
+    try {
+      const { data: userData, error } = await supabase.from("utenti").select("*").eq("id", user.id).single()
 
-        const recovered = await attemptSessionRecovery()
-        if (!recovered) {
-          console.error("❌ AuthProvider: Session recovery failed, signing out...")
-          await signOut()
-        }
-      } else if (!session) {
-        console.log("🔍 AuthProvider: No session, checking for available session...")
-        await checkSession()
+      if (userData && !error) {
+        setUser(userData)
+        localStorage.setItem("user", JSON.stringify(userData))
+        console.log("✅ AuthProvider: User data refreshed")
       }
-    }, SESSION_CHECK_INTERVAL)
+    } catch (error) {
+      console.error("❌ AuthProvider: Error refreshing user:", error)
+    }
+  }, [user, supabase])
+
+  // Effetto per controllare la sessione quando Supabase è pronto
+  useEffect(() => {
+    if (isConnected && supabase) {
+      console.log("🔐 AuthProvider: Supabase ready, checking session...")
+      checkExistingSession()
+    }
+  }, [isConnected, supabase, checkExistingSession])
+
+  // Effetto per il controllo periodico delle sessioni
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log("🔐 AuthProvider: Starting periodic session validation...")
+
+      sessionCheckInterval.current = setInterval(() => {
+        console.log("🔐 AuthProvider: Periodic session check...")
+        checkExistingSession()
+      }, SESSION_CHECK_INTERVAL)
+    }
 
     return () => {
       if (sessionCheckInterval.current) {
         clearInterval(sessionCheckInterval.current)
         sessionCheckInterval.current = null
-        console.log("🧹 AuthProvider: Cleared session check interval")
       }
     }
-  }, [supabase, isConnected, session, validateSession, attemptSessionRecovery, checkSession])
-
-  // Funzioni di autenticazione
-  const signIn = useCallback(
-    async (email: string, password: string) => {
-      if (!supabase) {
-        return { error: new Error("Supabase not initialized") as AuthError }
-      }
-
-      try {
-        console.log("🔐 AuthProvider: Attempting sign in...")
-        setIsLoading(true)
-
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-
-        if (error) {
-          console.error("🔐 AuthProvider: Sign in error:", error)
-          return { error }
-        }
-
-        if (data.session && validateSession(data.session)) {
-          console.log("✅ AuthProvider: Sign in successful")
-          setUser(data.session.user)
-          setSession(data.session)
-        }
-
-        return { error: null }
-      } catch (error) {
-        console.error("🔐 AuthProvider: Sign in exception:", error)
-        return { error: error as AuthError }
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [supabase, validateSession],
-  )
-
-  const signUp = useCallback(
-    async (email: string, password: string) => {
-      if (!supabase) {
-        return { error: new Error("Supabase not initialized") as AuthError }
-      }
-
-      try {
-        console.log("📝 AuthProvider: Attempting sign up...")
-        setIsLoading(true)
-
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        })
-
-        if (error) {
-          console.error("📝 AuthProvider: Sign up error:", error)
-          return { error }
-        }
-
-        console.log("✅ AuthProvider: Sign up successful")
-        return { error: null }
-      } catch (error) {
-        console.error("📝 AuthProvider: Sign up exception:", error)
-        return { error: error as AuthError }
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [supabase],
-  )
-
-  const signOut = useCallback(async () => {
-    if (!supabase) return
-
-    try {
-      console.log("👋 AuthProvider: Attempting sign out...")
-      setIsLoading(true)
-
-      const { error } = await supabase.auth.signOut()
-
-      if (error) {
-        console.error("👋 AuthProvider: Sign out error:", error)
-      }
-
-      // Pulisci lo stato locale indipendentemente dall'errore
-      setUser(null)
-      setSession(null)
-      clearAuthCookies()
-
-      console.log("✅ AuthProvider: Sign out completed")
-    } catch (error) {
-      console.error("👋 AuthProvider: Sign out exception:", error)
-      // Pulisci comunque lo stato locale
-      setUser(null)
-      setSession(null)
-      clearAuthCookies()
-    } finally {
-      setIsLoading(false)
-    }
-  }, [supabase, clearAuthCookies])
-
-  const resetPassword = useCallback(
-    async (email: string) => {
-      if (!supabase) {
-        return { error: new Error("Supabase not initialized") as AuthError }
-      }
-
-      try {
-        console.log("🔑 AuthProvider: Attempting password reset...")
-
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        })
-
-        if (error) {
-          console.error("🔑 AuthProvider: Password reset error:", error)
-          return { error }
-        }
-
-        console.log("✅ AuthProvider: Password reset email sent")
-        return { error: null }
-      } catch (error) {
-        console.error("🔑 AuthProvider: Password reset exception:", error)
-        return { error: error as AuthError }
-      }
-    },
-    [supabase],
-  )
+  }, [isAuthenticated, user, checkExistingSession])
 
   const value = {
     user,
-    session,
     isLoading,
-    signIn,
-    signUp,
-    signOut,
-    resetPassword,
+    isAuthenticated,
+    login,
+    logout,
+    refreshUser,
+    hashPassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

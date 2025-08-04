@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, ChevronLeft, ChevronRight, Clock, MapPin, User } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, Clock, FileText, User } from "lucide-react"
 import { useAgendaItems } from "@/hooks/use-agenda-items"
 import { useAuth } from "@/lib/auth-provider"
+import { formatDateIT } from "@/lib/date-utils"
 import Link from "next/link"
 
 type ViewType = "daily" | "weekly" | "monthly"
@@ -31,6 +32,7 @@ function calculateDateRange(selectedDate: Date, view: ViewType): { startDate: Da
       // Per la vista settimanale: dall'inizio della settimana (lunedì) alla fine (domenica)
       const dayOfWeek = start.getDay()
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Domenica = 0, quindi 6 giorni indietro
+
       start.setDate(start.getDate() - daysToMonday)
       start.setHours(0, 0, 0, 0)
 
@@ -48,7 +50,8 @@ function calculateDateRange(selectedDate: Date, view: ViewType): { startDate: Da
       break
   }
 
-  console.log(`📅 AgendaWidget: Calculated date range for ${view}:`, {
+  console.log("📅 AgendaWidget: Date range calculated", {
+    view,
     selectedDate: selectedDate.toISOString(),
     startDate: start.toISOString(),
     endDate: end.toISOString(),
@@ -67,20 +70,8 @@ export function AgendaWidget({ className }: AgendaWidgetProps) {
     return calculateDateRange(selectedDate, view)
   }, [selectedDate, view])
 
-  // Usa il hook con le date corrette
+  // Usa il hook con le date calcolate correttamente
   const { items, isLoading, error } = useAgendaItems(startDate, endDate)
-
-  console.log("📅 AgendaWidget: Render state:", {
-    authLoading,
-    hasUser: !!user,
-    selectedDate: selectedDate.toISOString(),
-    view,
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    itemsCount: items?.length || 0,
-    isLoading,
-    error: error?.message,
-  })
 
   // Funzioni per la navigazione delle date
   const navigateDate = (direction: "prev" | "next") => {
@@ -99,40 +90,31 @@ export function AgendaWidget({ className }: AgendaWidgetProps) {
     }
 
     setSelectedDate(newDate)
-    console.log(`📅 AgendaWidget: Navigated ${direction} to:`, newDate.toISOString())
   }
 
-  // Funzione per formattare la data del titolo
-  const formatTitle = () => {
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: "Europe/Rome",
-    }
-
+  // Funzione per ottenere il titolo della vista corrente
+  const getViewTitle = () => {
     switch (view) {
       case "daily":
-        return selectedDate.toLocaleDateString("it-IT", {
-          ...options,
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })
+        return formatDateIT(selectedDate)
       case "weekly":
-        const weekStart = new Date(startDate)
-        const weekEnd = new Date(endDate)
-        return `${weekStart.toLocaleDateString("it-IT", { ...options, day: "numeric", month: "short" })} - ${weekEnd.toLocaleDateString("it-IT", { ...options, day: "numeric", month: "short", year: "numeric" })}`
+        const weekStart = new Date(selectedDate)
+        const dayOfWeek = weekStart.getDay()
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+        weekStart.setDate(weekStart.getDate() - daysToMonday)
+
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekEnd.getDate() + 6)
+
+        return `${formatDateIT(weekStart)} - ${formatDateIT(weekEnd)}`
       case "monthly":
-        return selectedDate.toLocaleDateString("it-IT", {
-          ...options,
-          year: "numeric",
-          month: "long",
-        })
+        return selectedDate.toLocaleDateString("it-IT", { month: "long", year: "numeric" })
       default:
         return ""
     }
   }
 
-  // Funzione per filtrare gli elementi in base alla vista
+  // Filtra gli elementi in base alla vista
   const filteredItems = useMemo(() => {
     if (!items) return []
 
@@ -140,9 +122,21 @@ export function AgendaWidget({ className }: AgendaWidgetProps) {
       if (!item.data_scadenza) return false
 
       const itemDate = new Date(item.data_scadenza)
-      return itemDate >= startDate && itemDate <= endDate
+
+      switch (view) {
+        case "daily":
+          return itemDate.toDateString() === selectedDate.toDateString()
+        case "weekly":
+          return itemDate >= startDate && itemDate <= endDate
+        case "monthly":
+          return (
+            itemDate.getMonth() === selectedDate.getMonth() && itemDate.getFullYear() === selectedDate.getFullYear()
+          )
+        default:
+          return true
+      }
     })
-  }, [items, startDate, endDate])
+  }, [items, view, selectedDate, startDate, endDate])
 
   // Verifica se l'utente è autenticato
   if (authLoading) {
@@ -174,10 +168,8 @@ export function AgendaWidget({ className }: AgendaWidgetProps) {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-muted-foreground mb-4">Accesso richiesto per visualizzare l'agenda</p>
-            <Button asChild>
-              <Link href="/login">Accedi</Link>
-            </Button>
+            <User className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Accesso richiesto per visualizzare l'agenda</p>
           </div>
         </CardContent>
       </Card>
@@ -192,43 +184,35 @@ export function AgendaWidget({ className }: AgendaWidgetProps) {
             <Calendar className="h-5 w-5" />
             Agenda
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setView("daily")}
-              className={view === "daily" ? "bg-primary text-primary-foreground" : ""}
-            >
+
+          {/* Controlli vista */}
+          <div className="flex gap-1">
+            <Button variant={view === "daily" ? "default" : "outline"} size="sm" onClick={() => setView("daily")}>
               Giorno
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setView("weekly")}
-              className={view === "weekly" ? "bg-primary text-primary-foreground" : ""}
-            >
+            <Button variant={view === "weekly" ? "default" : "outline"} size="sm" onClick={() => setView("weekly")}>
               Settimana
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setView("monthly")}
-              className={view === "monthly" ? "bg-primary text-primary-foreground" : ""}
-            >
+            <Button variant={view === "monthly" ? "default" : "outline"} size="sm" onClick={() => setView("monthly")}>
               Mese
             </Button>
           </div>
         </div>
+
+        {/* Navigazione date */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigateDate("prev")}>
+          <Button variant="outline" size="sm" onClick={() => navigateDate("prev")}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h3 className="text-lg font-semibold">{formatTitle()}</h3>
-          <Button variant="ghost" size="sm" onClick={() => navigateDate("next")}>
+
+          <CardDescription className="font-medium">{getViewTitle()}</CardDescription>
+
+          <Button variant="outline" size="sm" onClick={() => navigateDate("next")}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </CardHeader>
+
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
@@ -236,61 +220,51 @@ export function AgendaWidget({ className }: AgendaWidgetProps) {
           </div>
         ) : error ? (
           <div className="text-center py-8">
-            <p className="text-destructive mb-2">Errore nel caricamento dell'agenda</p>
-            <p className="text-sm text-muted-foreground">{error.message}</p>
+            <p className="text-destructive">Errore nel caricamento: {error}</p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center py-8">
+            <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">Nessun elemento in agenda per questo periodo</p>
           </div>
         ) : (
           <div className="space-y-3">
             {filteredItems.map((item) => (
               <div
-                key={item.id}
+                key={`${item.tipo}-${item.id}`}
                 className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-medium truncate">{item.titolo || "Senza titolo"}</h4>
-                    {item.tipo && (
-                      <Badge variant="secondary" className="text-xs">
-                        {item.tipo}
-                      </Badge>
-                    )}
-                  </div>
-                  {item.descrizione && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{item.descrizione}</p>
+                <div className="flex-shrink-0 mt-1">
+                  {item.tipo === "note" ? (
+                    <FileText className="h-4 w-4 text-blue-500" />
+                  ) : (
+                    <FileText className="h-4 w-4 text-green-500" />
                   )}
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    {item.data_scadenza && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(item.data_scadenza).toLocaleDateString("it-IT", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    )}
-                    {item.luogo && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {item.luogo}
-                      </div>
-                    )}
-                    {item.assegnato_a && (
-                      <div className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {item.assegnato_a}
-                      </div>
-                    )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <Link
+                        href={`/${item.tipo}/${item.id}`}
+                        className="font-medium text-sm hover:underline line-clamp-1"
+                      >
+                        {item.titolo || "Senza titolo"}
+                      </Link>
+
+                      {item.data_scadenza && (
+                        <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {formatDateIT(item.data_scadenza)}
+                        </div>
+                      )}
+                    </div>
+
+                    <Badge variant="secondary" className="text-xs">
+                      {item.tipo === "note" ? "Nota" : "Pagina"}
+                    </Badge>
                   </div>
                 </div>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href={`/agenda/${item.id}`}>Dettagli</Link>
-                </Button>
               </div>
             ))}
           </div>
