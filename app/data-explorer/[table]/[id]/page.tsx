@@ -13,23 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
-import {
-  CheckCircle2,
-  FileText,
-  Calendar,
-  CheckSquare,
-  Clock,
-  ListTodo,
-  Briefcase,
-  Users,
-  StickyNote,
-  ArrowLeft,
-  Save,
-  Edit,
-  X,
-  Trash2,
-  AlertCircle,
-} from "lucide-react"
+import { CheckCircle2, FileText, Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, StickyNote, ArrowLeft, Save, Edit, X, Trash2, AlertCircle } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,7 +106,7 @@ const TABLE_FIELDS = {
       stato: "pianificato",
       attivo: true,
     },
-    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "priorita", "luogo", "note"],
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "luogo", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -130,7 +114,6 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "priority_select",
       note: "text",
       luogo: "string",
       attivo: "boolean",

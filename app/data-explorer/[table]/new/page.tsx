@@ -13,20 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { parseISO, formatISO } from "date-fns"
-import {
-  CheckCircle2,
-  FileText,
-  Settings,
-  Calendar,
-  CheckSquare,
-  Clock,
-  ListTodo,
-  Briefcase,
-  Users,
-  StickyNote,
-  ArrowLeft,
-  Save,
-} from "lucide-react"
+import { CheckCircle2, FileText, Settings, Calendar, CheckSquare, Clock, ListTodo, Briefcase, Users, StickyNote, ArrowLeft, Save } from 'lucide-react'
 import { EnhancedDatePicker } from "@/components/ui/enhanced-date-picker"
 
 // Definizione delle tabelle disponibili
@@ -104,6 +91,7 @@ const TABLE_FIELDS = {
         fields: ["luogo", "note", "tags"],
       },
     },
+    fieldOrder: ["titolo", "descrizione", "data_inizio", "data_fine", "stato", "luogo", "note"],
     types: {
       id: "number",
       titolo: "string",
@@ -111,10 +99,8 @@ const TABLE_FIELDS = {
       data_inizio: "datetime",
       data_fine: "datetime",
       stato: "select",
-      priorita: "priority_select",
       note: "text",
       luogo: "string",
-      tags: "tags",
       attivo: "boolean",
       id_utente: "number",
       data_creazione: "datetime",
