@@ -1,6 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter } from 'next/font/google'
 import "./globals.css"
 import { ThemeProvider as NextThemeProvider } from "next-themes"
 import { ThemeProvider } from "@/contexts/theme-context"
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   keywords: ["dashboard", "gestione", "dati", "attività", "intelligente"],
   authors: [{ name: "iStudio Team" }],
   viewport: "width=device-width, initial-scale=1",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -28,7 +28,12 @@ export default function RootLayout({
   return (
     <html lang="it" suppressHydrationWarning>
       <body className={inter.className}>
-        <NextThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false}>
+        <NextThemeProvider 
+          attribute="class" 
+          defaultTheme="system" 
+          enableSystem 
+          disableTransitionOnChange={false}
+        >
           <SupabaseProvider>
             <AuthProvider>
               <ThemeProvider>

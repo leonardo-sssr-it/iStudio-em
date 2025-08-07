@@ -25,6 +25,7 @@ export interface AuthContextType {
   isLoading: boolean
   isAdmin: boolean
   login: (usernameOrEmail: string, password: string) => Promise<boolean>
+  signUp: (email: string, password: string, metadata: any) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   checkSession: () => Promise<boolean>
@@ -38,6 +39,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAdmin: false,
   login: async () => false,
+  signUp: async () => {},
   logout: async () => {},
   refreshUser: async () => {},
   checkSession: async () => false,
@@ -45,12 +47,12 @@ const AuthContext = createContext<AuthContextType>({
   verifyPassword: async () => false,
 })
 
-const AUTH_COOKIE_NAME = "auth_session"
+const AUTH_COOKIE_NAME = "istudio_auth_session"
 const SESSION_DURATION_DAYS = 7
 const HASH_PREFIX = "hashed_"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing, resetClient } = useSupabase()
+  const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing } = useSupabase()
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -59,12 +61,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(false)
   const isCheckingSessionRef = useRef(false)
   const redirectingRef = useRef(false)
+  const initializationRef = useRef(false)
+
+  console.log("AuthProvider: Render", {
+    user: !!user,
+    isLoading,
+    supabaseConnected,
+    supabaseInitializing,
+    sessionChecked
+  })
 
   const hashPassword = useCallback(async (password: string): Promise<string> => {
     try {
       return await bcrypt.hash(password, 10)
     } catch (error) {
-      console.error("Errore nell'hashing della password:", error)
+      console.error("AuthProvider: Errore nell'hashing della password:", error)
       throw new Error("Impossibile eseguire l'hashing della password")
     }
   }, [])
@@ -83,20 +94,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return password === hashedPassword
       }
     } catch (error) {
-      console.error("Errore durante la verifica della password:", error)
+      console.error("AuthProvider: Errore durante la verifica della password:", error)
       return password === hashedPassword
     }
   }, [])
 
   const fetchUserData = useCallback(
     async (userId: string) => {
-      if (!supabase || !userId) return null
+      if (!supabase || !userId) {
+        console.log("AuthProvider: fetchUserData - Supabase non disponibile o userId mancante")
+        return null
+      }
+      
       try {
-        const { data, error } = await supabase.from("utenti").select("*").eq("id", userId).single()
-        if (error) throw error
+        console.log("AuthProvider: Recupero dati utente per ID:", userId)
+        const { data, error } = await supabase
+          .from("utenti")
+          .select("*")
+          .eq("id", userId)
+          .single()
+          
+        if (error) {
+          console.error("AuthProvider: Errore nel recupero dei dati utente:", error)
+          return null
+        }
+        
+        console.log("AuthProvider: Dati utente recuperati con successo")
         return data as AuthUser
       } catch (error) {
-        console.error("Errore nel recupero dei dati utente:", error)
+        console.error("AuthProvider: Errore nel recupero dei dati utente:", error)
         return null
       }
     },
@@ -111,9 +137,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("utenti")
           .update({ ultimo_accesso: new Date().toISOString() })
           .eq("id", userId)
-        if (error) console.error("Errore nell'aggiornamento dell'ultimo accesso:", error)
+        if (error) console.error("AuthProvider: Errore nell'aggiornamento dell'ultimo accesso:", error)
       } catch (error) {
-        console.error("Errore nell'aggiornamento dell'ultimo accesso:", error)
+        console.error("AuthProvider: Errore nell'aggiornamento dell'ultimo accesso:", error)
       }
     },
     [supabase],
@@ -128,10 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from("utenti")
           .update({ password: HASH_PREFIX + hashedPassword })
           .eq("id", userId)
-        if (error) console.error("Errore nell'aggiornamento della password:", error)
-        else console.log("Password aggiornata con successo alla versione hashata")
+        if (error) console.error("AuthProvider: Errore nell'aggiornamento della password:", error)
+        else console.log("AuthProvider: Password aggiornata con successo alla versione hashata")
       } catch (error) {
-        console.error("Errore nell'aggiornamento della password:", error)
+        console.error("AuthProvider: Errore nell'aggiornamento della password:", error)
       }
     },
     [supabase, hashPassword],
@@ -140,31 +166,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearAllAuthCookies = useCallback(() => {
     if (typeof document === "undefined") return
 
-    document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    document.cookie = `sb-access-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    document.cookie = `sb-refresh-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-    document.cookie = `supabase-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    console.log("AuthProvider: Pulizia di tutti i cookie di autenticazione")
 
-    const domains = [location.hostname, `.${location.hostname}`, ""]
-    const paths = ["/", "/auth", ""]
+    // Lista di tutti i possibili cookie da pulire
+    const cookiesToClear = [
+      AUTH_COOKIE_NAME,
+      'sb-access-token',
+      'sb-refresh-token',
+      'supabase-auth-token',
+      'supabase.auth.token'
+    ]
 
-    domains.forEach((domain) => {
-      paths.forEach((path) => {
-        document.cookie = `${AUTH_COOKIE_NAME}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        document.cookie = `sb-access-token=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-        document.cookie = `sb-refresh-token=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+    cookiesToClear.forEach(cookieName => {
+      // Pulisci per il dominio corrente
+      document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+      
+      // Pulisci per domini alternativi
+      const domains = [location.hostname, `.${location.hostname}`]
+      const paths = ["/", "/auth"]
+      
+      domains.forEach((domain) => {
+        paths.forEach((path) => {
+          document.cookie = `${cookieName}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
+        })
       })
     })
 
+    // Pulisci anche localStorage e sessionStorage
     try {
-      localStorage.removeItem("supabase.auth.token")
-      localStorage.removeItem("authToken")
-      localStorage.removeItem("authUser")
-      sessionStorage.removeItem("supabase.auth.token")
-      sessionStorage.removeItem("authToken")
-      sessionStorage.removeItem("authUser")
+      const keysToRemove = [
+        'supabase.auth.token',
+        'authToken',
+        'authUser',
+        'istudio_auth_session'
+      ]
+      
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key)
+        sessionStorage.removeItem(key)
+      })
     } catch (e) {
-      console.error("Errore nella pulizia dello storage:", e)
+      console.error("AuthProvider: Errore nella pulizia dello storage:", e)
     }
   }, [])
 
@@ -174,10 +216,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cookies = document.cookie.split(";")
       const sessionCookie = cookies.find((cookie) => cookie.trim().startsWith(`${AUTH_COOKIE_NAME}=`))
       if (sessionCookie) {
-        return JSON.parse(decodeURIComponent(sessionCookie.split("=")[1]))
+        const cookieValue = sessionCookie.split("=")[1]
+        return JSON.parse(decodeURIComponent(cookieValue))
       }
     } catch (error) {
-      console.error("Errore nel parsing del cookie di sessione:", error)
+      console.error("AuthProvider: Errore nel parsing del cookie di sessione:", error)
     }
     return null
   }, [])
@@ -193,49 +236,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cookieValue = encodeURIComponent(JSON.stringify(session))
       const isSecure = window.location.protocol === "https:"
       document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${expiresInDays * 24 * 60 * 60}; SameSite=Lax${isSecure ? "; Secure" : ""}`
+      
+      console.log("AuthProvider: Sessione salvata nel cookie")
     } catch (error) {
-      console.error("Errore nel salvataggio del cookie di sessione:", error)
+      console.error("AuthProvider: Errore nel salvataggio del cookie di sessione:", error)
     }
   }, [])
 
   const checkSession = useCallback(async (): Promise<boolean> => {
-    if (isCheckingSessionRef.current) return !!user
+    if (isCheckingSessionRef.current) {
+      console.log("AuthProvider: checkSession già in corso, skip")
+      return !!user
+    }
+    
     isCheckingSessionRef.current = true
+    
     if (!supabase || supabaseInitializing) {
+      console.log("AuthProvider: checkSession - Supabase non pronto")
       isCheckingSessionRef.current = false
       return false
     }
+    
     try {
+      console.log("AuthProvider: Verifica sessione...")
+      
       const session = getSessionFromCookie()
       if (!session || !session.user_id || new Date(session.expires_at) <= new Date()) {
+        console.log("AuthProvider: Sessione non valida o scaduta")
         if (session && typeof document !== "undefined") {
           clearAllAuthCookies()
         }
-        if (user !== null) setUser(null)
+        if (user !== null) {
+          setUser(null)
+          setIsAdmin(false)
+        }
         isCheckingSessionRef.current = false
         return false
       }
+
+      // Se abbiamo già l'utente con lo stesso ID, estendi solo la sessione
       if (user && user.id === session.user_id) {
+        console.log("AuthProvider: Utente già presente, estendo sessione")
         saveSessionToCookie(user.id)
         isCheckingSessionRef.current = false
         return true
       }
+
+      // Recupera i dati utente dal database
       const userData = await fetchUserData(session.user_id)
       if (!userData) {
+        console.log("AuthProvider: Dati utente non trovati")
         clearAllAuthCookies()
-        if (user !== null) setUser(null)
+        if (user !== null) {
+          setUser(null)
+          setIsAdmin(false)
+        }
         isCheckingSessionRef.current = false
         return false
       }
+
+      console.log("AuthProvider: Sessione valida, utente autenticato:", userData.username)
+      
+      // Aggiorna ultimo accesso
       await updateLastAccess(userData.id)
+      
+      // Imposta lo stato dell'utente
       setUser(userData)
       setIsAdmin(userData.ruolo === "admin")
+      
+      // Estendi la sessione
       saveSessionToCookie(userData.id)
+      
       isCheckingSessionRef.current = false
       return true
     } catch (error) {
       console.error("AuthProvider: Errore nella verifica della sessione:", error)
-      if (user !== null) setUser(null)
+      if (user !== null) {
+        setUser(null)
+        setIsAdmin(false)
+      }
       isCheckingSessionRef.current = false
       return false
     }
@@ -248,8 +327,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateLastAccess,
     saveSessionToCookie,
     clearAllAuthCookies,
-    setUser,
-    setIsAdmin,
   ])
 
   const login = useCallback(
@@ -262,16 +339,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         return false
       }
-      if (isCheckingSessionRef.current || redirectingRef.current) return false
+      
+      if (isCheckingSessionRef.current || redirectingRef.current) {
+        console.log("AuthProvider: Login già in corso, skip")
+        return false
+      }
+      
       setIsLoading(true)
       isCheckingSessionRef.current = true
+      
       try {
+        console.log("AuthProvider: Tentativo di login per:", usernameOrEmail)
+        
         const isEmail = usernameOrEmail.includes("@")
         let query = supabase.from("utenti").select("*")
         query = isEmail ? query.eq("email", usernameOrEmail) : query.eq("username", usernameOrEmail)
         const { data, error } = await query.maybeSingle()
 
         if (error && !error.message.includes("multiple (or no) rows returned")) {
+          console.error("AuthProvider: Errore nella query utente:", error)
           toast({
             title: "Errore di sistema",
             description: "Errore durante il recupero dei dati utente.",
@@ -279,7 +365,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
+        
         if (!data) {
+          console.log("AuthProvider: Utente non trovato")
           toast({
             title: "Credenziali non valide",
             description: "Username/email o password non corretti.",
@@ -287,9 +375,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
+        
         const fetchedUser = data as AuthUser
+        console.log("AuthProvider: Utente trovato, verifica password...")
+        
         const isPasswordValid = await verifyPassword(password, fetchedUser.password)
         if (!isPasswordValid) {
+          console.log("AuthProvider: Password non valida")
           toast({
             title: "Credenziali non valide",
             description: "Username/email o password non corretti.",
@@ -297,21 +389,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
+
+        console.log("AuthProvider: Login riuscito per:", fetchedUser.username)
+
+        // Se la password è in chiaro, aggiornala
         if (fetchedUser.password === password) {
           await updatePasswordToHashed(fetchedUser.id, password)
         }
+
+        // Aggiorna ultimo accesso
         await updateLastAccess(fetchedUser.id)
+        
+        // Salva la sessione
         saveSessionToCookie(fetchedUser.id)
+        
+        // Imposta lo stato dell'utente
         setUser(fetchedUser)
         setIsAdmin(fetchedUser.ruolo === "admin")
         setIsLoading(false)
+        
+        // Redirect
         redirectingRef.current = true
         const destination = "/dashboard-utente"
         router.push(destination)
-        toast({ title: "Login effettuato", description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!` })
+        
+        toast({ 
+          title: "Login effettuato", 
+          description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!` 
+        })
+        
         return true
       } catch (error: any) {
-        console.error("Errore durante il login:", error)
+        console.error("AuthProvider: Errore durante il login:", error)
         toast({
           title: "Errore",
           description: error.message || "Si è verificato un errore durante il login.",
@@ -331,63 +440,130 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updatePasswordToHashed,
       updateLastAccess,
       saveSessionToCookie,
-      setUser,
-      setIsAdmin,
     ],
+  )
+
+  const signUp = useCallback(
+    async (email: string, password: string, metadata: any): Promise<void> => {
+      if (!supabase || supabaseInitializing) {
+        throw new Error("Database non disponibile")
+      }
+
+      try {
+        console.log("AuthProvider: Tentativo di registrazione per:", email)
+        
+        // Verifica se l'utente esiste già
+        const { data: existingUser } = await supabase
+          .from("utenti")
+          .select("id")
+          .or(`email.eq.${email},username.eq.${metadata.username}`)
+          .maybeSingle()
+
+        if (existingUser) {
+          throw new Error("Utente già esistente")
+        }
+
+        // Hash della password
+        const hashedPassword = await hashPassword(password)
+
+        // Inserisci il nuovo utente
+        const { error } = await supabase
+          .from("utenti")
+          .insert({
+            email,
+            username: metadata.username,
+            nome: metadata.nome,
+            cognome: metadata.cognome,
+            password: HASH_PREFIX + hashedPassword,
+            ruolo: "user",
+            attivo: true,
+            data_creazione: new Date().toISOString(),
+          })
+
+        if (error) {
+          throw error
+        }
+
+        console.log("AuthProvider: Registrazione completata per:", email)
+      } catch (error: any) {
+        console.error("AuthProvider: Errore durante la registrazione:", error)
+        throw error
+      }
+    },
+    [supabase, supabaseInitializing, hashPassword],
   )
 
   const logout = useCallback(async (): Promise<void> => {
     if (redirectingRef.current) return
+    
+    console.log("AuthProvider: Logout in corso...")
     redirectingRef.current = true
 
+    // Pulisci tutti i cookie e lo storage
     clearAllAuthCookies()
+    
+    // Reset dello stato
     setUser(null)
     setIsAdmin(false)
     setSessionChecked(false)
 
-    if (resetClient) {
-      try {
-        await resetClient()
-      } catch (e) {
-        console.error("Errore nel reset del client Supabase:", e)
-      }
-    }
-
+    // Redirect alla home
     router.push("/")
-    toast({ title: "Logout effettuato", description: "Hai effettuato il logout con successo." })
+    
+    toast({ 
+      title: "Logout effettuato", 
+      description: "Hai effettuato il logout con successo." 
+    })
 
+    // Reset del flag dopo un breve delay
     setTimeout(() => {
-      if (typeof window !== "undefined") {
-        window.location.reload()
-      }
-    }, 100)
-  }, [router, setUser, setIsAdmin, clearAllAuthCookies, resetClient])
+      redirectingRef.current = false
+    }, 1000)
+  }, [router, clearAllAuthCookies])
 
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!user?.id || !supabase) return
     try {
+      console.log("AuthProvider: Refresh dati utente...")
       const userData = await fetchUserData(user.id)
       if (userData) {
         setUser(userData)
         setIsAdmin(userData.ruolo === "admin")
+        console.log("AuthProvider: Dati utente aggiornati")
       }
     } catch (error) {
-      console.error("Errore nell'aggiornamento dei dati utente:", error)
+      console.error("AuthProvider: Errore nell'aggiornamento dei dati utente:", error)
     }
-  }, [user, supabase, fetchUserData, setUser, setIsAdmin])
+  }, [user, supabase, fetchUserData])
 
+  // Reset del flag di redirect quando cambia il pathname
   useEffect(() => {
     if (redirectingRef.current) {
+      console.log("AuthProvider: Reset redirecting flag per cambio pathname")
       redirectingRef.current = false
     }
   }, [pathname])
 
+  // Inizializzazione e verifica sessione
   useEffect(() => {
     let isMounted = true
-    const checkSessionOnLoad = async () => {
-      if (sessionChecked || isCheckingSessionRef.current || supabaseInitializing) return
+    
+    const initializeAuth = async () => {
+      // Evita inizializzazioni multiple
+      if (initializationRef.current || sessionChecked || isCheckingSessionRef.current) {
+        return
+      }
+      
+      if (supabaseInitializing || !supabase) {
+        console.log("AuthProvider: In attesa di Supabase...")
+        return
+      }
+      
+      initializationRef.current = true
       setIsLoading(true)
+      
       try {
+        console.log("AuthProvider: Inizializzazione autenticazione...")
         await checkSession()
       } catch (error) {
         console.error("AuthProvider: Errore nella verifica della sessione iniziale:", error)
@@ -395,14 +571,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isMounted) {
           setIsLoading(false)
           setSessionChecked(true)
+          initializationRef.current = false
         }
       }
     }
-    if (supabase && supabaseConnected) {
-      checkSessionOnLoad()
-    } else if (!supabaseInitializing) {
+
+    if (supabase && supabaseConnected && !supabaseInitializing) {
+      initializeAuth()
+    } else if (!supabaseInitializing && !supabaseConnected) {
+      // Se Supabase non è connesso e non si sta inizializzando, ferma il loading
       setIsLoading(false)
     }
+
     return () => {
       isMounted = false
     }
@@ -413,6 +593,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: isLoading || supabaseInitializing,
     isAdmin,
     login,
+    signUp,
     logout,
     refreshUser,
     checkSession,
@@ -433,6 +614,7 @@ export function useAuth() {
       isLoading: true,
       isAdmin: false,
       login: async () => false,
+      signUp: async () => {},
       logout: async () => {},
       refreshUser: async () => {},
       checkSession: async () => false,

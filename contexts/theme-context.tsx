@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider"
 
 // Tipi per i temi
 interface Theme {
@@ -75,6 +76,7 @@ export function useSafeCustomTheme(): ThemeContextType {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected } = useSupabase()
+  const { isLoading: authLoading } = useAuth()
   const [themes, setThemes] = useState<Theme[]>([defaultTheme])
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
   const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
@@ -83,6 +85,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
   const [themesLoaded, setThemesLoaded] = useState(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout>()
+  const initializationRef = useRef(false)
+
+  console.log("ThemeProvider: Render", {
+    themesCount: themes.length,
+    currentTheme: currentTheme?.nome_tema,
+    mounted,
+    themesLoaded,
+    authLoading,
+    supabaseConnected: !!supabase && isConnected,
+  })
 
   // Funzione per convertire colori hex in HSL
   const hexToHsl = useCallback((hex: string): string => {
@@ -94,10 +106,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Rimuovi il # se presente
     hex = hex.replace("#", "")
 
+    // Assicurati che sia un hex valido a 6 caratteri
+    if (hex.length === 3) {
+      hex = hex.split('').map(char => char + char).join('')
+    }
+    if (hex.length !== 6) return "0 0% 50%"
+
     // Converti hex in RGB
     const r = Number.parseInt(hex.substr(0, 2), 16) / 255
     const g = Number.parseInt(hex.substr(2, 2), 16) / 255
-    const b = Number.parseInt(hex.substr(4, 4), 16) / 255
+    const b = Number.parseInt(hex.substr(4, 2), 16) / 255
 
     const max = Math.max(r, g, b)
     const min = Math.min(r, g, b)
@@ -133,13 +151,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
       const root = document.documentElement
 
-      console.log("=== APPLICANDO TEMA ===")
-      console.log("Nome tema:", theme.nome_tema)
-      console.log("Tema data:", theme)
+      console.log("ThemeProvider: Applicando tema:", theme.nome_tema)
 
       if (theme.isDefault) {
         // Resetta al tema predefinito
-        console.log("Resettando al tema predefinito")
         const customProperties = [
           "--primary",
           "--secondary",
@@ -166,24 +181,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.removeProperty("--radius")
       } else {
         // Applica i colori del tema personalizzato
-        console.log("Applicando tema personalizzato")
-
         if (theme.colore_titolo) {
           const titleHsl = hexToHsl(theme.colore_titolo)
           root.style.setProperty("--primary", titleHsl)
-          console.log(`✓ Primary color applicato: ${titleHsl}`)
         }
 
         if (theme.colore_card) {
           const cardHsl = hexToHsl(theme.colore_card)
           root.style.setProperty("--secondary", cardHsl)
-          console.log(`✓ Secondary color applicato: ${cardHsl}`)
         }
 
         if (theme.colore_tabs) {
           const tabsHsl = hexToHsl(theme.colore_tabs)
           root.style.setProperty("--accent", tabsHsl)
-          console.log(`✓ Accent color applicato: ${tabsHsl}`)
         }
 
         if (theme.colore_background) {
@@ -191,7 +201,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           root.style.setProperty("--background", bgHsl)
           root.style.setProperty("--card", bgHsl)
           root.style.setProperty("--popover", bgHsl)
-          console.log(`✓ Background color applicato: ${bgHsl}`)
         }
 
         if (theme.carattere_colore) {
@@ -199,25 +208,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           root.style.setProperty("--foreground", textHsl)
           root.style.setProperty("--card-foreground", textHsl)
           root.style.setProperty("--popover-foreground", textHsl)
-          console.log(`✓ Text color applicato: ${textHsl}`)
         }
 
         if (theme.colore_header) {
           const headerHsl = hexToHsl(theme.colore_header)
           root.style.setProperty("--header", headerHsl)
-          console.log(`✓ Header color applicato: ${headerHsl}`)
         }
 
         if (theme.colore_footer) {
           const footerHsl = hexToHsl(theme.colore_footer)
           root.style.setProperty("--footer", footerHsl)
-          console.log(`✓ Footer color applicato: ${footerHsl}`)
         }
 
         if (theme.colore_div) {
           const divHsl = hexToHsl(theme.colore_div)
           root.style.setProperty("--div", divHsl)
-          console.log(`✓ Div color applicato: ${divHsl}`)
         }
 
         // Applica le variabili CSS personalizzate se presenti
@@ -228,7 +233,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             try {
               cssVars = JSON.parse(theme.css_variables)
             } catch (e) {
-              console.error("Errore nel parsing delle CSS variables:", e)
+              console.error("ThemeProvider: Errore nel parsing delle CSS variables:", e)
             }
           } else if (typeof theme.css_variables === "object") {
             cssVars = theme.css_variables
@@ -237,7 +242,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           Object.entries(cssVars).forEach(([key, value]) => {
             if (value && typeof value === "string") {
               root.style.setProperty(`--${key}`, value)
-              console.log(`✓ Variabile CSS personalizzata applicata: --${key} = ${value}`)
             }
           })
         }
@@ -245,13 +249,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         // Applica il font family
         if (theme.carattere_tipo) {
           document.body.style.fontFamily = theme.carattere_tipo
-          console.log(`✓ Font family applicato: ${theme.carattere_tipo}`)
         }
 
         // Applica il border radius
         if (theme.border_radius) {
           root.style.setProperty("--radius", theme.border_radius)
-          console.log(`✓ Border radius applicato: ${theme.border_radius}`)
         }
       }
 
@@ -261,7 +263,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         document.body.classList.remove("theme-transition")
       }, 300)
 
-      console.log("=== TEMA APPLICATO CON SUCCESSO ===")
+      console.log("ThemeProvider: Tema applicato con successo")
     },
     [hexToHsl],
   )
@@ -281,11 +283,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database solo quando necessario
+  // Carica i temi dal database - SOLO quando l'autenticazione è stabile
   useEffect(() => {
     const loadThemes = async () => {
-      // Non caricare i temi se non siamo connessi o se sono già stati caricati
-      if (!supabase || !isConnected || themesLoaded) return
+      // Evita caricamenti multipli
+      if (initializationRef.current || themesLoaded) return
+      
+      // Aspetta che l'autenticazione sia stabile
+      if (authLoading) {
+        console.log("ThemeProvider: In attesa che l'autenticazione si stabilizzi...")
+        return
+      }
+      
+      // Verifica che Supabase sia disponibile
+      if (!supabase || !isConnected) {
+        console.log("ThemeProvider: Supabase non disponibile")
+        return
+      }
+
+      initializationRef.current = true
 
       // Timeout di sicurezza per evitare caricamenti infiniti
       if (loadingTimeoutRef.current) {
@@ -299,11 +315,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           setCurrentTheme(defaultTheme)
           applyThemeStyles(defaultTheme)
           setThemesLoaded(true)
+          initializationRef.current = false
         }
-      }, 10000) // 10 secondi di timeout
+      }, 8000) // 8 secondi di timeout
 
       try {
-        console.log("ThemeProvider: Loading themes from database...")
+        console.log("ThemeProvider: Caricamento temi dal database...")
         
         // Query semplice e sicura senza dipendenze dall'autenticazione
         const { data, error } = await supabase
@@ -312,12 +329,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           .order("nome_tema")
 
         if (error) {
-          console.error("ThemeProvider: Error loading themes:", error)
+          console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
           // In caso di errore, usa solo il tema di default
           setThemes([defaultTheme])
           setCurrentTheme(defaultTheme)
           applyThemeStyles(defaultTheme)
           setThemesLoaded(true)
+          initializationRef.current = false
           return
         }
 
@@ -343,7 +361,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
         const allThemes = [defaultTheme, ...supabaseThemes]
         setThemes(allThemes)
-        console.log("ThemeProvider: Themes loaded successfully:", allThemes.length)
+        console.log("ThemeProvider: Temi caricati con successo:", allThemes.length)
 
         // Applica il tema salvato o quello di default
         const savedThemeId = localStorage.getItem("app-theme")
@@ -352,9 +370,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           if (savedTheme) {
             setCurrentTheme(savedTheme)
             applyThemeStyles(savedTheme)
+          } else {
+            // Tema salvato non trovato, usa il default
+            setCurrentTheme(defaultTheme)
+            applyThemeStyles(defaultTheme)
           }
         } else {
-          // Applica il tema di default
+          // Nessun tema salvato, usa il default
           setCurrentTheme(defaultTheme)
           applyThemeStyles(defaultTheme)
         }
@@ -367,17 +389,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
         
       } catch (error) {
-        console.error("ThemeProvider: Error in loadThemes:", error)
+        console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
         // Fallback al tema di default in caso di errore
         setThemes([defaultTheme])
         setCurrentTheme(defaultTheme)
         applyThemeStyles(defaultTheme)
         setThemesLoaded(true)
+      } finally {
+        initializationRef.current = false
       }
     }
 
-    // Carica i temi solo quando l'app è mounted e Supabase è connesso
-    if (mounted && supabase && isConnected) {
+    // Carica i temi solo quando l'app è mounted, l'auth è stabile e Supabase è connesso
+    if (mounted && !authLoading && supabase && isConnected) {
       loadThemes()
     }
 
@@ -387,7 +411,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  }, [supabase, isConnected, mounted, themesLoaded, applyThemeStyles])
+  }, [supabase, isConnected, mounted, authLoading, themesLoaded, applyThemeStyles])
 
   // Applica le dimensioni del font
   const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
@@ -403,7 +427,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.style.setProperty("--font-size-base", sizes[size])
     root.classList.remove("font-small", "font-normal", "font-large")
     root.classList.add(`font-${size}`)
-    console.log(`Font size changed to: ${size} (${sizes[size]})`)
   }, [])
 
   // Applica il dark mode
@@ -416,19 +439,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove("dark")
     }
-    console.log(`Dark mode: ${dark}`)
   }, [])
-
-  // Debug per temi con informazioni più dettagliate
-  useEffect(() => {
-    console.log("ThemeProvider: State update:", {
-      themesCount: themes.length,
-      currentTheme: currentTheme?.nome_tema,
-      mounted,
-      themesLoaded,
-      supabaseConnected: !!supabase && isConnected,
-    })
-  }, [themes, currentTheme, mounted, themesLoaded, supabase, isConnected])
 
   // Effetti per applicare le impostazioni quando cambiano
   useEffect(() => {
@@ -448,7 +459,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     (themeId: number) => {
       const theme = themes.find((t) => t.id === themeId)
       if (theme) {
-        console.log("Applying theme:", theme.nome_tema)
+        console.log("ThemeProvider: Applicando tema:", theme.nome_tema)
         setCurrentTheme(theme)
         applyThemeStyles(theme)
         localStorage.setItem("app-theme", themeId.toString())
@@ -458,7 +469,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   )
 
   const resetToDefault = useCallback(() => {
-    console.log("Resetting to default theme")
+    console.log("ThemeProvider: Reset al tema di default")
     setCurrentTheme(defaultTheme)
     applyThemeStyles(defaultTheme)
     localStorage.setItem("app-theme", "0")
@@ -467,20 +478,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
     setLayoutState(newLayout)
     localStorage.setItem("app-layout", newLayout)
-    console.log("Layout changed to:", newLayout)
   }, [])
 
   const toggleDarkMode = useCallback(() => {
     const newDarkMode = !isDarkMode
     setIsDarkMode(newDarkMode)
     localStorage.setItem("app-dark-mode", newDarkMode.toString())
-    console.log("Dark mode toggled:", newDarkMode)
   }, [isDarkMode])
 
   const setFontSize = useCallback((size: "small" | "normal" | "large") => {
     setFontSizeState(size)
     localStorage.setItem("app-font-size", size)
-    console.log("Font size changed to:", size)
   }, [])
 
   const value: ThemeContextType = {
