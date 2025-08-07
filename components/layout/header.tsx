@@ -9,10 +9,24 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { Menu, Moon, Sun, Palette, User, LogOut, Settings, Layout, LayoutGrid, LayoutDashboard, Type, RotateCcw, ChevronDown } from 'lucide-react'
+import {
+  Menu,
+  Moon,
+  Sun,
+  Palette,
+  User,
+  LogOut,
+  Settings,
+  Layout,
+  LayoutGrid,
+  LayoutDashboard,
+  Type,
+  RotateCcw,
+  ChevronDown,
+} from "lucide-react"
 
 export function Header() {
-  const { user, isAdmin, logout, isLoading: authLoading } = useAuth() // Get authLoading here
+  const { user, isAdmin, logout } = useAuth()
   const { config, isLoading: configLoading } = useAppConfig()
   const {
     themes,
@@ -40,9 +54,8 @@ export function Header() {
       user: user ? { id: user.id, nome: user.nome, username: user.username, email: user.email } : null,
       isAdmin,
       mounted,
-      authLoading, // Add authLoading to debug log
     })
-  }, [user, isAdmin, mounted, authLoading]) // Add authLoading to dependencies
+  }, [user, isAdmin, mounted])
 
   // Formattazione data su due righe SENZA grassetto
   const formatDateTime = useCallback(() => {
@@ -134,8 +147,7 @@ export function Header() {
     })
   }, [themes, currentTheme, mounted])
 
-  // Modifica la condizione di caricamento per includere authLoading
-  if (!mounted || authLoading) {
+  if (!mounted) {
     return (
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">

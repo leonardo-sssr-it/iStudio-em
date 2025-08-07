@@ -1,9 +1,8 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
-import { useAuth } from "@/lib/auth-provider" // Import useAuth
 
 // Tipi per i temi
 interface Theme {
@@ -56,6 +55,7 @@ export function useSafeCustomTheme(): ThemeContextType {
   const context = useContext(ThemeContext)
   if (!context) {
     // Fallback sicuro se il context non è disponibile
+    console.warn("useSafeCustomTheme: ThemeContext non disponibile, usando fallback")
     return {
       themes: [defaultTheme],
       currentTheme: defaultTheme,
@@ -75,13 +75,14 @@ export function useSafeCustomTheme(): ThemeContextType {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected } = useSupabase()
-  const { isLoading: authLoading, user: authUser } = useAuth() // Get auth state
   const [themes, setThemes] = useState<Theme[]>([defaultTheme])
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
   const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
   const [mounted, setMounted] = useState(false)
+  const [themesLoaded, setThemesLoaded] = useState(false)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout>()
 
   // Funzione per convertire colori hex in HSL
   const hexToHsl = useCallback((hex: string): string => {
@@ -96,7 +97,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Converti hex in RGB
     const r = Number.parseInt(hex.substr(0, 2), 16) / 255
     const g = Number.parseInt(hex.substr(2, 2), 16) / 255
-    const b = Number.parseInt(hex.substr(4, 2), 16) / 255
+    const b = Number.parseInt(hex.substr(4, 4), 16) / 255
 
     const max = Math.max(r, g, b)
     const min = Math.min(r, g, b)
@@ -280,28 +281,43 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database
+  // Carica i temi dal database solo quando necessario
   useEffect(() => {
     const loadThemes = async () => {
-      // Only proceed if Supabase is connected and AuthProvider has finished its initial loading
-      if (!supabase || !isConnected || authLoading) {
-        console.log("ThemeProvider: Waiting for Supabase connection or AuthProvider to finish loading...", {
-          supabase: !!supabase,
-          isConnected,
-          authLoading,
-        })
-        return
+      // Non caricare i temi se non siamo connessi o se sono già stati caricati
+      if (!supabase || !isConnected || themesLoaded) return
+
+      // Timeout di sicurezza per evitare caricamenti infiniti
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
       }
 
-      try {
-        console.log("Loading themes from database...")
-        const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
-
-        if (error) {
-          console.error("Error loading themes:", error)
-          // Fallback to default theme on error
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.warn("ThemeProvider: Timeout nel caricamento dei temi, uso tema di default")
+        if (!themesLoaded) {
+          setThemes([defaultTheme])
           setCurrentTheme(defaultTheme)
           applyThemeStyles(defaultTheme)
+          setThemesLoaded(true)
+        }
+      }, 10000) // 10 secondi di timeout
+
+      try {
+        console.log("ThemeProvider: Loading themes from database...")
+        
+        // Query semplice e sicura senza dipendenze dall'autenticazione
+        const { data, error } = await supabase
+          .from("temi")
+          .select("*")
+          .order("nome_tema")
+
+        if (error) {
+          console.error("ThemeProvider: Error loading themes:", error)
+          // In caso di errore, usa solo il tema di default
+          setThemes([defaultTheme])
+          setCurrentTheme(defaultTheme)
+          applyThemeStyles(defaultTheme)
+          setThemesLoaded(true)
           return
         }
 
@@ -318,14 +334,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
               carattere_tipo: theme.carattere_tipo || "Tahoma, sans-serif",
               border_radius: theme.border_radius || "0.5rem",
               css_variables:
-                typeof theme.css_variables === "string" ? JSON.parse(theme.css_variables) : theme.css_variables || {},
+                typeof theme.css_variables === "string" 
+                  ? JSON.parse(theme.css_variables) 
+                  : theme.css_variables || {},
               isDefault: false,
             }))
           : []
 
         const allThemes = [defaultTheme, ...supabaseThemes]
         setThemes(allThemes)
-        console.log("Themes loaded:", allThemes.length)
+        console.log("ThemeProvider: Themes loaded successfully:", allThemes.length)
 
         // Applica il tema salvato o quello di default
         const savedThemeId = localStorage.getItem("app-theme")
@@ -334,28 +352,42 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           if (savedTheme) {
             setCurrentTheme(savedTheme)
             applyThemeStyles(savedTheme)
-          } else {
-            // If saved theme not found, fallback to default
-            setCurrentTheme(defaultTheme)
-            applyThemeStyles(defaultTheme)
           }
         } else {
           // Applica il tema di default
           setCurrentTheme(defaultTheme)
           applyThemeStyles(defaultTheme)
         }
+
+        setThemesLoaded(true)
+        
+        // Cancella il timeout se il caricamento è completato con successo
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current)
+        }
+        
       } catch (error) {
-        console.error("Error in loadThemes:", error)
+        console.error("ThemeProvider: Error in loadThemes:", error)
+        // Fallback al tema di default in caso di errore
+        setThemes([defaultTheme])
         setCurrentTheme(defaultTheme)
         applyThemeStyles(defaultTheme)
+        setThemesLoaded(true)
       }
     }
 
-    // This effect should run when mounted, Supabase is connected, and AuthProvider is not loading.
-    if (mounted && supabase && isConnected && !authLoading) {
+    // Carica i temi solo quando l'app è mounted e Supabase è connesso
+    if (mounted && supabase && isConnected) {
       loadThemes()
     }
-  }, [supabase, isConnected, mounted, applyThemeStyles, authLoading]) // Add authLoading to dependencies
+
+    // Cleanup del timeout
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [supabase, isConnected, mounted, themesLoaded, applyThemeStyles])
 
   // Applica le dimensioni del font
   const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
@@ -386,6 +418,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     console.log(`Dark mode: ${dark}`)
   }, [])
+
+  // Debug per temi con informazioni più dettagliate
+  useEffect(() => {
+    console.log("ThemeProvider: State update:", {
+      themesCount: themes.length,
+      currentTheme: currentTheme?.nome_tema,
+      mounted,
+      themesLoaded,
+      supabaseConnected: !!supabase && isConnected,
+    })
+  }, [themes, currentTheme, mounted, themesLoaded, supabase, isConnected])
 
   // Effetti per applicare le impostazioni quando cambiano
   useEffect(() => {
