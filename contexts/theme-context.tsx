@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
+import { useAuth } from "@/lib/auth-provider" // Import useAuth
 
 // Tipi per i temi
 interface Theme {
@@ -74,6 +75,7 @@ export function useSafeCustomTheme(): ThemeContextType {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected } = useSupabase()
+  const { isLoading: authLoading, user: authUser } = useAuth() // Get auth state
   const [themes, setThemes] = useState<Theme[]>([defaultTheme])
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
   const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
@@ -281,7 +283,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Carica i temi dal database
   useEffect(() => {
     const loadThemes = async () => {
-      if (!supabase || !isConnected) return
+      // Only proceed if Supabase is connected and AuthProvider has finished its initial loading
+      if (!supabase || !isConnected || authLoading) {
+        console.log("ThemeProvider: Waiting for Supabase connection or AuthProvider to finish loading...", {
+          supabase: !!supabase,
+          isConnected,
+          authLoading,
+        })
+        return
+      }
 
       try {
         console.log("Loading themes from database...")
@@ -289,6 +299,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("Error loading themes:", error)
+          // Fallback to default theme on error
+          setCurrentTheme(defaultTheme)
+          applyThemeStyles(defaultTheme)
           return
         }
 
@@ -321,6 +334,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           if (savedTheme) {
             setCurrentTheme(savedTheme)
             applyThemeStyles(savedTheme)
+          } else {
+            // If saved theme not found, fallback to default
+            setCurrentTheme(defaultTheme)
+            applyThemeStyles(defaultTheme)
           }
         } else {
           // Applica il tema di default
@@ -329,13 +346,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Error in loadThemes:", error)
+        setCurrentTheme(defaultTheme)
+        applyThemeStyles(defaultTheme)
       }
     }
 
-    if (mounted) {
+    // This effect should run when mounted, Supabase is connected, and AuthProvider is not loading.
+    if (mounted && supabase && isConnected && !authLoading) {
       loadThemes()
     }
-  }, [supabase, isConnected, mounted, applyThemeStyles])
+  }, [supabase, isConnected, mounted, applyThemeStyles, authLoading]) // Add authLoading to dependencies
 
   // Applica le dimensioni del font
   const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
