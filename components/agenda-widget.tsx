@@ -28,8 +28,22 @@ import {
   subMonths,
 } from "date-fns"
 import { it } from "date-fns/locale"
-import { CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, User, FileText, CheckSquare, AlertTriangle, Briefcase, Plus, Eye, CalendarDays, CalendarRange, Grid3X3 } from 'lucide-react'
-import Link from "next/link"
+import {
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  User,
+  FileText,
+  CheckSquare,
+  AlertTriangle,
+  Briefcase,
+  Plus,
+  Eye,
+  CalendarDays,
+  CalendarRange,
+  Grid3X3,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface AgendaWidgetProps {
@@ -111,6 +125,32 @@ const calculateDateRange = (selectedDate: Date, view: "daily" | "weekly" | "mont
   return { startDate, endDate }
 }
 
+// Funzione per ottenere l'abbreviazione della tabella
+const getTableAbbreviation = (tableName: string): string => {
+  const abbreviations: Record<string, string> = {
+    appuntamenti: "APP",
+    attivita: "ATT",
+    progetti: "PRO",
+    scadenze: "SCA",
+    todolist: "TDL",
+    todo: "TDL",
+  }
+  return abbreviations[tableName] || tableName.substring(0, 3).toUpperCase()
+}
+
+// Funzione per ottenere il colore del tag verticale
+const getTableTagColor = (tableName: string): string => {
+  const colors: Record<string, string> = {
+    appuntamenti: "bg-blue-500",
+    attivita: "bg-green-500",
+    progetti: "bg-orange-500",
+    scadenze: "bg-red-500",
+    todolist: "bg-purple-500",
+    todo: "bg-purple-500",
+  }
+  return colors[tableName] || "bg-gray-500"
+}
+
 // Componente per il menu di creazione nuovo elemento
 const NewItemMenu = ({ date }: { date: Date }) => {
   const router = useRouter()
@@ -167,11 +207,29 @@ const NewItemMenu = ({ date }: { date: Date }) => {
   )
 }
 
+// Componente per il tag verticale
+const VerticalTag = ({ tableName }: { tableName: string }) => {
+  const abbreviation = getTableAbbreviation(tableName)
+  const color = getTableTagColor(tableName)
+
+  return (
+    <div className={cn("w-1 h-full rounded-l-md", color)} title={tableName}>
+      <div
+        className="writing-mode-vertical text-xs font-bold text-white p-1 rotate-180"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        {abbreviation}
+      </div>
+    </div>
+  )
+}
+
 export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps) {
   const { user, isLoading: authLoading } = useAuth()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
   const [mounted, setMounted] = useState(false)
+  const router = useRouter()
 
   // Calcola le date corrette in base alla vista selezionata
   const { startDate, endDate } = useMemo(() => {
@@ -254,6 +312,13 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
     }
   }
 
+  // Funzione per gestire il click su un elemento
+  const handleItemClick = (item: any) => {
+    const url = `/data-explorer/${item.tabella_origine}/${item.id_origine}`
+    console.log(`🔗 AgendaWidget: Navigating to item: ${url}`)
+    router.push(url)
+  }
+
   // Vista giornaliera
   const renderDailyView = () => (
     <div className="space-y-4">
@@ -273,41 +338,56 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
         <ScrollArea className="h-[400px]">
           <div className="space-y-3">
             {items.map((item) => (
-              <Card key={`${item.tipo}-${item.id}`} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      {getItemIcon(item.tipo)}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{item.titolo}</h4>
-                        {item.descrizione && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.descrizione}</p>
-                        )}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          {item.data_inizio && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {format(new Date(item.data_inizio), "HH:mm")}
+              <Card
+                key={`${item.tipo}-${item.id}`}
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => handleItemClick(item)}
+              >
+                <CardContent className="p-0">
+                  <div className="flex">
+                    <VerticalTag tableName={item.tabella_origine} />
+                    <div className="flex-1 p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getItemIcon(item.tipo)}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium truncate">{item.titolo}</h4>
+                            {item.descrizione && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.descrizione}</p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              {item.data_inizio && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {format(new Date(item.data_inizio), "HH:mm")}
+                                </div>
+                              )}
+                              {item.cliente && (
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {item.cliente}
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {item.cliente && (
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {item.cliente}
-                            </div>
-                          )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2">
+                          <Badge variant="outline" className={cn("text-xs", getItemColor(item.tipo))}>
+                            {item.tipo}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleItemClick(item)
+                            }}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-2">
-                      <Badge variant="outline" className={cn("text-xs", getItemColor(item.tipo))}>
-                        {item.tipo}
-                      </Badge>
-                      <Link href={`/data-explorer/${item.tabella_origine}/${item.id_origine}`}>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </Link>
                     </div>
                   </div>
                 </CardContent>
@@ -319,7 +399,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
     </div>
   )
 
-  // Vista settimanale
+  // Vista settimanale con altezza dinamica
   const renderWeeklyView = () => {
     const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 })
     const weekDays = eachDayOfInterval({
@@ -335,15 +415,21 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
             const isToday = isSameDay(day, new Date())
             const isSelected = isSameDay(day, selectedDate)
 
+            // Calcola altezza dinamica basata sul numero di elementi
+            const minHeight = 120
+            const itemHeight = 24 // Altezza approssimativa per elemento
+            const dynamicHeight = Math.max(minHeight, dayItems.length * itemHeight + 60)
+
             return (
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "border rounded-lg p-2 min-h-[120px] cursor-pointer transition-colors",
+                  "border rounded-lg p-2 cursor-pointer transition-colors",
                   isToday && "bg-primary/5 border-primary/20",
                   isSelected && "ring-2 ring-primary/50",
                   "hover:bg-muted/50",
                 )}
+                style={{ minHeight: `${dynamicHeight}px` }}
                 onClick={() => setSelectedDate(day)}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -353,18 +439,23 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                   <NewItemMenu date={day} />
                 </div>
                 <div className="space-y-1">
-                  {dayItems.slice(0, 3).map((item) => (
+                  {dayItems.map((item, index) => (
                     <div
                       key={`${item.tipo}-${item.id}`}
-                      className={cn("text-xs p-1 rounded border truncate", getItemColor(item.tipo))}
+                      className={cn(
+                        "text-xs p-1 rounded border truncate cursor-pointer hover:opacity-80 flex items-center gap-1",
+                        getItemColor(item.tipo),
+                      )}
                       title={item.titolo}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleItemClick(item)
+                      }}
                     >
-                      {item.titolo}
+                      <div className={cn("w-1 h-3 rounded", getTableTagColor(item.tabella_origine))} />
+                      <span className="truncate">{item.titolo}</span>
                     </div>
                   ))}
-                  {dayItems.length > 3 && (
-                    <div className="text-xs text-muted-foreground">+{dayItems.length - 3} altri</div>
-                  )}
                 </div>
               </div>
             )
@@ -374,7 +465,7 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
     )
   }
 
-  // Vista mensile
+  // Vista mensile con altezza dinamica
   const renderMonthlyView = () => {
     const monthStart = startOfMonth(selectedDate)
     const monthEnd = endOfMonth(selectedDate)
@@ -409,16 +500,22 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                   const isCurrentMonth = isSameMonth(day, selectedDate)
                   const isSelected = isSameDay(day, selectedDate)
 
+                  // Calcola altezza dinamica basata sul numero di elementi
+                  const minHeight = 80
+                  const itemHeight = 20
+                  const dynamicHeight = Math.max(minHeight, dayItems.length * itemHeight + 40)
+
                   return (
                     <div
                       key={day.toISOString()}
                       className={cn(
-                        "border rounded-lg p-2 min-h-[80px] cursor-pointer transition-colors",
+                        "border rounded-lg p-2 cursor-pointer transition-colors",
                         !isCurrentMonth && "opacity-50 bg-muted/20",
                         isToday && "bg-primary/5 border-primary/20",
                         isSelected && "ring-2 ring-primary/50",
                         "hover:bg-muted/50",
                       )}
+                      style={{ minHeight: `${dynamicHeight}px` }}
                       onClick={() => setSelectedDate(day)}
                     >
                       <div className="flex items-center justify-between mb-1">
@@ -434,18 +531,23 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                         {isCurrentMonth && <NewItemMenu date={day} />}
                       </div>
                       <div className="space-y-1">
-                        {dayItems.slice(0, 2).map((item) => (
+                        {dayItems.map((item) => (
                           <div
                             key={`${item.tipo}-${item.id}`}
-                            className={cn("text-xs p-1 rounded border truncate", getItemColor(item.tipo))}
+                            className={cn(
+                              "text-xs p-1 rounded border truncate cursor-pointer hover:opacity-80 flex items-center gap-1",
+                              getItemColor(item.tipo),
+                            )}
                             title={item.titolo}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleItemClick(item)
+                            }}
                           >
-                            {item.titolo}
+                            <div className={cn("w-1 h-3 rounded", getTableTagColor(item.tabella_origine))} />
+                            <span className="truncate">{item.titolo}</span>
                           </div>
                         ))}
-                        {dayItems.length > 2 && (
-                          <div className="text-xs text-muted-foreground">+{dayItems.length - 2}</div>
-                        )}
                       </div>
                     </div>
                   )
