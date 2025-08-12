@@ -1,243 +1,167 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect, useRef } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createContext, useContext, useEffect, useState, useRef } from "react"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
-type SupabaseContext = {
-  supabase: ReturnType<typeof createClient<Database>> | null
+interface SupabaseContextType {
+  supabase: SupabaseClient<Database> | null
   isConnected: boolean
   isInitializing: boolean
-  resetClient: () => Promise<void>
+  error: string | null
 }
 
-const Context = createContext<SupabaseContext>({
+const SupabaseContext = createContext<SupabaseContextType>({
   supabase: null,
   isConnected: false,
   isInitializing: true,
-  resetClient: async () => {},
+  error: null,
 })
 
-// Singleton globale per evitare istanze multiple
-let globalSupabaseInstance: ReturnType<typeof createClient<Database>> | null = null
-let globalInstanceId = 0
-let globalConnectionState = false
-
-// Stato persistente per prevenire reset durante unmount/remount
-const persistentState = {
-  isConnected: false,
-  isInitialized: false,
-  lastConnectionCheck: 0,
+export const useSupabase = () => {
+  const context = useContext(SupabaseContext)
+  if (!context) {
+    throw new Error("useSupabase must be used within a SupabaseProvider")
+  }
+  return context
 }
 
+// Stato globale persistente per prevenire reset durante unmount/remount
+const globalState = {
+  supabase: null as SupabaseClient<Database> | null,
+  isConnected: false,
+  isInitializing: true,
+  error: null as string | null,
+  instanceId: 0,
+  connectionCache: new Map<string, boolean>(),
+  lastConnectionTest: 0,
+}
+
+let renderCount = 0
+
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase, setSupabase] = useState<ReturnType<typeof createClient<Database>> | null>(globalSupabaseInstance)
-  const [isConnected, setIsConnected] = useState(globalConnectionState)
-  const [isInitializing, setIsInitializing] = useState(!persistentState.isInitialized)
-  const currentInstanceId = useRef(globalInstanceId)
-  const initializationRef = useRef(false)
+  renderCount++
+  const [state, setState] = useState(() => ({
+    supabase: globalState.supabase,
+    isConnected: globalState.isConnected,
+    isInitializing: globalState.isInitializing,
+    error: globalState.error,
+  }))
+
+  const initializingRef = useRef(false)
   const mountedRef = useRef(true)
 
-  console.log("SupabaseProvider: Inizializzazione componente", {
-    hasGlobalInstance: !!globalSupabaseInstance,
-    globalConnectionState,
-    persistentInitialized: persistentState.isInitialized,
-  })
-
-  const createSupabaseClient = async (forceNew = false) => {
-    try {
-      // Se abbiamo già un'istanza globale valida e non forziamo il rinnovo, riutilizzala
-      if (!forceNew && globalSupabaseInstance && persistentState.isInitialized) {
-        console.log("SupabaseProvider: Riutilizzo istanza globale esistente")
-        return globalSupabaseInstance
-      }
-
-      console.log("SupabaseProvider: Creando nuova istanza Supabase")
-
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-
-      if (!supabaseUrl || !supabaseAnonKey) {
-        console.error("SupabaseProvider: Variabili d'ambiente Supabase mancanti")
-        return null
-      }
-
-      // Crea il client Supabase con configurazione ottimizzata
-      const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-          flowType: "pkce",
-        },
-        global: {
-          headers: {
-            "X-Client-Info": "istudio-v0.4",
-          },
-        },
-      })
-
-      // Salva l'istanza nel singleton globale
-      globalSupabaseInstance = client
-      globalInstanceId++
-      currentInstanceId.current = globalInstanceId
-
-      console.log(`SupabaseProvider: Nuova istanza creata (ID: ${globalInstanceId})`)
-      return client
-    } catch (error) {
-      console.error("SupabaseProvider: Errore nella creazione del client:", error)
-      return null
-    }
-  }
-
-  const testConnection = async (client: ReturnType<typeof createClient<Database>>) => {
-    try {
-      // Usa cache per evitare test ripetuti
-      const now = Date.now()
-      if (persistentState.isConnected && now - persistentState.lastConnectionCheck < 30000) {
-        console.log("SupabaseProvider: Connessione già verificata di recente")
-        return persistentState.isConnected
-      }
-
-      // Test semplice senza autenticazione
-      const { error } = await client.from("utenti").select("id").limit(1).maybeSingle()
-
-      const connected = !error || error.message.includes("multiple (or no) rows returned")
-
-      // Aggiorna stato persistente
-      persistentState.isConnected = connected
-      persistentState.lastConnectionCheck = now
-      globalConnectionState = connected
-
-      if (!connected) {
-        console.error("SupabaseProvider: Errore nel test di connessione:", error)
-      }
-
-      return connected
-    } catch (error) {
-      console.error("SupabaseProvider: Errore nel test di connessione:", error)
-      persistentState.isConnected = false
-      globalConnectionState = false
-      return false
-    }
-  }
-
-  const resetClient = async () => {
-    console.log("SupabaseProvider: Reset del client richiesto")
-
-    // Reset dello stato globale
-    globalSupabaseInstance = null
-    globalConnectionState = false
-    persistentState.isConnected = false
-    persistentState.isInitialized = false
-    persistentState.lastConnectionCheck = 0
-
-    // Reset dello stato locale
-    setSupabase(null)
-    setIsConnected(false)
-    setIsInitializing(true)
-    initializationRef.current = false
-
-    // Crea una nuova istanza
-    const newClient = await createSupabaseClient(true)
-    if (newClient && mountedRef.current) {
-      const connected = await testConnection(newClient)
-      setSupabase(newClient)
-      setIsConnected(connected)
-      persistentState.isInitialized = true
-    }
-
+  // Funzione per aggiornare sia lo stato locale che globale
+  const updateState = (newState: Partial<typeof state>) => {
+    Object.assign(globalState, newState)
     if (mountedRef.current) {
-      setIsInitializing(false)
+      setState((prev) => ({ ...prev, ...newState }))
+    }
+  }
+
+  const testConnection = async (supabase: SupabaseClient<Database>): Promise<boolean> => {
+    const now = Date.now()
+    const cacheKey = "connection_test"
+
+    // Cache del test di connessione per 30 secondi
+    if (globalState.connectionCache.has(cacheKey) && now - globalState.lastConnectionTest < 30000) {
+      return globalState.connectionCache.get(cacheKey)!
+    }
+
+    try {
+      const { data, error } = await supabase.from("utenti").select("count").limit(1).single()
+      const isConnected = !error
+
+      globalState.connectionCache.set(cacheKey, isConnected)
+      globalState.lastConnectionTest = now
+
+      return isConnected
+    } catch (error) {
+      globalState.connectionCache.set(cacheKey, false)
+      globalState.lastConnectionTest = now
+      return false
     }
   }
 
   useEffect(() => {
     const initializeSupabase = async () => {
-      // Evita inizializzazioni multiple
-      if (initializationRef.current) {
-        console.log("SupabaseProvider: Inizializzazione già in corso, skip")
+      if (initializingRef.current || globalState.supabase) {
+        if (globalState.supabase) {
+          console.log(
+            `${new Date().toISOString()} SupabaseProvider: Riutilizzo istanza esistente (ID: ${globalState.instanceId})`,
+          )
+          updateState({
+            supabase: globalState.supabase,
+            isConnected: globalState.isConnected,
+            isInitializing: false,
+            error: globalState.error,
+          })
+        }
         return
       }
 
-      // Se abbiamo già un'istanza globale valida, usala
-      if (globalSupabaseInstance && persistentState.isInitialized) {
-        console.log("SupabaseProvider: Recupero istanza globale esistente")
-        setSupabase(globalSupabaseInstance)
-        setIsConnected(globalConnectionState)
-        setIsInitializing(false)
-        return
-      }
-
-      initializationRef.current = true
-      console.log("SupabaseProvider: Inizializzazione...")
+      initializingRef.current = true
+      console.log(`${new Date().toISOString()} SupabaseProvider: Inizializzazione...`)
 
       try {
-        const client = await createSupabaseClient()
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-        if (!client || !mountedRef.current) {
-          if (mountedRef.current) {
-            setIsInitializing(false)
-          }
-          return
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error("Variabili ambiente Supabase mancanti")
         }
 
-        // Test della connessione
-        const connected = await testConnection(client)
+        const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          },
+        })
 
-        if (mountedRef.current) {
-          setSupabase(client)
-          setIsConnected(connected)
-          persistentState.isInitialized = true
-          globalConnectionState = connected
-        }
+        globalState.instanceId++
+        globalState.supabase = supabase
 
-        console.log(`SupabaseProvider: Inizializzazione completata (connesso: ${connected})`)
+        const isConnected = await testConnection(supabase)
+
+        updateState({
+          supabase,
+          isConnected,
+          isInitializing: false,
+          error: null,
+        })
+
+        console.log(
+          `${new Date().toISOString()} SupabaseProvider: Inizializzazione completata (connesso: ${isConnected})`,
+        )
       } catch (error) {
-        console.error("SupabaseProvider: Errore nell'inizializzazione:", error)
-        if (mountedRef.current) {
-          setIsConnected(false)
-          globalConnectionState = false
-        }
+        const errorMessage = error instanceof Error ? error.message : "Errore sconosciuto"
+        console.error(`${new Date().toISOString()} SupabaseProvider: Errore inizializzazione:`, errorMessage)
+
+        updateState({
+          supabase: null,
+          isConnected: false,
+          isInitializing: false,
+          error: errorMessage,
+        })
       } finally {
-        if (mountedRef.current) {
-          setIsInitializing(false)
-        }
-        initializationRef.current = false
+        initializingRef.current = false
       }
     }
 
     initializeSupabase()
-  }, [])
 
-  // Cleanup controllato - solo quando necessario
-  useEffect(() => {
+    // Cleanup solo su unmount del componente, non durante la navigazione
     return () => {
       mountedRef.current = false
-      console.log("SupabaseProvider: Componente smontato")
-      // NON resettiamo l'istanza globale qui per mantenerla tra i remount
+      // Non resettiamo globalState qui per mantenere lo stato durante la navigazione
+      if (renderCount % 10 === 0) {
+        // Log ridotto
+        console.log(`${new Date().toISOString()} SupabaseProvider: Cleanup`)
+      }
     }
   }, [])
 
-  return (
-    <Context.Provider
-      value={{
-        supabase,
-        isConnected,
-        isInitializing,
-        resetClient,
-      }}
-    >
-      {children}
-    </Context.Provider>
-  )
-}
-
-export const useSupabase = () => {
-  const context = useContext(Context)
-  if (!context) {
-    throw new Error("useSupabase deve essere usato all'interno di SupabaseProvider")
-  }
-  return context
+  return <SupabaseContext.Provider value={state}>{children}</SupabaseContext.Provider>
 }
