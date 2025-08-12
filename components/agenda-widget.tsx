@@ -151,6 +151,23 @@ const getTableTagColor = (tableName: string): string => {
   return colors[tableName] || "bg-gray-500"
 }
 
+// Componente per il tag verticale
+const VerticalTag = ({ tableName }: { tableName: string }) => {
+  const abbreviation = getTableAbbreviation(tableName)
+  const color = getTableTagColor(tableName)
+
+  return (
+    <div className={cn("w-1 h-full rounded-l-md", color)} title={tableName}>
+      <div
+        className="writing-mode-vertical text-xs font-bold text-white p-1 rotate-180"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        {abbreviation}
+      </div>
+    </div>
+  )
+}
+
 // Componente per il menu di creazione nuovo elemento
 const NewItemMenu = ({ date }: { date: Date }) => {
   const router = useRouter()
@@ -207,29 +224,19 @@ const NewItemMenu = ({ date }: { date: Date }) => {
   )
 }
 
-// Componente per il tag verticale
-const VerticalTag = ({ tableName }: { tableName: string }) => {
-  const abbreviation = getTableAbbreviation(tableName)
-  const color = getTableTagColor(tableName)
-
-  return (
-    <div className={cn("w-1 h-full rounded-l-md", color)} title={tableName}>
-      <div
-        className="writing-mode-vertical text-xs font-bold text-white p-1 rotate-180"
-        style={{ writingMode: "vertical-rl" }}
-      >
-        {abbreviation}
-      </div>
-    </div>
-  )
-}
-
 export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps) {
   const { user, isLoading: authLoading } = useAuth()
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
+
+  // Funzione per gestire il click su un elemento
+  const handleItemClick = (item: any) => {
+    const url = `/data-explorer/${item.tabella_origine}/${item.id_origine}`
+    console.log(`🔗 AgendaWidget: Navigating to item: ${url}`)
+    router.push(url)
+  }
 
   // Calcola le date corrette in base alla vista selezionata
   const { startDate, endDate } = useMemo(() => {
@@ -310,13 +317,6 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
       default:
         return "bg-gray-100 text-gray-800 border-gray-200"
     }
-  }
-
-  // Funzione per gestire il click su un elemento
-  const handleItemClick = (item: any) => {
-    const url = `/data-explorer/${item.tabella_origine}/${item.id_origine}`
-    console.log(`🔗 AgendaWidget: Navigating to item: ${url}`)
-    router.push(url)
   }
 
   // Vista giornaliera
