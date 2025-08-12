@@ -51,6 +51,14 @@ const defaultTheme: Theme = {
   isDefault: true,
 }
 
+// Stato persistente globale per prevenire reset durante unmount/remount
+const persistentThemeState = {
+  themes: [defaultTheme] as Theme[],
+  currentTheme: defaultTheme as Theme | null,
+  themesLoaded: false,
+  lastThemeLoad: 0,
+}
+
 // Hook sicuro per usare il context
 export function useSafeCustomTheme(): ThemeContextType {
   const context = useContext(ThemeContext)
@@ -77,19 +85,20 @@ export function useSafeCustomTheme(): ThemeContextType {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { supabase, isConnected } = useSupabase()
   const { isLoading: authLoading } = useAuth()
-  const [themes, setThemes] = useState<Theme[]>([defaultTheme])
-  const [currentTheme, setCurrentTheme] = useState<Theme | null>(defaultTheme)
+  const [themes, setThemes] = useState<Theme[]>(persistentThemeState.themes)
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(persistentThemeState.currentTheme)
   const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
   const [mounted, setMounted] = useState(false)
-  const [themesLoaded, setThemesLoaded] = useState(false)
+  const [themesLoaded, setThemesLoaded] = useState(persistentThemeState.themesLoaded)
   const loadingTimeoutRef = useRef<NodeJS.Timeout>()
   const initializationRef = useRef(false)
   const renderCountRef = useRef(0)
   const lastStateRef = useRef<string>("")
+  const mountedRef = useRef(true)
 
-  // Debouncing per evitare render multipli
+  // Debouncing per evitare render multipli - con riduzione log
   const currentState = JSON.stringify({
     themesCount: themes.length,
     currentTheme: currentTheme?.nome_tema,
@@ -103,8 +112,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     renderCountRef.current++
     lastStateRef.current = currentState
 
-    // Log solo ogni 3 render per ridurre spam
-    if (renderCountRef.current % 3 === 1) {
+    // Log solo ogni 5 render per ridurre spam
+    if (renderCountRef.current % 5 === 1) {
       console.log("ThemeProvider: Render", {
         themesCount: themes.length,
         currentTheme: currentTheme?.nome_tema,
@@ -116,6 +125,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       })
     }
   }
+
+  // Aggiorna lo stato persistente
+  const updatePersistentState = useCallback((newThemes: Theme[], newCurrentTheme: Theme | null, loaded: boolean) => {
+    persistentThemeState.themes = newThemes
+    persistentThemeState.currentTheme = newCurrentTheme
+    persistentThemeState.themesLoaded = loaded
+    persistentThemeState.lastThemeLoad = Date.now()
+  }, [])
 
   // Funzione per convertire colori hex in HSL
   const hexToHsl = useCallback((hex: string): string => {
@@ -307,13 +324,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database - CON DEBOUNCING E PREVENZIONE DUPLICATI
+  // Carica i temi dal database - CON STATO PERSISTENTE E PREVENZIONE DUPLICATI
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
     const loadThemes = async () => {
       // Evita caricamenti multipli
       if (initializationRef.current || themesLoaded) {
+        return
+      }
+
+      // Usa cache per evitare caricamenti ripetuti
+      const now = Date.now()
+      if (persistentThemeState.themesLoaded && now - persistentThemeState.lastThemeLoad < 60000) {
+        console.log("ThemeProvider: Temi già caricati di recente, uso cache")
+        if (mountedRef.current) {
+          setThemes(persistentThemeState.themes)
+          setCurrentTheme(persistentThemeState.currentTheme)
+          setThemesLoaded(true)
+          if (persistentThemeState.currentTheme) {
+            applyThemeStyles(persistentThemeState.currentTheme)
+          }
+        }
         return
       }
 
@@ -336,11 +368,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
       loadingTimeoutRef.current = setTimeout(() => {
         console.warn("ThemeProvider: Timeout nel caricamento dei temi, uso tema di default")
-        if (!themesLoaded) {
+        if (!themesLoaded && mountedRef.current) {
           setThemes([defaultTheme])
           setCurrentTheme(defaultTheme)
           applyThemeStyles(defaultTheme)
           setThemesLoaded(true)
+          updatePersistentState([defaultTheme], defaultTheme, true)
           initializationRef.current = false
         }
       }, 8000) // 8 secondi di timeout
@@ -354,10 +387,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
           // In caso di errore, usa solo il tema di default
-          setThemes([defaultTheme])
-          setCurrentTheme(defaultTheme)
-          applyThemeStyles(defaultTheme)
-          setThemesLoaded(true)
+          if (mountedRef.current) {
+            setThemes([defaultTheme])
+            setCurrentTheme(defaultTheme)
+            applyThemeStyles(defaultTheme)
+            setThemesLoaded(true)
+            updatePersistentState([defaultTheme], defaultTheme, true)
+          }
           initializationRef.current = false
           return
         }
@@ -381,28 +417,34 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           : []
 
         const allThemes = [defaultTheme, ...supabaseThemes]
-        setThemes(allThemes)
-        console.log("ThemeProvider: Temi caricati con successo:", allThemes.length)
 
-        // Applica il tema salvato o quello di default
-        const savedThemeId = localStorage.getItem("app-theme")
-        if (savedThemeId) {
-          const savedTheme = allThemes.find((t) => t.id.toString() === savedThemeId)
-          if (savedTheme) {
-            setCurrentTheme(savedTheme)
-            applyThemeStyles(savedTheme)
+        if (mountedRef.current) {
+          setThemes(allThemes)
+          console.log("ThemeProvider: Temi caricati con successo:", allThemes.length)
+
+          // Applica il tema salvato o quello di default
+          const savedThemeId = localStorage.getItem("app-theme")
+          if (savedThemeId) {
+            const savedTheme = allThemes.find((t) => t.id.toString() === savedThemeId)
+            if (savedTheme) {
+              setCurrentTheme(savedTheme)
+              applyThemeStyles(savedTheme)
+              updatePersistentState(allThemes, savedTheme, true)
+            } else {
+              // Tema salvato non trovato, usa il default
+              setCurrentTheme(defaultTheme)
+              applyThemeStyles(defaultTheme)
+              updatePersistentState(allThemes, defaultTheme, true)
+            }
           } else {
-            // Tema salvato non trovato, usa il default
+            // Nessun tema salvato, usa il default
             setCurrentTheme(defaultTheme)
             applyThemeStyles(defaultTheme)
+            updatePersistentState(allThemes, defaultTheme, true)
           }
-        } else {
-          // Nessun tema salvato, usa il default
-          setCurrentTheme(defaultTheme)
-          applyThemeStyles(defaultTheme)
-        }
 
-        setThemesLoaded(true)
+          setThemesLoaded(true)
+        }
 
         // Cancella il timeout se il caricamento è completato con successo
         if (loadingTimeoutRef.current) {
@@ -411,18 +453,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
         // Fallback al tema di default in caso di errore
-        setThemes([defaultTheme])
-        setCurrentTheme(defaultTheme)
-        applyThemeStyles(defaultTheme)
-        setThemesLoaded(true)
+        if (mountedRef.current) {
+          setThemes([defaultTheme])
+          setCurrentTheme(defaultTheme)
+          applyThemeStyles(defaultTheme)
+          setThemesLoaded(true)
+          updatePersistentState([defaultTheme], defaultTheme, true)
+        }
       } finally {
         initializationRef.current = false
       }
     }
 
-    // Debouncing: aspetta 200ms prima di caricare i temi
+    // Debouncing: aspetta 250ms prima di caricare i temi
     if (mounted && !authLoading && supabase && isConnected && !themesLoaded) {
-      timeoutId = setTimeout(loadThemes, 200)
+      timeoutId = setTimeout(loadThemes, 250)
     }
 
     // Cleanup del timeout
@@ -432,7 +477,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         clearTimeout(loadingTimeoutRef.current)
       }
     }
-  }, [supabase, isConnected, mounted, authLoading, themesLoaded, applyThemeStyles])
+  }, [supabase, isConnected, mounted, authLoading, themesLoaded, applyThemeStyles, updatePersistentState])
 
   // Applica le dimensioni del font
   const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
@@ -479,22 +524,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const applyTheme = useCallback(
     (themeId: number) => {
       const theme = themes.find((t) => t.id === themeId)
-      if (theme) {
+      if (theme && mountedRef.current) {
         console.log("ThemeProvider: Applicando tema:", theme.nome_tema)
         setCurrentTheme(theme)
         applyThemeStyles(theme)
+        updatePersistentState(themes, theme, themesLoaded)
         localStorage.setItem("app-theme", themeId.toString())
       }
     },
-    [themes, applyThemeStyles],
+    [themes, applyThemeStyles, themesLoaded, updatePersistentState],
   )
 
   const resetToDefault = useCallback(() => {
-    console.log("ThemeProvider: Reset al tema di default")
-    setCurrentTheme(defaultTheme)
-    applyThemeStyles(defaultTheme)
-    localStorage.setItem("app-theme", "0")
-  }, [applyThemeStyles])
+    if (mountedRef.current) {
+      console.log("ThemeProvider: Reset al tema di default")
+      setCurrentTheme(defaultTheme)
+      applyThemeStyles(defaultTheme)
+      updatePersistentState(themes, defaultTheme, themesLoaded)
+      localStorage.setItem("app-theme", "0")
+    }
+  }, [applyThemeStyles, themes, themesLoaded, updatePersistentState])
 
   const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
     setLayoutState(newLayout)
@@ -510,6 +559,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setFontSize = useCallback((size: "small" | "normal" | "large") => {
     setFontSizeState(size)
     localStorage.setItem("app-font-size", size)
+  }, [])
+
+  // Cleanup controllato
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      console.log("ThemeProvider: Componente smontato")
+      // NON resettiamo lo stato persistente qui per mantenerlo tra i remount
+    }
   }, [])
 
   const value: ThemeContextType = {
