@@ -146,7 +146,6 @@ const getTableBorderColor = (tableName: string): string => {
     progetti: "border-l-orange-500",
     scadenze: "border-l-red-500",
     todolist: "border-l-purple-500",
-    todo: "border-l-purple-500",
   }
   return colors[tableName] || "border-l-gray-500"
 }
