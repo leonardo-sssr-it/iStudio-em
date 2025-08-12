@@ -138,29 +138,33 @@ const getTableAbbreviation = (tableName: string): string => {
   return abbreviations[tableName] || tableName.substring(0, 3).toUpperCase()
 }
 
-// Funzione per ottenere il colore del tag verticale
-const getTableTagColor = (tableName: string): string => {
+// Funzione per ottenere il colore del bordo del tag verticale
+const getTableBorderColor = (tableName: string): string => {
   const colors: Record<string, string> = {
-    appuntamenti: "bg-blue-500",
-    attivita: "bg-green-500",
-    progetti: "bg-orange-500",
-    scadenze: "bg-red-500",
-    todolist: "bg-purple-500",
-    todo: "bg-purple-500",
+    appuntamenti: "border-l-blue-500",
+    attivita: "border-l-green-500",
+    progetti: "border-l-orange-500",
+    scadenze: "border-l-red-500",
+    todolist: "border-l-purple-500",
+    todo: "border-l-purple-500",
   }
-  return colors[tableName] || "bg-gray-500"
+  return colors[tableName] || "border-l-gray-500"
 }
 
-// Componente per il tag verticale
+// Componente per il tag verticale con abbreviazione ruotata
 const VerticalTag = ({ tableName }: { tableName: string }) => {
   const abbreviation = getTableAbbreviation(tableName)
-  const color = getTableTagColor(tableName)
 
   return (
-    <div className={cn("w-1 h-full rounded-l-md", color)} title={tableName}>
+    <div className="relative w-6 h-full flex items-center justify-center bg-black dark:bg-white">
       <div
-        className="writing-mode-vertical text-xs font-bold text-white p-1 rotate-180"
-        style={{ writingMode: "vertical-rl" }}
+        className="text-white dark:text-black text-xs font-bold leading-none select-none"
+        style={{
+          transform: "rotate(90deg)",
+          transformOrigin: "center",
+          whiteSpace: "nowrap",
+        }}
+        title={tableName}
       >
         {abbreviation}
       </div>
@@ -233,8 +237,9 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
 
   // Funzione per gestire il click su un elemento
   const handleItemClick = (item: any) => {
+    // Correzione: usa il percorso corretto per i dettagli dell'elemento
     const url = `/data-explorer/${item.tabella_origine}/${item.id_origine}`
-    console.log(`🔗 AgendaWidget: Navigating to item: ${url}`)
+    console.log(`🔗 AgendaWidget: Navigating to item details: ${url}`)
     router.push(url)
   }
 
@@ -340,7 +345,10 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
             {items.map((item) => (
               <Card
                 key={`${item.tipo}-${item.id}`}
-                className="hover:shadow-md transition-shadow cursor-pointer"
+                className={cn(
+                  "hover:shadow-md transition-shadow cursor-pointer border-l-4",
+                  getTableBorderColor(item.tabella_origine),
+                )}
                 onClick={() => handleItemClick(item)}
               >
                 <CardContent className="p-0">
@@ -452,7 +460,17 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                         handleItemClick(item)
                       }}
                     >
-                      <div className={cn("w-1 h-3 rounded", getTableTagColor(item.tabella_origine))} />
+                      <div className="w-2 h-3 bg-black dark:bg-white rounded-sm flex items-center justify-center">
+                        <span
+                          className="text-white dark:text-black text-[8px] font-bold leading-none"
+                          style={{
+                            transform: "rotate(90deg)",
+                            transformOrigin: "center",
+                          }}
+                        >
+                          {getTableAbbreviation(item.tabella_origine)}
+                        </span>
+                      </div>
                       <span className="truncate">{item.titolo}</span>
                     </div>
                   ))}
@@ -544,7 +562,17 @@ export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps)
                               handleItemClick(item)
                             }}
                           >
-                            <div className={cn("w-1 h-3 rounded", getTableTagColor(item.tabella_origine))} />
+                            <div className="w-2 h-3 bg-black dark:bg-white rounded-sm flex items-center justify-center">
+                              <span
+                                className="text-white dark:text-black text-[8px] font-bold leading-none"
+                                style={{
+                                  transform: "rotate(90deg)",
+                                  transformOrigin: "center",
+                                }}
+                              >
+                                {getTableAbbreviation(item.tabella_origine)}
+                              </span>
+                            </div>
                             <span className="truncate">{item.titolo}</span>
                           </div>
                         ))}
