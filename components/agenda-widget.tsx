@@ -90,28 +90,28 @@ const calculateDateRange = (selectedDate: Date, view: "daily" | "weekly" | "mont
   switch (view) {
     case "daily":
       startDate = new Date(selectedDate)
-      startDate.setHours(0, 0, 0, 0)
+      startDate.setHours(0, 0, 0, 1)
       endDate = new Date(selectedDate)
       endDate.setHours(23, 59, 59, 999)
       break
 
     case "weekly":
       startDate = startOfWeek(selectedDate, { weekStartsOn: 1 })
-      startDate.setHours(0, 0, 0, 0)
+      startDate.setHours(0, 0, 0, 1)
       endDate = endOfWeek(selectedDate, { weekStartsOn: 1 })
       endDate.setHours(23, 59, 59, 999)
       break
 
     case "monthly":
       startDate = startOfMonth(selectedDate)
-      startDate.setHours(0, 0, 0, 0)
+      startDate.setHours(0, 0, 0, 1)
       endDate = endOfMonth(selectedDate)
       endDate.setHours(23, 59, 59, 999)
       break
 
     default:
       startDate = new Date(selectedDate)
-      startDate.setHours(0, 0, 0, 0)
+      startDate.setHours(0, 0, 0, 1)
       endDate = new Date(selectedDate)
       endDate.setHours(23, 59, 59, 999)
   }
