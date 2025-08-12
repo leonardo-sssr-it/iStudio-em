@@ -1,29 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Save, Trash2, Edit, Eye } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
-import {
-  getTableConfig,
-  getVisibleFields,
-  getEditableFields,
-  getFieldType,
-  getSelectOptions,
-  isRequiredField,
-} from "../../config"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, Edit, Save, X, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+import { getTableConfig, getVisibleFields, getEditableFields, isFieldRequired, getFieldOptions } from "../../config"
 
-export default function DataExplorerDetailPage() {
+interface RecordData {
+  [key: string]: any
+}
+
+export default function RecordDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { supabase } = useSupabase()
@@ -32,383 +26,343 @@ export default function DataExplorerDetailPage() {
   const table = params?.table as string
   const id = params?.id as string
 
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [editing, setEditing] = useState(id === "new")
-  const [formData, setFormData] = useState<any>({})
+  const [record, setRecord] = useState<RecordData | null>(null)
+  const [editedRecord, setEditedRecord] = useState<RecordData>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
-  // Ottieni configurazione tabella
   const tableConfig = getTableConfig(table)
   const visibleFields = getVisibleFields(table)
   const editableFields = getEditableFields(table)
 
-  // Carica i dati se non è una nuova entry
   useEffect(() => {
-    if (id !== "new" && table && supabase && user) {
-      loadData()
-    } else if (id === "new") {
-      // Inizializza form per nuovo elemento
-      const initialData: any = { id_utente: user?.id }
-      setFormData(initialData)
-      setData(initialData)
-      setLoading(false)
-    }
-  }, [id, table, supabase, user])
+    if (!table || !id || !supabase) return
 
-  const loadData = async () => {
-    if (!supabase || !table || !id || !user) return
+    loadRecord()
+  }, [table, id, supabase])
+
+  const loadRecord = async () => {
+    if (!supabase || !tableConfig) return
 
     try {
-      setLoading(true)
+      setIsLoading(true)
 
-      const { data: result, error } = await supabase
-        .from(table)
-        .select("*")
-        .eq("id", id)
-        .eq("id_utente", user.id)
-        .single()
+      const { data, error } = await supabase.from(table).select("*").eq(tableConfig.primaryKey, id).single()
 
       if (error) {
-        throw error
+        console.error("Errore caricamento record:", error)
+        toast.error("Errore nel caricamento del record")
+        return
       }
 
-      setData(result)
-      setFormData(result)
-    } catch (error: any) {
-      console.error("Errore caricamento dati:", error)
-      toast({
-        title: "Errore",
-        description: `Impossibile caricare i dati: ${error.message}`,
-        variant: "destructive",
-      })
-      router.push(`/data-explorer?table=${table}`)
+      setRecord(data)
+      setEditedRecord(data)
+    } catch (error) {
+      console.error("Errore caricamento record:", error)
+      toast.error("Errore nel caricamento del record")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   const handleSave = async () => {
-    if (!supabase || !table || !user) return
+    if (!supabase || !tableConfig || !record) return
 
     try {
-      setSaving(true)
+      setIsSaving(true)
 
-      // Prepara i dati per il salvataggio
-      const saveData = { ...formData }
-      saveData.modifica = new Date().toISOString()
+      // Valida campi obbligatori
+      const requiredFields = Object.entries(editableFields)
+        .filter(([_, config]) => config.required)
+        .map(([fieldName]) => fieldName)
 
-      if (id === "new") {
-        saveData.id_utente = user.id
-
-        const { data: result, error } = await supabase.from(table).insert([saveData]).select().single()
-
-        if (error) throw error
-
-        toast({
-          title: "Successo",
-          description: "Elemento creato con successo",
-        })
-
-        router.push(`/data-explorer/${table}/${result.id}`)
-      } else {
-        const { error } = await supabase.from(table).update(saveData).eq("id", id).eq("id_utente", user.id)
-
-        if (error) throw error
-
-        setData(saveData)
-        setEditing(false)
-
-        toast({
-          title: "Successo",
-          description: "Elemento aggiornato con successo",
-        })
+      for (const fieldName of requiredFields) {
+        if (!editedRecord[fieldName] && editedRecord[fieldName] !== 0 && editedRecord[fieldName] !== false) {
+          toast.error(`Il campo ${fieldName} è obbligatorio`)
+          return
+        }
       }
-    } catch (error: any) {
-      console.error("Errore salvataggio:", error)
-      toast({
-        title: "Errore",
-        description: `Impossibile salvare: ${error.message}`,
-        variant: "destructive",
+
+      // Prepara i dati per l'aggiornamento
+      const updateData: RecordData = {}
+      Object.keys(editableFields).forEach((fieldName) => {
+        if (editedRecord[fieldName] !== record[fieldName]) {
+          updateData[fieldName] = editedRecord[fieldName]
+        }
       })
+
+      // Aggiungi timestamp di modifica se esiste
+      if (tableConfig.fields.modifica || tableConfig.fields.updated_at) {
+        const timestampField = tableConfig.fields.modifica ? "modifica" : "updated_at"
+        updateData[timestampField] = new Date().toISOString()
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        toast.info("Nessuna modifica da salvare")
+        setIsEditing(false)
+        return
+      }
+
+      const { error } = await supabase.from(table).update(updateData).eq(tableConfig.primaryKey, id)
+
+      if (error) {
+        console.error("Errore salvataggio:", error)
+        toast.error("Errore nel salvataggio")
+        return
+      }
+
+      toast.success("Record aggiornato con successo")
+      setIsEditing(false)
+      loadRecord() // Ricarica i dati aggiornati
+    } catch (error) {
+      console.error("Errore salvataggio:", error)
+      toast.error("Errore nel salvataggio")
     } finally {
-      setSaving(false)
+      setIsSaving(false)
     }
   }
 
   const handleDelete = async () => {
-    if (!supabase || !table || !id || !user || id === "new") return
+    if (!supabase || !tableConfig || !record) return
 
-    if (!confirm("Sei sicuro di voler eliminare questo elemento?")) return
+    if (!confirm("Sei sicuro di voler eliminare questo record?")) return
 
     try {
-      const { error } = await supabase.from(table).delete().eq("id", id).eq("id_utente", user.id)
+      const { error } = await supabase.from(table).delete().eq(tableConfig.primaryKey, id)
 
-      if (error) throw error
+      if (error) {
+        console.error("Errore eliminazione:", error)
+        toast.error("Errore nell'eliminazione")
+        return
+      }
 
-      toast({
-        title: "Successo",
-        description: "Elemento eliminato con successo",
-      })
-
-      router.push(`/data-explorer?table=${table}`)
-    } catch (error: any) {
+      toast.success("Record eliminato con successo")
+      router.push(`/data-explorer/${table}`)
+    } catch (error) {
       console.error("Errore eliminazione:", error)
-      toast({
-        title: "Errore",
-        description: `Impossibile eliminare: ${error.message}`,
-        variant: "destructive",
-      })
+      toast.error("Errore nell'eliminazione")
     }
   }
 
   const handleFieldChange = (fieldName: string, value: any) => {
-    setFormData((prev: any) => ({
+    setEditedRecord((prev) => ({
       ...prev,
       [fieldName]: value,
     }))
   }
 
-  const renderField = (fieldName: string, value: any, isEditing: boolean) => {
-    const fieldType = getFieldType(table, fieldName)
-    const selectOptions = getSelectOptions(table, fieldName)
-    const required = isRequiredField(table, fieldName)
-
-    if (!isEditing) {
-      // Modalità visualizzazione
-      return (
-        <div key={fieldName} className="space-y-2">
-          <Label className="text-sm font-medium">
-            {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-          </Label>
-          <div className="p-2 bg-muted rounded-md text-sm">{renderFieldValue(value, fieldType)}</div>
-        </div>
-      )
+  const renderFieldValue = (fieldName: string, value: any, config: any) => {
+    if (value === null || value === undefined) {
+      return <span className="text-muted-foreground">-</span>
     }
 
-    // Modalità modifica
-    const commonProps = {
-      id: fieldName,
-      value: value || "",
-      onChange: (e: any) => handleFieldChange(fieldName, e.target.value),
-      required,
-    }
-
-    switch (fieldType) {
-      case "text":
-        return (
-          <div key={fieldName} className="space-y-2">
-            <Label htmlFor={fieldName} className="text-sm font-medium">
-              {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-              {required && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Textarea {...commonProps} rows={4} />
-          </div>
-        )
-
+    switch (config.type) {
       case "boolean":
-        return (
-          <div key={fieldName} className="flex items-center space-x-2">
-            <Switch
-              id={fieldName}
-              checked={!!value}
-              onCheckedChange={(checked) => handleFieldChange(fieldName, checked)}
-            />
-            <Label htmlFor={fieldName} className="text-sm font-medium">
-              {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-            </Label>
-          </div>
-        )
-
+        return <Badge variant={value ? "default" : "secondary"}>{value ? "Sì" : "No"}</Badge>
       case "date":
       case "datetime":
-        return (
-          <div key={fieldName} className="space-y-2">
-            <Label htmlFor={fieldName} className="text-sm font-medium">
-              {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-              {required && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Input
-              {...commonProps}
-              type={fieldType === "date" ? "date" : "datetime-local"}
-              value={value ? new Date(value).toISOString().slice(0, fieldType === "date" ? 10 : 16) : ""}
-            />
-          </div>
-        )
-
-      case "number":
-        return (
-          <div key={fieldName} className="space-y-2">
-            <Label htmlFor={fieldName} className="text-sm font-medium">
-              {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-              {required && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Input
-              {...commonProps}
-              type="number"
-              onChange={(e) => handleFieldChange(fieldName, Number.parseInt(e.target.value) || 0)}
-            />
-          </div>
-        )
-
-      default:
-        if (selectOptions.length > 0) {
-          return (
-            <div key={fieldName} className="space-y-2">
-              <Label htmlFor={fieldName} className="text-sm font-medium">
-                {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-                {required && <span className="text-red-500 ml-1">*</span>}
-              </Label>
-              <Select value={value || ""} onValueChange={(val) => handleFieldChange(fieldName, val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )
+        return new Date(value).toLocaleString("it-IT")
+      case "array":
+        if (Array.isArray(value)) {
+          return value.map((item, index) => (
+            <Badge key={index} variant="outline" className="mr-1">
+              {item}
+            </Badge>
+          ))
         }
-
+        return String(value)
+      case "json":
         return (
-          <div key={fieldName} className="space-y-2">
-            <Label htmlFor={fieldName} className="text-sm font-medium">
-              {fieldName.charAt(0).toUpperCase() + fieldName.slice(1).replace("_", " ")}
-              {required && <span className="text-red-500 ml-1">*</span>}
-            </Label>
-            <Input {...commonProps} />
-          </div>
+          <pre className="text-sm bg-muted p-2 rounded overflow-auto max-h-32">{JSON.stringify(value, null, 2)}</pre>
         )
-    }
-  }
-
-  const renderFieldValue = (value: any, type: string) => {
-    if (value === null || value === undefined) return "-"
-
-    switch (type) {
-      case "boolean":
-        return value ? "✓ Sì" : "✗ No"
-      case "date":
-        return value ? new Date(value).toLocaleDateString("it-IT") : "-"
-      case "datetime":
-        return value ? new Date(value).toLocaleString("it-IT") : "-"
-      case "text":
-        return value.length > 100 ? value.substring(0, 100) + "..." : value
+      case "textarea":
+        return <div className="whitespace-pre-wrap max-h-32 overflow-auto">{String(value)}</div>
       default:
         return String(value)
     }
   }
 
-  if (!tableConfig) {
+  const renderFieldInput = (fieldName: string, value: any, config: any) => {
+    const commonProps = {
+      value: value || "",
+      onChange: (e: any) => handleFieldChange(fieldName, e.target.value),
+      placeholder: config.placeholder,
+      required: config.required,
+    }
+
+    switch (config.type) {
+      case "boolean":
+        return (
+          <input
+            type="checkbox"
+            checked={!!value}
+            onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
+            className="w-4 h-4"
+          />
+        )
+      case "number":
+        return (
+          <Input
+            type="number"
+            {...commonProps}
+            onChange={(e) => handleFieldChange(fieldName, Number.parseFloat(e.target.value) || 0)}
+          />
+        )
+      case "date":
+        return <Input type="date" {...commonProps} value={value ? new Date(value).toISOString().split("T")[0] : ""} />
+      case "datetime":
+        return (
+          <Input
+            type="datetime-local"
+            {...commonProps}
+            value={value ? new Date(value).toISOString().slice(0, 16) : ""}
+          />
+        )
+      case "select":
+        return (
+          <select
+            {...commonProps}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">Seleziona...</option>
+            {getFieldOptions(table, fieldName).map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        )
+      case "textarea":
+        return <Textarea {...commonProps} rows={4} />
+      case "array":
+        return (
+          <Input
+            {...commonProps}
+            value={Array.isArray(value) ? value.join(", ") : value || ""}
+            onChange={(e) =>
+              handleFieldChange(
+                fieldName,
+                e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              )
+            }
+            placeholder="Elementi separati da virgola"
+          />
+        )
+      case "json":
+        return (
+          <Textarea
+            {...commonProps}
+            value={typeof value === "object" ? JSON.stringify(value, null, 2) : value || ""}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value)
+                handleFieldChange(fieldName, parsed)
+              } catch {
+                handleFieldChange(fieldName, e.target.value)
+              }
+            }}
+            rows={6}
+            placeholder="JSON valido"
+          />
+        )
+      default:
+        return <Input {...commonProps} />
+    }
+  }
+
+  if (isLoading) {
     return (
-      <div className="container mx-auto py-8">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-red-500">Tabella non configurata: {table}</p>
-            <Button onClick={() => router.back()} className="mt-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Torna indietro
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Caricamento...</div>
+        </div>
       </div>
     )
   }
 
-  if (loading) {
+  if (!record || !tableConfig) {
     return (
-      <div className="container mx-auto py-8 space-y-6">
-        <div className="flex items-center space-x-4">
-          <Skeleton className="h-10 w-10" />
-          <Skeleton className="h-8 w-48" />
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-muted-foreground">Record non trovato</div>
         </div>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-64" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Torna indietro
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => router.push(`/data-explorer/${table}`)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Indietro
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{id === "new" ? `Nuovo ${table}` : `${table} #${id}`}</h1>
-            <p className="text-muted-foreground">{editing ? "Modalità modifica" : "Modalità visualizzazione"}</p>
-          </div>
+          <h1 className="text-2xl font-bold">
+            {tableConfig.displayName} - {record[tableConfig.primaryKey]}
+          </h1>
         </div>
 
-        <div className="flex items-center space-x-2">
-          {id !== "new" && (
+        <div className="flex items-center gap-2">
+          {!isEditing ? (
             <>
-              <Button variant="outline" onClick={() => setEditing(!editing)} disabled={saving}>
-                {editing ? (
-                  <>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Visualizza
-                  </>
-                ) : (
-                  <>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifica
-                  </>
-                )}
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Modifica
               </Button>
-
-              <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-                <Trash2 className="h-4 w-4 mr-2" />
+              <Button variant="destructive" size="sm" onClick={handleDelete}>
+                <Trash2 className="w-4 h-4 mr-2" />
                 Elimina
               </Button>
             </>
-          )}
-
-          {editing && (
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Salvataggio..." : "Salva"}
-            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsEditing(false)
+                  setEditedRecord(record)
+                }}
+                disabled={isSaving}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Annulla
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                <Save className="w-4 h-4 mr-2" />
+                {isSaving ? "Salvataggio..." : "Salva"}
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Form */}
       <Card>
         <CardHeader>
-          <CardTitle>{editing ? "Modifica dati" : "Dettagli"}</CardTitle>
-          <CardDescription>
-            {editing ? "Modifica i campi desiderati e clicca Salva" : "Visualizzazione dei dati dell'elemento"}
-          </CardDescription>
+          <CardTitle>{isEditing ? "Modifica Record" : "Dettagli Record"}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {visibleFields.map((fieldName) => {
-              const shouldShow = editing ? editableFields.includes(fieldName) : true
-              if (!shouldShow) return null
-
-              return renderField(fieldName, formData[fieldName], editing)
-            })}
+            {Object.entries(visibleFields).map(([fieldName, fieldConfig]) => (
+              <div key={fieldName} className="space-y-2">
+                <label className="text-sm font-medium">
+                  {fieldName}
+                  {isFieldRequired(table, fieldName) && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                {isEditing && !fieldConfig.readonly ? (
+                  renderFieldInput(fieldName, editedRecord[fieldName], fieldConfig)
+                ) : (
+                  <div className="min-h-[40px] flex items-start">
+                    {renderFieldValue(fieldName, record[fieldName], fieldConfig)}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

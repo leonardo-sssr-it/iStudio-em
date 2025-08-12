@@ -7,9 +7,25 @@ import { useAuth } from "@/lib/auth-provider"
 
 interface Theme {
   id: number
-  nome: string
-  colori: any
-  attivo: boolean
+  nome_tema: string
+  colore_titolo?: string
+  colore_sfondo?: string
+  colore_testo?: string
+  colore_accento?: string
+  carattere_tipo?: string
+  carattere_dimensione?: number
+  carattere_colore?: string
+  colore_header?: string
+  colore_footer?: string
+  colore_background?: string
+  colore_card?: string
+  colore_tabs?: string
+  colore_div?: string
+  border_radius?: string
+  css_variables?: Record<string, string> | string | null
+  attivo?: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 interface ThemeContextType {
@@ -118,16 +134,65 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       try {
         console.log("ThemeProvider: Caricamento temi dal database...")
 
-        const { data: themesData, error } = await supabase.from("temi").select("*").eq("attivo", true).order("nome")
+        // Prima prova a caricare dalla tabella temi se esiste
+        let themesData: Theme[] = []
+        let error: any = null
+
+        try {
+          const { data, error: themesError } = await supabase
+            .from("temi")
+            .select("*")
+            .eq("attivo", true)
+            .order("nome_tema")
+
+          if (!themesError && data) {
+            themesData = data
+          } else {
+            error = themesError
+          }
+        } catch (e) {
+          // Se la tabella temi non esiste, crea temi di default
+          console.log("ThemeProvider: Tabella temi non trovata, uso temi di default")
+          themesData = [
+            {
+              id: 1,
+              nome_tema: "Sistema",
+              colore_background: "#ffffff",
+              colore_titolo: "#1a202c",
+              colore_testo: "#2d3748",
+              carattere_tipo: "system-ui, sans-serif",
+              attivo: true,
+            },
+            {
+              id: 2,
+              nome_tema: "Scuro",
+              colore_background: "#1a202c",
+              colore_titolo: "#ffffff",
+              colore_testo: "#e2e8f0",
+              carattere_tipo: "system-ui, sans-serif",
+              attivo: true,
+            },
+          ]
+        }
 
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current)
         }
 
-        if (error) {
+        if (error && themesData.length === 0) {
           console.error("ThemeProvider: Errore caricamento temi:", error)
           // Usa tema di default in caso di errore
-          const defaultThemes = [{ id: 1, nome: "Sistema", colori: {}, attivo: true }]
+          const defaultThemes = [
+            {
+              id: 1,
+              nome_tema: "Sistema",
+              colore_background: "#ffffff",
+              colore_titolo: "#1a202c",
+              colore_testo: "#2d3748",
+              carattere_tipo: "system-ui, sans-serif",
+              attivo: true,
+            },
+          ]
           globalThemeState.themes = defaultThemes
           globalThemeState.themesLoaded = true
           globalThemeState.themeCache.set(cacheKey, defaultThemes)
@@ -137,21 +202,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const loadedThemes = themesData || []
-        console.log(`ThemeProvider: Temi caricati con successo: ${loadedThemes.length}`)
+        console.log(`ThemeProvider: Temi caricati con successo: ${themesData.length}`)
 
         // Aggiorna stato globale
-        globalThemeState.themes = loadedThemes
+        globalThemeState.themes = themesData
         globalThemeState.themesLoaded = true
-        globalThemeState.themeCache.set(cacheKey, loadedThemes)
+        globalThemeState.themeCache.set(cacheKey, themesData)
         globalThemeState.lastThemeLoad = now
 
         // Aggiorna stato locale
-        setThemes(loadedThemes)
+        setThemes(themesData)
         setThemesLoaded(true)
 
         // Applica il tema corrente se disponibile
-        const currentThemeObj = loadedThemes.find((t) => t.nome === currentTheme)
+        const currentThemeObj = themesData.find((t) => t.nome_tema === currentTheme)
         if (currentThemeObj) {
           applyTheme(currentThemeObj)
         }
@@ -175,16 +239,51 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return
 
     try {
-      console.log(`ThemeProvider: Applicando tema: ${theme.nome}`)
+      console.log(`ThemeProvider: Applicando tema: ${theme.nome_tema}`)
 
       const root = document.documentElement
 
-      if (theme.colori && typeof theme.colori === "object") {
-        Object.entries(theme.colori).forEach(([key, value]) => {
-          if (typeof value === "string") {
-            root.style.setProperty(`--${key}`, value)
+      // Applica i colori del tema
+      if (theme.colore_background) {
+        root.style.setProperty("--background", theme.colore_background)
+      }
+      if (theme.colore_titolo) {
+        root.style.setProperty("--foreground", theme.colore_titolo)
+      }
+      if (theme.colore_testo) {
+        root.style.setProperty("--muted-foreground", theme.colore_testo)
+      }
+      if (theme.colore_card) {
+        root.style.setProperty("--card", theme.colore_card)
+      }
+      if (theme.colore_header) {
+        root.style.setProperty("--primary", theme.colore_header)
+      }
+
+      // Applica le variabili CSS personalizzate se presenti
+      if (theme.css_variables) {
+        let cssVars: Record<string, string> = {}
+
+        if (typeof theme.css_variables === "string") {
+          try {
+            cssVars = JSON.parse(theme.css_variables)
+          } catch (e) {
+            console.error("ThemeProvider: Errore nel parsing delle CSS variables:", e)
+          }
+        } else if (typeof theme.css_variables === "object") {
+          cssVars = theme.css_variables
+        }
+
+        Object.entries(cssVars).forEach(([key, value]) => {
+          if (value && typeof value === "string") {
+            root.style.setProperty(key.startsWith("--") ? key : `--${key}`, value)
           }
         })
+      }
+
+      // Applica il font family
+      if (theme.carattere_tipo) {
+        document.body.style.fontFamily = theme.carattere_tipo
       }
 
       console.log("ThemeProvider: Tema applicato con successo")
@@ -202,7 +301,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(THEME_STORAGE_KEY, themeName)
     }
 
-    const theme = themes.find((t) => t.nome === themeName)
+    const theme = themes.find((t) => t.nome_tema === themeName)
     if (theme) {
       applyTheme(theme)
     }

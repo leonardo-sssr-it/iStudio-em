@@ -1,359 +1,408 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useEffect, useState, useRef } from "react"
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { useSupabase } from "./supabase-provider"
 import bcrypt from "bcryptjs"
 
 interface User {
   id: number
-  nome: string
   username: string
   email: string
-  ruolo?: string
+  nome?: string
+  cognome?: string
+  ruolo: string
+  attivo: boolean
 }
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAdmin: boolean
-  login: (identifier: string, password: string) => Promise<boolean>
+  login: (identifier: string, password: string) => Promise<{ success: boolean; message: string }>
   logout: () => void
   checkSession: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Stato globale per prevenire reset durante unmount/remount
-let globalAuthState = {
+// Stato globale persistente per l'autenticazione
+const globalAuthState = {
   user: null as User | null,
   isLoading: true,
   sessionChecked: false,
   lastSessionCheck: 0,
-  sessionCache: new Map<string, User | null>(),
+  sessionCache: new Map<string, { user: User | null; timestamp: number }>(),
 }
+
+const SESSION_CACHE_DURATION = 300000 // 5 minuti
+const SESSION_CHECK_INTERVAL = 60000 // 1 minuto
 
 // Backup in sessionStorage
 const SESSION_STORAGE_KEY = "istudio_auth_backup"
-const SESSION_CACHE_DURATION = 5 * 60 * 1000 // 5 minuti
+const COOKIE_NAME = "istudio_session"
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { supabase, isConnected, isInitializing } = useSupabase()
-  const [user, setUser] = useState<User | null>(globalAuthState.user)
-  const [isLoading, setIsLoading] = useState<boolean>(globalAuthState.isLoading)
-  const renderCountRef = useRef(0)
-  const initializingRef = useRef(false)
-
-  // Incrementa render count
-  renderCountRef.current++
-
-  // Log ridotti - solo ogni 5 render
-  if (renderCountRef.current % 5 === 1) {
-    console.log(`AuthProvider: Render`, {
-      user: !!user,
-      isLoading,
-      supabaseConnected: isConnected,
-      supabaseInitializing: isInitializing,
-      sessionChecked: globalAuthState.sessionChecked,
-      renderCount: renderCountRef.current,
-    })
-  }
-
-  // Calcola isAdmin
-  const isAdmin = user?.ruolo === "admin" || user?.username === "admin"
-
-  // Funzioni helper per sessionStorage
-  const saveToSessionStorage = (userData: User | null) => {
-    try {
-      if (userData) {
-        sessionStorage.setItem(
-          SESSION_STORAGE_KEY,
-          JSON.stringify({
-            user: userData,
-            timestamp: Date.now(),
-          }),
-        )
-      } else {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY)
+const saveAuthBackup = (user: User | null) => {
+  try {
+    if (typeof window !== "undefined") {
+      const backup = {
+        user,
+        timestamp: Date.now(),
       }
-    } catch (e) {
-      console.warn("AuthProvider: Errore salvataggio sessionStorage:", e)
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(backup))
     }
+  } catch (error) {
+    console.warn("AuthProvider: Impossibile salvare backup auth:", error)
   }
+}
 
-  const loadFromSessionStorage = (): User | null => {
-    try {
-      const stored = sessionStorage.getItem(SESSION_STORAGE_KEY)
-      if (!stored) return null
+const loadAuthBackup = (): User | null => {
+  try {
+    if (typeof window === "undefined") return null
 
-      const { user: userData, timestamp } = JSON.parse(stored)
+    const backup = sessionStorage.getItem(SESSION_STORAGE_KEY)
+    if (!backup) return null
 
-      // Verifica se il backup è ancora valido (5 minuti)
-      if (Date.now() - timestamp > SESSION_CACHE_DURATION) {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY)
-        return null
-      }
+    const parsed = JSON.parse(backup)
+    const age = Date.now() - parsed.timestamp
 
-      return userData
-    } catch (e) {
-      console.warn("AuthProvider: Errore caricamento sessionStorage:", e)
+    // Backup valido per 1 ora
+    if (age > 3600000) {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY)
       return null
     }
+
+    return parsed.user
+  } catch (error) {
+    console.warn("AuthProvider: Impossibile caricare backup auth:", error)
+    return null
+  }
+}
+
+const setCookie = (name: string, value: string, days = 7) => {
+  if (typeof window === "undefined") return
+
+  const expires = new Date()
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+}
+
+const getCookie = (name: string): string | null => {
+  if (typeof window === "undefined") return null
+
+  const nameEQ = name + "="
+  const ca = document.cookie.split(";")
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i]
+    while (c.charAt(0) === " ") c = c.substring(1, c.length)
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length)
+  }
+  return null
+}
+
+const deleteCookie = (name: string) => {
+  if (typeof window === "undefined") return
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`
+}
+
+let renderCount = 0
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  renderCount++
+
+  const { supabase, isConnected: supabaseConnected, isInitializing: supabaseInitializing } = useSupabase()
+
+  const [state, setState] = useState(() => {
+    // Se abbiamo già un utente nello stato globale, usalo
+    if (globalAuthState.user && globalAuthState.sessionChecked) {
+      return {
+        user: globalAuthState.user,
+        isLoading: false,
+      }
+    }
+
+    // Altrimenti prova a caricare dal backup
+    const backupUser = loadAuthBackup()
+    if (backupUser) {
+      globalAuthState.user = backupUser
+      globalAuthState.sessionChecked = true
+      return {
+        user: backupUser,
+        isLoading: false,
+      }
+    }
+
+    return {
+      user: globalAuthState.user,
+      isLoading: globalAuthState.isLoading,
+    }
+  })
+
+  const checkingRef = useRef(false)
+  const mountedRef = useRef(true)
+  const timeoutRef = useRef<NodeJS.Timeout>()
+
+  // Log ridotti - solo ogni 5 render
+  if (renderCount % 5 === 1) {
+    console.log(
+      `AuthProvider: Render`,
+      JSON.stringify({
+        user: !!state.user,
+        isLoading: state.isLoading,
+        supabaseConnected,
+        supabaseInitializing,
+        sessionChecked: globalAuthState.sessionChecked,
+        renderCount,
+      }),
+    )
   }
 
-  // Funzione per verificare la sessione
+  const updateAuthState = (newState: Partial<typeof state>) => {
+    Object.assign(globalAuthState, newState)
+    if (mountedRef.current) {
+      setState((prev) => ({ ...prev, ...newState }))
+    }
+
+    // Salva backup se c'è un utente
+    if (newState.user !== undefined) {
+      saveAuthBackup(newState.user)
+    }
+  }
+
   const checkSession = async (): Promise<User | null> => {
-    if (!supabase || !isConnected) return null
+    if (!supabase || !supabaseConnected || checkingRef.current) {
+      return null
+    }
+
+    const now = Date.now()
+    const cacheKey = "session_check"
+
+    // Usa cache per evitare controlli ripetuti
+    if (globalAuthState.sessionCache.has(cacheKey)) {
+      const cached = globalAuthState.sessionCache.get(cacheKey)!
+      if (now - cached.timestamp < SESSION_CACHE_DURATION) {
+        return cached.user
+      }
+    }
+
+    checkingRef.current = true
 
     try {
       console.log("AuthProvider: Verifica sessione...")
 
-      // Cache delle verifiche sessione per evitare chiamate ripetute
-      const now = Date.now()
-      const cacheKey = "session_check"
-
-      if (now - globalAuthState.lastSessionCheck < 10000 && globalAuthState.sessionCache.has(cacheKey)) {
-        const cachedUser = globalAuthState.sessionCache.get(cacheKey)
-        console.log("AuthProvider: Usando sessione dalla cache")
-        return cachedUser
-      }
-
-      // Verifica cookie di sessione
-      const sessionCookie = document.cookie.split("; ").find((row) => row.startsWith("istudio_session="))
-
-      if (!sessionCookie) {
+      const sessionId = getCookie(COOKIE_NAME)
+      if (!sessionId) {
         console.log("AuthProvider: Nessun cookie di sessione trovato")
-        globalAuthState.sessionCache.set(cacheKey, null)
-        globalAuthState.lastSessionCheck = now
+        globalAuthState.sessionCache.set(cacheKey, { user: null, timestamp: now })
         return null
       }
 
-      const sessionData = sessionCookie.split("=")[1]
-      if (!sessionData) {
-        console.log("AuthProvider: Cookie di sessione vuoto")
-        globalAuthState.sessionCache.set(cacheKey, null)
-        globalAuthState.lastSessionCheck = now
-        return null
-      }
-
-      // Decodifica i dati della sessione
-      let userData: User
-      try {
-        userData = JSON.parse(decodeURIComponent(sessionData))
-      } catch (e) {
-        console.log("AuthProvider: Cookie di sessione non valido")
-        globalAuthState.sessionCache.set(cacheKey, null)
-        globalAuthState.lastSessionCheck = now
-        return null
-      }
-
-      // Verifica che l'utente esista ancora nel database
-      const { data: dbUser, error } = await supabase
+      // Verifica se l'utente esiste ancora nel database
+      const { data: userData, error } = await supabase
         .from("utenti")
-        .select("id, nome, username, email, ruolo")
-        .eq("id", userData.id)
+        .select("id, username, email, nome, cognome, ruolo, attivo")
+        .eq("id", Number.parseInt(sessionId))
+        .eq("attivo", true)
         .single()
 
-      if (error || !dbUser) {
-        console.log("AuthProvider: Utente non trovato nel database")
-        // Rimuovi cookie non valido
-        document.cookie = "istudio_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
-        globalAuthState.sessionCache.set(cacheKey, null)
-        globalAuthState.lastSessionCheck = now
+      if (error || !userData) {
+        console.log("AuthProvider: Sessione non valida o scaduta")
+        deleteCookie(COOKIE_NAME)
+        globalAuthState.sessionCache.set(cacheKey, { user: null, timestamp: now })
         return null
       }
 
-      console.log("AuthProvider: Sessione valida per:", dbUser.username)
-      globalAuthState.sessionCache.set(cacheKey, dbUser)
+      const user: User = {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        nome: userData.nome || undefined,
+        cognome: userData.cognome || undefined,
+        ruolo: userData.ruolo,
+        attivo: userData.attivo,
+      }
+
+      console.log(`AuthProvider: Sessione valida per utente: ${user.username}`)
+
+      // Salva in cache
+      globalAuthState.sessionCache.set(cacheKey, { user, timestamp: now })
       globalAuthState.lastSessionCheck = now
-      return dbUser
+
+      return user
     } catch (error) {
       console.error("AuthProvider: Errore verifica sessione:", error)
+      globalAuthState.sessionCache.set(cacheKey, { user: null, timestamp: now })
       return null
+    } finally {
+      checkingRef.current = false
     }
   }
 
-  // Funzione di login
-  const login = async (identifier: string, password: string): Promise<boolean> => {
-    if (!supabase || !isConnected) {
-      console.error("AuthProvider: Supabase non disponibile per login")
-      return false
+  const login = async (identifier: string, password: string): Promise<{ success: boolean; message: string }> => {
+    if (!supabase || !supabaseConnected) {
+      return { success: false, message: "Database non disponibile" }
     }
 
     try {
       console.log(`AuthProvider: Tentativo di login per: ${identifier}`)
 
       // Cerca l'utente per username o email
-      const { data: users, error } = await supabase
+      const { data: userData, error } = await supabase
         .from("utenti")
-        .select("id, nome, username, email, password, ruolo")
+        .select("id, username, email, password, nome, cognome, ruolo, attivo")
         .or(`username.eq.${identifier},email.eq.${identifier}`)
+        .eq("attivo", true)
+        .single()
 
-      if (error || !users || users.length === 0) {
-        console.log("AuthProvider: Utente non trovato")
-        return false
+      if (error || !userData) {
+        console.log("AuthProvider: Utente non trovato o non attivo")
+        return { success: false, message: "Credenziali non valide" }
       }
-
-      const user = users[0]
 
       // Verifica password
       let passwordValid = false
 
-      if (user.password) {
-        // Se la password inizia con $2, è già hashata con bcrypt
-        if (user.password.startsWith("$2")) {
-          passwordValid = await bcrypt.compare(password, user.password)
-        } else {
-          // Password in chiaro - verifica e poi aggiorna con hash
-          passwordValid = user.password === password
+      if (userData.password.startsWith("$2")) {
+        // Password hashata con bcrypt
+        passwordValid = await bcrypt.compare(password, userData.password)
+      } else {
+        // Password in chiaro (per compatibilità)
+        passwordValid = password === userData.password
 
-          if (passwordValid) {
-            // Aggiorna la password con hash
-            const hashedPassword = await bcrypt.hash(password, 10)
-            await supabase.from("utenti").update({ password: hashedPassword }).eq("id", user.id)
-            console.log("AuthProvider: Password aggiornata con hash")
-          }
+        // Aggiorna la password hashata nel database
+        if (passwordValid) {
+          const hashedPassword = await bcrypt.hash(password, 12)
+          await supabase.from("utenti").update({ password: hashedPassword }).eq("id", userData.id)
         }
       }
 
       if (!passwordValid) {
         console.log("AuthProvider: Password non valida")
-        return false
+        return { success: false, message: "Credenziali non valide" }
       }
 
-      // Crea oggetto utente senza password
-      const userData: User = {
-        id: user.id,
-        nome: user.nome,
-        username: user.username,
-        email: user.email,
-        ruolo: user.ruolo,
+      const user: User = {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email,
+        nome: userData.nome || undefined,
+        cognome: userData.cognome || undefined,
+        ruolo: userData.ruolo,
+        attivo: userData.attivo,
       }
 
-      // Salva cookie di sessione (scade in 24 ore)
-      const sessionData = encodeURIComponent(JSON.stringify(userData))
-      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString()
-      document.cookie = `istudio_session=${sessionData}; expires=${expires}; path=/; SameSite=Lax`
+      // Imposta cookie di sessione
+      setCookie(COOKIE_NAME, user.id.toString(), 7)
 
-      // Aggiorna stato globale
-      globalAuthState.user = userData
-      globalAuthState.isLoading = false
+      // Aggiorna stato
+      updateAuthState({
+        user,
+        isLoading: false,
+      })
+
       globalAuthState.sessionChecked = true
 
-      // Aggiorna stato locale
-      setUser(userData)
-      setIsLoading(false)
-
-      // Salva backup in sessionStorage
-      saveToSessionStorage(userData)
-
-      // Pulisci cache sessione per forzare ricaricamento
+      // Pulisci cache per forzare refresh
       globalAuthState.sessionCache.clear()
 
-      console.log(`AuthProvider: Login riuscito per: ${userData.username}`)
-      return true
+      console.log(`AuthProvider: Login riuscito per: ${user.username}`)
+
+      return { success: true, message: "Login effettuato con successo" }
     } catch (error) {
       console.error("AuthProvider: Errore login:", error)
-      return false
+      return { success: false, message: "Errore durante il login" }
     }
   }
 
-  // Funzione di logout
   const logout = () => {
     console.log("AuthProvider: Logout")
 
-    // Rimuovi cookie
-    document.cookie = "istudio_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;"
+    deleteCookie(COOKIE_NAME)
 
-    // Reset stato globale
-    globalAuthState.user = null
-    globalAuthState.isLoading = false
+    updateAuthState({
+      user: null,
+      isLoading: false,
+    })
+
     globalAuthState.sessionChecked = true
     globalAuthState.sessionCache.clear()
 
-    // Reset stato locale
-    setUser(null)
-    setIsLoading(false)
-
     // Rimuovi backup
-    saveToSessionStorage(null)
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY)
+    }
   }
 
-  // Inizializzazione auth
+  // Inizializzazione e verifica sessione
   useEffect(() => {
     const initializeAuth = async () => {
-      // Previeni inizializzazioni multiple
-      if (initializingRef.current || globalAuthState.sessionChecked) {
+      if (supabaseInitializing || !supabaseConnected || globalAuthState.sessionChecked) {
         return
       }
 
-      // Aspetta che Supabase sia pronto
-      if (isInitializing || !isConnected) {
-        return
-      }
+      console.log("AuthProvider: Inizializzazione autenticazione...")
 
-      initializingRef.current = true
+      const user = await checkSession()
 
-      try {
-        console.log("AuthProvider: Inizializzazione autenticazione...")
+      updateAuthState({
+        user,
+        isLoading: false,
+      })
 
-        // Prima prova a recuperare dallo stato globale
-        if (globalAuthState.user && !globalAuthState.isLoading) {
-          setUser(globalAuthState.user)
-          setIsLoading(false)
-          return
-        }
-
-        // Poi prova sessionStorage come backup
-        const backupUser = loadFromSessionStorage()
-        if (backupUser) {
-          console.log("AuthProvider: Recupero utente da sessionStorage")
-          globalAuthState.user = backupUser
-          globalAuthState.isLoading = false
-          globalAuthState.sessionChecked = true
-          setUser(backupUser)
-          setIsLoading(false)
-          return
-        }
-
-        // Infine verifica la sessione dal cookie
-        const sessionUser = await checkSession()
-
-        globalAuthState.user = sessionUser
-        globalAuthState.isLoading = false
-        globalAuthState.sessionChecked = true
-
-        setUser(sessionUser)
-        setIsLoading(false)
-
-        if (sessionUser) {
-          saveToSessionStorage(sessionUser)
-        }
-      } catch (error) {
-        console.error("AuthProvider: Errore inizializzazione:", error)
-        globalAuthState.user = null
-        globalAuthState.isLoading = false
-        globalAuthState.sessionChecked = true
-        setUser(null)
-        setIsLoading(false)
-      } finally {
-        initializingRef.current = false
-      }
+      globalAuthState.sessionChecked = true
     }
 
-    initializeAuth()
-  }, [supabase, isConnected, isInitializing])
+    // Debouncing per evitare chiamate multiple
+    timeoutRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        initializeAuth()
+      }
+    }, 200)
 
-  const value: AuthContextType = {
-    user,
-    isLoading,
-    isAdmin,
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [supabase, supabaseConnected, supabaseInitializing])
+
+  // Controllo periodico della sessione
+  useEffect(() => {
+    if (!state.user || !supabaseConnected) return
+
+    const interval = setInterval(async () => {
+      const now = Date.now()
+      if (now - globalAuthState.lastSessionCheck > SESSION_CHECK_INTERVAL) {
+        const user = await checkSession()
+        if (!user && state.user) {
+          // Sessione scaduta
+          logout()
+        }
+      }
+    }, SESSION_CHECK_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, [state.user, supabaseConnected])
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
+
+  const contextValue: AuthContextType = {
+    user: state.user,
+    isLoading: state.isLoading,
+    isAdmin: state.user?.ruolo === "admin",
     login,
     logout,
     checkSession,
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => {
@@ -367,16 +416,13 @@ export const useAuth = () => {
 // Funzione per reset esplicito (da usare solo su logout)
 export const resetAuthState = () => {
   console.log("AuthProvider: Reset esplicito dello stato")
-  globalAuthState = {
-    user: null,
-    isLoading: true,
-    sessionChecked: false,
-    lastSessionCheck: 0,
-    sessionCache: new Map(),
-  }
-  try {
+  globalAuthState.user = null
+  globalAuthState.isLoading = true
+  globalAuthState.sessionChecked = false
+  globalAuthState.lastSessionCheck = 0
+  globalAuthState.sessionCache.clear()
+
+  if (typeof window !== "undefined") {
     sessionStorage.removeItem(SESSION_STORAGE_KEY)
-  } catch (e) {
-    // Ignora errori sessionStorage
   }
 }

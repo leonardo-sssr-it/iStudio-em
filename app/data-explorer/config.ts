@@ -1,189 +1,372 @@
-// Configurazione delle tabelle per il Data Explorer
-export interface TableFieldConfig {
-  fieldOrder: string[]
-  types: Record<string, string>
-  requiredFields: string[]
-  autoFields: string[]
-  selectOptions?: Record<string, string[]>
-  hiddenFields?: string[]
+// Tipi per le configurazioni delle tabelle
+export interface FieldConfig {
+  type: "text" | "number" | "boolean" | "date" | "datetime" | "select" | "textarea" | "json" | "array"
+  required?: boolean
+  hidden?: boolean
+  readonly?: boolean
+  options?: string[] // Per campi select
+  placeholder?: string
+  validation?: {
+    min?: number
+    max?: number
+    pattern?: string
+  }
 }
 
-export const TABLE_FIELDS: Record<string, TableFieldConfig> = {
-  todolist: {
-    fieldOrder: [
-      "id",
-      "titolo",
-      "descrizione",
-      "scadenza",
-      "priorita", // Campo nascosto come richiesto
-      "completato",
-      "notifica",
-      "id_utente",
-      "modifica",
-    ],
-    types: {
-      id: "number",
-      titolo: "string",
-      descrizione: "text",
-      scadenza: "date",
-      priorita: "string",
-      completato: "boolean",
-      notifica: "time",
-      id_utente: "number",
-      modifica: "datetime",
-    },
-    requiredFields: ["titolo", "id_utente"],
-    autoFields: ["id", "modifica"],
-    selectOptions: {
-      priorita: ["bassa", "media", "alta", "urgente"],
-    },
-    hiddenFields: ["priorita"], // Campo nascosto come richiesto nel codice originale
-  },
+export interface TableConfig {
+  name: string
+  displayName: string
+  fields: Record<string, FieldConfig>
+  primaryKey: string
+  orderBy?: string
+  searchFields?: string[]
+}
 
+// Configurazioni per tutte le tabelle
+export const TABLE_FIELDS: Record<string, TableConfig> = {
   utenti: {
-    fieldOrder: ["id", "nome", "username", "email", "password", "ruolo", "attivo", "modifica"],
-    types: {
-      id: "number",
-      nome: "string",
-      username: "string",
-      email: "email",
-      password: "password",
-      ruolo: "string",
-      attivo: "boolean",
-      modifica: "datetime",
-    },
-    requiredFields: ["nome", "username", "email"],
-    autoFields: ["id", "modifica"],
-    selectOptions: {
-      ruolo: ["utente", "admin", "moderatore"],
+    name: "utenti",
+    displayName: "Utenti",
+    primaryKey: "id",
+    orderBy: "username",
+    searchFields: ["username", "email", "nome", "cognome"],
+    fields: {
+      id: {
+        type: "number",
+        readonly: true,
+        hidden: true,
+      },
+      username: {
+        type: "text",
+        required: true,
+        placeholder: "Nome utente",
+      },
+      email: {
+        type: "text",
+        required: true,
+        placeholder: "Email",
+        validation: {
+          pattern: "^[^@]+@[^@]+\\.[^@]+$",
+        },
+      },
+      password: {
+        type: "text",
+        required: true,
+        placeholder: "Password",
+        hidden: true,
+      },
+      nome: {
+        type: "text",
+        placeholder: "Nome",
+      },
+      cognome: {
+        type: "text",
+        placeholder: "Cognome",
+      },
+      ruolo: {
+        type: "select",
+        required: true,
+        options: ["admin", "utente", "guest"],
+      },
+      attivo: {
+        type: "boolean",
+        required: true,
+      },
+      ultimo_accesso: {
+        type: "datetime",
+        readonly: true,
+      },
+      data_creazione: {
+        type: "datetime",
+        readonly: true,
+      },
     },
   },
-
   note: {
-    fieldOrder: [
-      "id",
-      "titolo",
-      "contenuto",
-      "data_creazione",
-      "modifica",
-      "tags",
-      "priorita",
-      "notifica",
-      "notebook_id",
-      "id_utente",
-      "synced",
-      "completato",
-    ],
-    types: {
-      id: "number",
-      titolo: "string",
-      contenuto: "text",
-      data_creazione: "datetime",
-      modifica: "datetime",
-      tags: "array",
-      priorita: "string",
-      notifica: "datetime",
-      notebook_id: "string",
-      id_utente: "string",
-      synced: "boolean",
-      completato: "boolean",
-    },
-    requiredFields: ["titolo", "id_utente"],
-    autoFields: ["id", "data_creazione", "modifica"],
-    selectOptions: {
-      priorita: ["bassa", "media", "alta"],
+    name: "note",
+    displayName: "Note",
+    primaryKey: "id",
+    orderBy: "modifica",
+    searchFields: ["titolo", "contenuto"],
+    fields: {
+      id: {
+        type: "number",
+        readonly: true,
+        hidden: true,
+      },
+      titolo: {
+        type: "text",
+        required: true,
+        placeholder: "Titolo della nota",
+      },
+      contenuto: {
+        type: "textarea",
+        required: true,
+        placeholder: "Contenuto della nota",
+      },
+      creato_il: {
+        type: "datetime",
+        readonly: true,
+      },
+      modifica: {
+        type: "datetime",
+        readonly: true,
+      },
+      tags: {
+        type: "array",
+        placeholder: "Tags (separati da virgola)",
+      },
+      priorita: {
+        type: "select",
+        options: ["bassa", "media", "alta", "urgente"],
+        hidden: true, // Come richiesto nel codice originale
+      },
+      notifica: {
+        type: "datetime",
+        placeholder: "Data notifica",
+      },
+      notebook_id: {
+        type: "text",
+        placeholder: "ID Notebook",
+      },
+      id_utente: {
+        type: "text",
+        readonly: true,
+      },
+      synced: {
+        type: "boolean",
+      },
     },
   },
-
   pagine: {
-    fieldOrder: [
-      "id",
-      "titolo",
-      "estratto",
-      "contenuto",
-      "categoria",
-      "tags",
-      "immagine",
-      "pubblicato",
-      "privato",
-      "attivo",
-      "id_utente",
-      "modifica",
-    ],
-    types: {
-      id: "number",
-      titolo: "string",
-      estratto: "text",
-      contenuto: "text",
-      categoria: "string",
-      tags: "json",
-      immagine: "string",
-      pubblicato: "datetime",
-      privato: "boolean",
-      attivo: "boolean",
-      id_utente: "number",
-      modifica: "datetime",
-    },
-    requiredFields: ["titolo", "id_utente"],
-    autoFields: ["id", "modifica"],
-    selectOptions: {
-      categoria: ["blog", "pagina", "news", "tutorial"],
+    name: "pagine",
+    displayName: "Pagine",
+    primaryKey: "id",
+    orderBy: "modifica",
+    searchFields: ["titolo", "estratto", "contenuto"],
+    fields: {
+      id: {
+        type: "number",
+        readonly: true,
+        hidden: true,
+      },
+      modifica: {
+        type: "datetime",
+        readonly: true,
+      },
+      id_utente: {
+        type: "number",
+        required: true,
+        readonly: true,
+      },
+      attivo: {
+        type: "boolean",
+        required: true,
+      },
+      titolo: {
+        type: "text",
+        required: true,
+        placeholder: "Titolo della pagina",
+      },
+      estratto: {
+        type: "textarea",
+        placeholder: "Estratto della pagina",
+      },
+      contenuto: {
+        type: "textarea",
+        required: true,
+        placeholder: "Contenuto della pagina",
+      },
+      categoria: {
+        type: "text",
+        placeholder: "Categoria",
+      },
+      tags: {
+        type: "json",
+        placeholder: "Tags (JSON)",
+      },
+      immagine: {
+        type: "text",
+        placeholder: "URL immagine",
+      },
+      pubblicato: {
+        type: "datetime",
+        required: true,
+      },
+      privato: {
+        type: "boolean",
+      },
     },
   },
-
-  temi: {
-    fieldOrder: ["id", "nome", "colori", "attivo", "modifica"],
-    types: {
-      id: "number",
-      nome: "string",
-      colori: "json",
-      attivo: "boolean",
-      modifica: "datetime",
+  configurazione: {
+    name: "configurazione",
+    displayName: "Configurazione",
+    primaryKey: "id",
+    fields: {
+      id: {
+        type: "text",
+        readonly: true,
+        hidden: true,
+      },
+      versione: {
+        type: "text",
+        placeholder: "Versione",
+      },
+      nome_app: {
+        type: "text",
+        placeholder: "Nome applicazione",
+      },
+      tema_default: {
+        type: "text",
+        placeholder: "Tema di default",
+      },
+      lingua_default: {
+        type: "text",
+        placeholder: "Lingua di default",
+      },
+      fuso_orario: {
+        type: "text",
+        placeholder: "Fuso orario",
+      },
+      debug: {
+        type: "boolean",
+      },
+      priorita: {
+        type: "json",
+        placeholder: "Priorità (JSON)",
+      },
+      stati: {
+        type: "json",
+        placeholder: "Stati (JSON)",
+      },
+      categorie: {
+        type: "json",
+        placeholder: "Categorie (JSON)",
+      },
+      tags_predefiniti: {
+        type: "json",
+        placeholder: "Tags predefiniti (JSON)",
+      },
+      impostazioni_notifiche: {
+        type: "json",
+        placeholder: "Impostazioni notifiche (JSON)",
+      },
+      created_at: {
+        type: "datetime",
+        readonly: true,
+      },
+      updated_at: {
+        type: "datetime",
+        readonly: true,
+      },
     },
-    requiredFields: ["nome"],
-    autoFields: ["id", "modifica"],
+  },
+  // Configurazione per todolist (se esiste)
+  todolist: {
+    name: "todolist",
+    displayName: "Todo List",
+    primaryKey: "id",
+    orderBy: "created_at",
+    searchFields: ["titolo", "descrizione"],
+    fields: {
+      id: {
+        type: "number",
+        readonly: true,
+        hidden: true,
+      },
+      titolo: {
+        type: "text",
+        required: true,
+        placeholder: "Titolo del task",
+      },
+      descrizione: {
+        type: "textarea",
+        placeholder: "Descrizione del task",
+      },
+      completato: {
+        type: "boolean",
+      },
+      priorita: {
+        type: "select",
+        options: ["bassa", "media", "alta", "urgente"],
+        hidden: true, // Come richiesto nel codice originale
+      },
+      scadenza: {
+        type: "datetime",
+        placeholder: "Data scadenza",
+      },
+      id_utente: {
+        type: "number",
+        readonly: true,
+      },
+      created_at: {
+        type: "datetime",
+        readonly: true,
+      },
+      updated_at: {
+        type: "datetime",
+        readonly: true,
+      },
+    },
   },
 }
 
-// Helper functions per lavorare con le configurazioni
-export function getTableConfig(tableName: string): TableFieldConfig | null {
-  return TABLE_FIELDS[tableName] || null
+// Helper functions
+export function getTableConfig(tableName: string): TableConfig | undefined {
+  return TABLE_FIELDS[tableName]
 }
 
-export function getVisibleFields(tableName: string): string[] {
+export function getVisibleFields(tableName: string): Record<string, FieldConfig> {
+  const config = getTableConfig(tableName)
+  if (!config) return {}
+
+  return Object.fromEntries(Object.entries(config.fields).filter(([_, fieldConfig]) => !fieldConfig.hidden))
+}
+
+export function getEditableFields(tableName: string): Record<string, FieldConfig> {
+  const config = getTableConfig(tableName)
+  if (!config) return {}
+
+  return Object.fromEntries(
+    Object.entries(config.fields).filter(([_, fieldConfig]) => !fieldConfig.hidden && !fieldConfig.readonly),
+  )
+}
+
+export function getRequiredFields(tableName: string): string[] {
   const config = getTableConfig(tableName)
   if (!config) return []
 
-  const hiddenFields = config.hiddenFields || []
-  return config.fieldOrder.filter((field) => !hiddenFields.includes(field))
+  return Object.entries(config.fields)
+    .filter(([_, fieldConfig]) => fieldConfig.required && !fieldConfig.readonly)
+    .map(([fieldName]) => fieldName)
 }
 
-export function getEditableFields(tableName: string): string[] {
+export function getSearchableFields(tableName: string): string[] {
   const config = getTableConfig(tableName)
-  if (!config) return []
-
-  const autoFields = config.autoFields || []
-  const hiddenFields = config.hiddenFields || []
-
-  return config.fieldOrder.filter((field) => !autoFields.includes(field) && !hiddenFields.includes(field))
+  return config?.searchFields || []
 }
 
 export function getFieldType(tableName: string, fieldName: string): string {
   const config = getTableConfig(tableName)
-  return config?.types[fieldName] || "string"
+  return config?.fields[fieldName]?.type || "text"
 }
 
-export function getSelectOptions(tableName: string, fieldName: string): string[] {
+export function getFieldOptions(tableName: string, fieldName: string): string[] {
   const config = getTableConfig(tableName)
-  return config?.selectOptions?.[fieldName] || []
+  return config?.fields[fieldName]?.options || []
 }
 
-export function isRequiredField(tableName: string, fieldName: string): boolean {
+export function isFieldRequired(tableName: string, fieldName: string): boolean {
   const config = getTableConfig(tableName)
-  return config?.requiredFields.includes(fieldName) || false
+  return config?.fields[fieldName]?.required || false
 }
 
-export function isAutoField(tableName: string, fieldName: string): boolean {
+export function isFieldReadonly(tableName: string, fieldName: string): boolean {
   const config = getTableConfig(tableName)
-  return config?.autoFields.includes(fieldName) || false
+  return config?.fields[fieldName]?.readonly || false
+}
+
+export function isFieldHidden(tableName: string, fieldName: string): boolean {
+  const config = getTableConfig(tableName)
+  return config?.fields[fieldName]?.hidden || false
 }
