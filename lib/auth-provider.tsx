@@ -9,6 +9,7 @@ interface AuthUser {
   nome: string
   username: string
   email: string
+  ruolo?: string
 }
 
 interface AuthContextType {
@@ -17,20 +18,10 @@ interface AuthContextType {
   isAdmin: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
-  supabaseConnected: boolean
-  supabaseInitializing: boolean
-  sessionChecked: boolean
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
-}
 
 // Stato globale persistente per prevenire reset durante unmount/remount
 const globalAuthState = {
@@ -39,17 +30,17 @@ const globalAuthState = {
   isAdmin: false,
   sessionChecked: false,
   lastSessionCheck: 0,
-  sessionCache: new Map<string, any>(),
+  sessionCache: new Map<string, { user: AuthUser | null; timestamp: number }>(),
 }
 
-// Backup in sessionStorage
+// Backup in sessionStorage per recupero rapido
 const SESSION_STORAGE_KEY = "istudio_auth_backup"
+const SESSION_CACHE_DURATION = 300000 // 5 minuti
 
-const saveAuthBackup = (user: AuthUser | null, isAdmin: boolean) => {
+const saveAuthBackup = (user: AuthUser | null) => {
   try {
     const backup = {
       user,
-      isAdmin,
       timestamp: Date.now(),
     }
     sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(backup))
@@ -58,7 +49,7 @@ const saveAuthBackup = (user: AuthUser | null, isAdmin: boolean) => {
   }
 }
 
-const loadAuthBackup = (): { user: AuthUser | null; isAdmin: boolean } | null => {
+const loadAuthBackup = (): AuthUser | null => {
   try {
     const backup = sessionStorage.getItem(SESSION_STORAGE_KEY)
     if (!backup) return null
@@ -66,13 +57,12 @@ const loadAuthBackup = (): { user: AuthUser | null; isAdmin: boolean } | null =>
     const parsed = JSON.parse(backup)
     const age = Date.now() - parsed.timestamp
 
-    // Backup valido per 1 ora
-    if (age > 3600000) {
+    if (age > SESSION_CACHE_DURATION) {
       sessionStorage.removeItem(SESSION_STORAGE_KEY)
       return null
     }
 
-    return { user: parsed.user, isAdmin: parsed.isAdmin }
+    return parsed.user
   } catch (error) {
     console.warn("Impossibile caricare backup auth:", error)
     return null
@@ -88,29 +78,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Inizializza lo stato dal globalState o dal backup
   const [state, setState] = useState(() => {
-    // Se abbiamo già uno stato globale, usalo
-    if (globalAuthState.user !== null || globalAuthState.sessionChecked) {
+    // Se abbiamo già uno stato globale valido, usalo
+    if (globalAuthState.sessionChecked && globalAuthState.user) {
       return {
         user: globalAuthState.user,
-        isLoading: globalAuthState.isLoading,
+        isLoading: false,
         isAdmin: globalAuthState.isAdmin,
-        sessionChecked: globalAuthState.sessionChecked,
       }
     }
 
     // Altrimenti prova a caricare dal backup
-    const backup = loadAuthBackup()
-    if (backup) {
-      globalAuthState.user = backup.user
-      globalAuthState.isAdmin = backup.isAdmin
-      globalAuthState.isLoading = false
+    const backupUser = loadAuthBackup()
+    if (backupUser) {
+      globalAuthState.user = backupUser
+      globalAuthState.isAdmin = backupUser.ruolo === "admin"
       globalAuthState.sessionChecked = true
+      globalAuthState.isLoading = false
 
       return {
-        user: backup.user,
+        user: backupUser,
         isLoading: false,
-        isAdmin: backup.isAdmin,
-        sessionChecked: true,
+        isAdmin: backupUser.ruolo === "admin",
       }
     }
 
@@ -118,12 +106,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: globalAuthState.user,
       isLoading: globalAuthState.isLoading,
       isAdmin: globalAuthState.isAdmin,
-      sessionChecked: globalAuthState.sessionChecked,
     }
   })
 
   const initializingRef = useRef(false)
   const mountedRef = useRef(true)
+  const timeoutRef = useRef<NodeJS.Timeout>()
 
   // Funzione per aggiornare sia lo stato locale che globale
   const updateAuthState = useCallback((newState: Partial<typeof state>) => {
@@ -132,12 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => ({ ...prev, ...newState }))
     }
 
-    // Salva backup se abbiamo dati utente
-    if (newState.user !== undefined || newState.isAdmin !== undefined) {
-      saveAuthBackup(
-        newState.user !== undefined ? newState.user : globalAuthState.user,
-        newState.isAdmin !== undefined ? newState.isAdmin : globalAuthState.isAdmin,
-      )
+    // Salva backup se c'è un utente
+    if (newState.user !== undefined) {
+      saveAuthBackup(newState.user)
     }
   }, [])
 
@@ -150,21 +135,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: state.isLoading,
         supabaseConnected,
         supabaseInitializing,
-        sessionChecked: state.sessionChecked,
+        sessionChecked: globalAuthState.sessionChecked,
         renderCount,
       }),
     )
   }
 
-  const checkSession = useCallback(async () => {
-    if (!supabase || !supabaseConnected) return
+  const checkSession = useCallback(async (): Promise<AuthUser | null> => {
+    if (!supabase || !supabaseConnected) {
+      return null
+    }
 
-    const now = Date.now()
     const cacheKey = "session_check"
+    const now = Date.now()
+    const cached = globalAuthState.sessionCache.get(cacheKey)
 
-    // Cache della verifica sessione per 30 secondi
-    if (globalAuthState.sessionCache.has(cacheKey) && now - globalAuthState.lastSessionCheck < 30000) {
-      return globalAuthState.sessionCache.get(cacheKey)
+    // Cache per 30 secondi
+    if (cached && now - cached.timestamp < 30000) {
+      return cached.user
     }
 
     try {
@@ -172,13 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const {
         data: { session },
-        error,
+        error: sessionError,
       } = await supabase.auth.getSession()
 
-      if (error || !session) {
+      if (sessionError || !session?.user) {
         console.log(`${new Date().toISOString()} AuthProvider: Sessione non valida o scaduta`)
-        globalAuthState.sessionCache.set(cacheKey, null)
-        globalAuthState.lastSessionCheck = now
+        globalAuthState.sessionCache.set(cacheKey, { user: null, timestamp: now })
         return null
       }
 
@@ -189,9 +176,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (userError || !userData) {
-        console.log(`${new Date().toISOString()} AuthProvider: Utente non trovato nel database`)
-        globalAuthState.sessionCache.set(cacheKey, null)
-        globalAuthState.lastSessionCheck = now
+        console.error(`${new Date().toISOString()} AuthProvider: Errore caricamento dati utente:`, userError)
+        globalAuthState.sessionCache.set(cacheKey, { user: null, timestamp: now })
         return null
       }
 
@@ -200,32 +186,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         nome: userData.nome,
         username: userData.username,
         email: userData.email,
+        ruolo: userData.ruolo,
       }
 
-      const result = {
-        user: authUser,
-        isAdmin: userData.ruolo === "admin",
-      }
-
-      globalAuthState.sessionCache.set(cacheKey, result)
-      globalAuthState.lastSessionCheck = now
-
-      return result
+      globalAuthState.sessionCache.set(cacheKey, { user: authUser, timestamp: now })
+      return authUser
     } catch (error) {
       console.error(`${new Date().toISOString()} AuthProvider: Errore verifica sessione:`, error)
-      globalAuthState.sessionCache.set(cacheKey, null)
-      globalAuthState.lastSessionCheck = now
+      globalAuthState.sessionCache.set(cacheKey, { user: null, timestamp: now })
       return null
     }
   }, [supabase, supabaseConnected])
 
   const initializeAuth = useCallback(async () => {
-    if (initializingRef.current || !supabase || !supabaseConnected || supabaseInitializing) {
+    if (initializingRef.current || globalAuthState.sessionChecked) {
       return
     }
 
-    // Se abbiamo già un utente valido, non reinizializzare
-    if (globalAuthState.user && globalAuthState.sessionChecked) {
+    if (!supabase || !supabaseConnected || supabaseInitializing) {
       return
     }
 
@@ -233,48 +211,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log(`${new Date().toISOString()} AuthProvider: Inizializzazione autenticazione...`)
 
     try {
-      const sessionResult = await checkSession()
+      const user = await checkSession()
 
-      if (sessionResult) {
-        updateAuthState({
-          user: sessionResult.user,
-          isAdmin: sessionResult.isAdmin,
-          isLoading: false,
-          sessionChecked: true,
-        })
-      } else {
-        updateAuthState({
-          user: null,
-          isAdmin: false,
-          isLoading: false,
-          sessionChecked: true,
-        })
+      updateAuthState({
+        user,
+        isLoading: false,
+        isAdmin: user?.ruolo === "admin",
+      })
+
+      globalAuthState.sessionChecked = true
+      globalAuthState.lastSessionCheck = Date.now()
+
+      if (user) {
+        console.log(`${new Date().toISOString()} AuthProvider: Utente autenticato: ${user.username}`)
       }
     } catch (error) {
       console.error(`${new Date().toISOString()} AuthProvider: Errore inizializzazione:`, error)
       updateAuthState({
         user: null,
-        isAdmin: false,
         isLoading: false,
-        sessionChecked: true,
+        isAdmin: false,
       })
+      globalAuthState.sessionChecked = true
     } finally {
       initializingRef.current = false
     }
   }, [supabase, supabaseConnected, supabaseInitializing, checkSession, updateAuthState])
 
-  useEffect(() => {
-    initializeAuth()
-
-    return () => {
-      mountedRef.current = false
-    }
-  }, [initializeAuth])
-
   const login = useCallback(
     async (email: string, password: string) => {
       if (!supabase) {
-        return { success: false, error: "Supabase non inizializzato" }
+        return { success: false, error: "Supabase non disponibile" }
       }
 
       try {
@@ -286,17 +253,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
 
         if (error) {
+          console.error(`${new Date().toISOString()} AuthProvider: Errore login:`, error)
           return { success: false, error: error.message }
+        }
+
+        if (!data.user) {
+          return { success: false, error: "Dati utente non disponibili" }
         }
 
         const { data: userData, error: userError } = await supabase
           .from("utenti")
           .select("id, nome, username, email, ruolo")
-          .eq("email", email)
+          .eq("email", data.user.email)
           .single()
 
         if (userError || !userData) {
-          return { success: false, error: "Utente non trovato" }
+          console.error(`${new Date().toISOString()} AuthProvider: Errore caricamento dati utente:`, userError)
+          return { success: false, error: "Errore caricamento dati utente" }
         }
 
         const authUser: AuthUser = {
@@ -304,25 +277,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nome: userData.nome,
           username: userData.username,
           email: userData.email,
+          ruolo: userData.ruolo,
         }
-
-        const isAdmin = userData.ruolo === "admin"
 
         updateAuthState({
           user: authUser,
-          isAdmin,
           isLoading: false,
-          sessionChecked: true,
+          isAdmin: authUser.ruolo === "admin",
         })
 
-        // Invalida cache
+        // Aggiorna cache
         globalAuthState.sessionCache.clear()
+        globalAuthState.sessionCache.set("session_check", { user: authUser, timestamp: Date.now() })
 
-        console.log(`${new Date().toISOString()} AuthProvider: Login riuscito per: ${userData.username}`)
+        console.log(`${new Date().toISOString()} AuthProvider: Login riuscito per: ${authUser.username}`)
         return { success: true }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Errore sconosciuto"
-        console.error(`${new Date().toISOString()} AuthProvider: Errore login:`, errorMessage)
+        console.error(`${new Date().toISOString()} AuthProvider: Errore login:`, error)
         return { success: false, error: errorMessage }
       }
     },
@@ -333,18 +305,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) return
 
     try {
+      console.log(`${new Date().toISOString()} AuthProvider: Logout...`)
+
       await supabase.auth.signOut()
 
       updateAuthState({
         user: null,
-        isAdmin: false,
         isLoading: false,
-        sessionChecked: true,
+        isAdmin: false,
       })
 
-      // Pulisci backup e cache
-      sessionStorage.removeItem(SESSION_STORAGE_KEY)
+      // Pulisci cache e backup
       globalAuthState.sessionCache.clear()
+      globalAuthState.sessionChecked = false
+      sessionStorage.removeItem(SESSION_STORAGE_KEY)
 
       console.log(`${new Date().toISOString()} AuthProvider: Logout completato`)
     } catch (error) {
@@ -352,16 +326,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase, updateAuthState])
 
+  const refreshUser = useCallback(async () => {
+    if (!supabase || !supabaseConnected) return
+
+    try {
+      const user = await checkSession()
+      updateAuthState({
+        user,
+        isAdmin: user?.ruolo === "admin",
+      })
+    } catch (error) {
+      console.error(`${new Date().toISOString()} AuthProvider: Errore refresh utente:`, error)
+    }
+  }, [supabase, supabaseConnected, checkSession, updateAuthState])
+
+  useEffect(() => {
+    // Timeout di sicurezza per inizializzazione
+    if (!supabaseInitializing && supabaseConnected && !globalAuthState.sessionChecked) {
+      timeoutRef.current = setTimeout(() => {
+        initializeAuth()
+      }, 200)
+    }
+
+    return () => {
+      mountedRef.current = false
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      // NON resettiamo globalAuthState qui per mantenerlo tra i remount
+    }
+  }, [supabaseInitializing, supabaseConnected, initializeAuth])
+
   const contextValue: AuthContextType = {
     user: state.user,
     isLoading: state.isLoading,
     isAdmin: state.isAdmin,
     login,
     logout,
-    supabaseConnected,
-    supabaseInitializing,
-    sessionChecked: state.sessionChecked,
+    refreshUser,
   }
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }

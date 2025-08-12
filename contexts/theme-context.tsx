@@ -1,296 +1,588 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { useSupabase } from "@/lib/supabase-provider"
 import { useAuth } from "@/lib/auth-provider"
 
+// Tipi per i temi
 interface Theme {
   id: number
-  nome: string
-  descrizione: string | null
-  css_vars: Record<string, string>
-  is_default: boolean
-  created_at: string
+  nome_tema: string
+  colore_titolo?: string
+  colore_sfondo?: string
+  colore_testo?: string
+  colore_accento?: string
+  carattere_tipo?: string
+  carattere_dimensione?: number
+  carattere_colore?: string
+  colore_header?: string
+  colore_footer?: string
+  colore_background?: string
+  colore_card?: string
+  colore_tabs?: string
+  colore_div?: string
+  border_radius?: string
+  css_variables?: Record<string, string> | string | null
+  isDefault?: boolean
 }
 
+// Tipi per il context
 interface ThemeContextType {
   themes: Theme[]
-  currentTheme: string
-  setCurrentTheme: (themeName: string) => void
+  currentTheme: Theme | null
+  applyTheme: (themeId: number) => void
+  resetToDefault: () => void
+  layout: "default" | "fullWidth" | "sidebar"
+  setLayout: (layout: "default" | "fullWidth" | "sidebar") => void
+  toggleDarkMode: () => void
+  isDarkMode: boolean
+  fontSize: "small" | "normal" | "large"
+  setFontSize: (size: "small" | "normal" | "large") => void
   mounted: boolean
-  themesLoaded: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-export const useTheme = () => {
+// Tema predefinito
+const defaultTheme: Theme = {
+  id: 0,
+  nome_tema: "Sistema",
+  isDefault: true,
+}
+
+// Stato persistente globale per prevenire reset durante unmount/remount
+const persistentThemeState = {
+  themes: [defaultTheme] as Theme[],
+  currentTheme: defaultTheme as Theme | null,
+  themesLoaded: false,
+  lastThemeLoad: 0,
+}
+
+// Hook sicuro per usare il context
+export function useSafeCustomTheme(): ThemeContextType {
   const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error("useTheme must be used within a ThemeProvider")
+  if (!context) {
+    // Fallback sicuro se il context non è disponibile
+    console.warn("useSafeCustomTheme: ThemeContext non disponibile, usando fallback")
+    return {
+      themes: [defaultTheme],
+      currentTheme: defaultTheme,
+      applyTheme: () => {},
+      resetToDefault: () => {},
+      layout: "default",
+      setLayout: () => {},
+      toggleDarkMode: () => {},
+      isDarkMode: false,
+      fontSize: "normal",
+      setFontSize: () => {},
+      mounted: false,
+    }
   }
   return context
 }
 
-// Stato globale persistente per i temi
-const globalThemeState = {
-  themes: [] as Theme[],
-  currentTheme: "Sistema",
-  themesLoaded: false,
-  themesCache: new Map<string, Theme[]>(),
-  lastThemeLoad: 0,
-}
-
-// Cache in localStorage per i temi
-const THEME_CACHE_KEY = "istudio_themes_cache"
-const CURRENT_THEME_KEY = "istudio_current_theme"
-
-const saveThemeCache = (themes: Theme[]) => {
-  try {
-    const cache = {
-      themes,
-      timestamp: Date.now(),
-    }
-    localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(cache))
-  } catch (error) {
-    console.warn("Impossibile salvare cache temi:", error)
-  }
-}
-
-const loadThemeCache = (): Theme[] | null => {
-  try {
-    const cache = localStorage.getItem(THEME_CACHE_KEY)
-    if (!cache) return null
-
-    const parsed = JSON.parse(cache)
-    const age = Date.now() - parsed.timestamp
-
-    // Cache valida per 1 ora
-    if (age > 3600000) {
-      localStorage.removeItem(THEME_CACHE_KEY)
-      return null
-    }
-
-    return parsed.themes
-  } catch (error) {
-    console.warn("Impossibile caricare cache temi:", error)
-    return null
-  }
-}
-
-const saveCurrentTheme = (themeName: string) => {
-  try {
-    localStorage.setItem(CURRENT_THEME_KEY, themeName)
-  } catch (error) {
-    console.warn("Impossibile salvare tema corrente:", error)
-  }
-}
-
-const loadCurrentTheme = (): string => {
-  try {
-    return localStorage.getItem(CURRENT_THEME_KEY) || "Sistema"
-  } catch (error) {
-    return "Sistema"
-  }
-}
-
-let renderCount = 0
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  renderCount++
-
-  const { supabase, isConnected: supabaseConnected } = useSupabase()
+  const { supabase, isConnected } = useSupabase()
   const { isLoading: authLoading } = useAuth()
+  const [themes, setThemes] = useState<Theme[]>(persistentThemeState.themes)
+  const [currentTheme, setCurrentTheme] = useState<Theme | null>(persistentThemeState.currentTheme)
+  const [layout, setLayoutState] = useState<"default" | "fullWidth" | "sidebar">("default")
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [fontSize, setFontSizeState] = useState<"small" | "normal" | "large">("normal")
+  const [mounted, setMounted] = useState(false)
+  const [themesLoaded, setThemesLoaded] = useState(persistentThemeState.themesLoaded)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout>()
+  const initializationRef = useRef(false)
+  const renderCountRef = useRef(0)
+  const lastStateRef = useRef<string>("")
+  const mountedRef = useRef(true)
 
-  // Inizializza lo stato dal globalState o dalla cache
-  const [state, setState] = useState(() => {
-    // Se abbiamo già temi caricati globalmente, usali
-    if (globalThemeState.themesLoaded && globalThemeState.themes.length > 0) {
-      return {
-        themes: globalThemeState.themes,
-        currentTheme: globalThemeState.currentTheme,
-        mounted: false,
-        themesLoaded: true,
-      }
-    }
-
-    // Altrimenti prova a caricare dalla cache
-    const cachedThemes = loadThemeCache()
-    const savedTheme = loadCurrentTheme()
-
-    if (cachedThemes && cachedThemes.length > 0) {
-      globalThemeState.themes = cachedThemes
-      globalThemeState.currentTheme = savedTheme
-      globalThemeState.themesLoaded = true
-
-      return {
-        themes: cachedThemes,
-        currentTheme: savedTheme,
-        mounted: false,
-        themesLoaded: true,
-      }
-    }
-
-    return {
-      themes: globalThemeState.themes,
-      currentTheme: globalThemeState.currentTheme,
-      mounted: false,
-      themesLoaded: globalThemeState.themesLoaded,
-    }
+  // Debouncing per evitare render multipli - con riduzione log
+  const currentState = JSON.stringify({
+    themesCount: themes.length,
+    currentTheme: currentTheme?.nome_tema,
+    mounted,
+    themesLoaded,
+    authLoading,
+    supabaseConnected: !!supabase && isConnected,
   })
 
-  const loadingRef = useRef(false)
-  const mountedRef = useRef(true)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  if (currentState !== lastStateRef.current) {
+    renderCountRef.current++
+    lastStateRef.current = currentState
 
-  // Funzione per aggiornare sia lo stato locale che globale
-  const updateThemeState = useCallback((newState: Partial<typeof state>) => {
-    Object.assign(globalThemeState, newState)
-    if (mountedRef.current) {
-      setState((prev) => ({ ...prev, ...newState }))
+    // Log solo ogni 5 render per ridurre spam
+    if (renderCountRef.current % 5 === 1) {
+      console.log("ThemeProvider: Render", {
+        themesCount: themes.length,
+        currentTheme: currentTheme?.nome_tema,
+        mounted,
+        themesLoaded,
+        authLoading,
+        supabaseConnected: !!supabase && isConnected,
+        renderCount: renderCountRef.current,
+      })
+    }
+  }
+
+  // Aggiorna lo stato persistente
+  const updatePersistentState = useCallback((newThemes: Theme[], newCurrentTheme: Theme | null, loaded: boolean) => {
+    persistentThemeState.themes = newThemes
+    persistentThemeState.currentTheme = newCurrentTheme
+    persistentThemeState.themesLoaded = loaded
+    persistentThemeState.lastThemeLoad = Date.now()
+  }, [])
+
+  // Funzione per convertire colori hex in HSL
+  const hexToHsl = useCallback((hex: string): string => {
+    if (!hex || hex === "") return "0 0% 50%"
+
+    // Se il colore è già in formato HSL, restituiscilo così com'è
+    if (hex.includes("hsl") || hex.includes("%")) return hex.replace("hsl(", "").replace(")", "")
+
+    // Rimuovi il # se presente
+    hex = hex.replace("#", "")
+
+    // Assicurati che sia un hex valido a 6 caratteri
+    if (hex.length === 3) {
+      hex = hex
+        .split("")
+        .map((char) => char + char)
+        .join("")
+    }
+    if (hex.length !== 6) return "0 0% 50%"
+
+    // Converti hex in RGB
+    const r = Number.parseInt(hex.substr(0, 2), 16) / 255
+    const g = Number.parseInt(hex.substr(2, 2), 16) / 255
+    const b = Number.parseInt(hex.substr(4, 2), 16) / 255
+
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    let h = 0,
+      s = 0,
+      l = (max + min) / 2
+
+    if (max !== min) {
+      const d = max - min
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+      switch (max) {
+        case r:
+          h = (g - b) / d + (g < b ? 6 : 0)
+          break
+        case g:
+          h = (b - r) / d + 2
+          break
+        case b:
+          h = (r - g) / d + 4
+          break
+      }
+      h /= 6
+    }
+
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
+  }, [])
+
+  // Applica gli stili del tema
+  const applyThemeStyles = useCallback(
+    (theme: Theme) => {
+      if (typeof window === "undefined") return
+
+      const root = document.documentElement
+
+      console.log("ThemeProvider: Applicando tema:", theme.nome_tema)
+
+      if (theme.isDefault) {
+        // Resetta al tema predefinito
+        const customProperties = [
+          "--primary",
+          "--secondary",
+          "--accent",
+          "--background",
+          "--foreground",
+          "--card",
+          "--card-foreground",
+          "--popover",
+          "--popover-foreground",
+          "--header",
+          "--footer",
+          "--div",
+        ]
+
+        customProperties.forEach((prop) => {
+          root.style.removeProperty(prop)
+        })
+
+        // Resetta il font family
+        document.body.style.fontFamily = ""
+
+        // Resetta il border radius
+        root.style.removeProperty("--radius")
+      } else {
+        // Applica i colori del tema personalizzato
+        if (theme.colore_titolo) {
+          const titleHsl = hexToHsl(theme.colore_titolo)
+          root.style.setProperty("--primary", titleHsl)
+        }
+
+        if (theme.colore_card) {
+          const cardHsl = hexToHsl(theme.colore_card)
+          root.style.setProperty("--secondary", cardHsl)
+        }
+
+        if (theme.colore_tabs) {
+          const tabsHsl = hexToHsl(theme.colore_tabs)
+          root.style.setProperty("--accent", tabsHsl)
+        }
+
+        if (theme.colore_background) {
+          const bgHsl = hexToHsl(theme.colore_background)
+          root.style.setProperty("--background", bgHsl)
+          root.style.setProperty("--card", bgHsl)
+          root.style.setProperty("--popover", bgHsl)
+        }
+
+        if (theme.carattere_colore) {
+          const textHsl = hexToHsl(theme.carattere_colore)
+          root.style.setProperty("--foreground", textHsl)
+          root.style.setProperty("--card-foreground", textHsl)
+          root.style.setProperty("--popover-foreground", textHsl)
+        }
+
+        if (theme.colore_header) {
+          const headerHsl = hexToHsl(theme.colore_header)
+          root.style.setProperty("--header", headerHsl)
+        }
+
+        if (theme.colore_footer) {
+          const footerHsl = hexToHsl(theme.colore_footer)
+          root.style.setProperty("--footer", footerHsl)
+        }
+
+        if (theme.colore_div) {
+          const divHsl = hexToHsl(theme.colore_div)
+          root.style.setProperty("--div", divHsl)
+        }
+
+        // Applica le variabili CSS personalizzate se presenti
+        if (theme.css_variables) {
+          let cssVars: Record<string, string> = {}
+
+          if (typeof theme.css_variables === "string") {
+            try {
+              cssVars = JSON.parse(theme.css_variables)
+            } catch (e) {
+              console.error("ThemeProvider: Errore nel parsing delle CSS variables:", e)
+            }
+          } else if (typeof theme.css_variables === "object") {
+            cssVars = theme.css_variables
+          }
+
+          Object.entries(cssVars).forEach(([key, value]) => {
+            if (value && typeof value === "string") {
+              root.style.setProperty(`--${key}`, value)
+            }
+          })
+        }
+
+        // Applica il font family
+        if (theme.carattere_tipo) {
+          document.body.style.fontFamily = theme.carattere_tipo
+        }
+
+        // Applica il border radius
+        if (theme.border_radius) {
+          root.style.setProperty("--radius", theme.border_radius)
+        }
+      }
+
+      // Forza il re-render aggiungendo una classe temporanea
+      document.body.classList.add("theme-transition")
+      setTimeout(() => {
+        document.body.classList.remove("theme-transition")
+      }, 300)
+
+      console.log("ThemeProvider: Tema applicato con successo")
+    },
+    [hexToHsl],
+  )
+
+  // Carica le preferenze dal localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedLayout = localStorage.getItem("app-layout") as "default" | "fullWidth" | "sidebar" | null
+      const savedDarkMode = localStorage.getItem("app-dark-mode")
+      const savedFontSize = localStorage.getItem("app-font-size") as "small" | "normal" | "large" | null
+
+      if (savedLayout) setLayoutState(savedLayout)
+      if (savedDarkMode) setIsDarkMode(savedDarkMode === "true")
+      if (savedFontSize) setFontSizeState(savedFontSize)
+
+      setMounted(true)
     }
   }, [])
 
-  // Log ridotto (ogni 5 render)
-  if (renderCount % 5 === 0) {
-    console.log(
-      `${new Date().toISOString()} ThemeProvider: Render`,
-      JSON.stringify({
-        themesCount: state.themes.length,
-        currentTheme: state.currentTheme,
-        mounted: state.mounted,
-        themesLoaded: state.themesLoaded,
-        authLoading,
-        supabaseConnected,
-        renderCount,
-      }),
-    )
-  }
+  // Carica i temi dal database - CON STATO PERSISTENTE E PREVENZIONE DUPLICATI
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
 
-  const loadThemes = useCallback(async () => {
-    if (!supabase || !supabaseConnected || loadingRef.current) {
-      return
-    }
-
-    // Se abbiamo già i temi caricati, non ricaricare
-    if (globalThemeState.themesLoaded && globalThemeState.themes.length > 0) {
-      return
-    }
-
-    const now = Date.now()
-    const cacheKey = "themes_load"
-
-    // Cache del caricamento temi per 5 minuti
-    if (globalThemeState.themesCache.has(cacheKey) && now - globalThemeState.lastThemeLoad < 300000) {
-      const cachedThemes = globalThemeState.themesCache.get(cacheKey)!
-      updateThemeState({
-        themes: cachedThemes,
-        themesLoaded: true,
-      })
-      return
-    }
-
-    loadingRef.current = true
-    console.log(`${new Date().toISOString()} ThemeProvider: Caricamento temi dal database...`)
-
-    try {
-      const { data: themes, error } = await supabase.from("temi").select("*").order("nome")
-
-      if (error) {
-        console.error(`${new Date().toISOString()} ThemeProvider: Errore caricamento temi:`, error)
+    const loadThemes = async () => {
+      // Evita caricamenti multipli
+      if (initializationRef.current || themesLoaded) {
         return
       }
 
-      const themesData = themes || []
-
-      // Salva in cache
-      globalThemeState.themesCache.set(cacheKey, themesData)
-      globalThemeState.lastThemeLoad = now
-      saveThemeCache(themesData)
-
-      updateThemeState({
-        themes: themesData,
-        themesLoaded: true,
-      })
-
-      console.log(`${new Date().toISOString()} ThemeProvider: Temi caricati con successo: ${themesData.length}`)
-    } catch (error) {
-      console.error(`${new Date().toISOString()} ThemeProvider: Errore caricamento temi:`, error)
-    } finally {
-      loadingRef.current = false
-    }
-  }, [supabase, supabaseConnected, updateThemeState])
-
-  const applyTheme = useCallback(
-    (themeName: string) => {
-      const theme = state.themes.find((t) => t.nome === themeName)
-
-      if (!theme) {
-        console.warn(`${new Date().toISOString()} ThemeProvider: Tema non trovato: ${themeName}`)
+      // Usa cache per evitare caricamenti ripetuti
+      const now = Date.now()
+      if (persistentThemeState.themesLoaded && now - persistentThemeState.lastThemeLoad < 60000) {
+        console.log("ThemeProvider: Temi già caricati di recente, uso cache")
+        if (mountedRef.current) {
+          setThemes(persistentThemeState.themes)
+          setCurrentTheme(persistentThemeState.currentTheme)
+          setThemesLoaded(true)
+          if (persistentThemeState.currentTheme) {
+            applyThemeStyles(persistentThemeState.currentTheme)
+          }
+        }
         return
       }
 
-      console.log(`${new Date().toISOString()} ThemeProvider: Applicando tema: ${themeName}`)
+      // Aspetta che l'autenticazione sia stabile
+      if (authLoading) {
+        return
+      }
+
+      // Verifica che Supabase sia disponibile
+      if (!supabase || !isConnected) {
+        return
+      }
+
+      initializationRef.current = true
+
+      // Timeout di sicurezza per evitare caricamenti infiniti
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.warn("ThemeProvider: Timeout nel caricamento dei temi, uso tema di default")
+        if (!themesLoaded && mountedRef.current) {
+          setThemes([defaultTheme])
+          setCurrentTheme(defaultTheme)
+          applyThemeStyles(defaultTheme)
+          setThemesLoaded(true)
+          updatePersistentState([defaultTheme], defaultTheme, true)
+          initializationRef.current = false
+        }
+      }, 8000) // 8 secondi di timeout
 
       try {
-        const root = document.documentElement
+        console.log("ThemeProvider: Caricamento temi dal database...")
 
-        // Applica le variabili CSS
-        Object.entries(theme.css_vars).forEach(([key, value]) => {
-          root.style.setProperty(key, value)
-        })
+        // Query semplice e sicura senza dipendenze dall'autenticazione
+        const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
 
-        updateThemeState({ currentTheme: themeName })
-        saveCurrentTheme(themeName)
+        if (error) {
+          console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
+          // In caso di errore, usa solo il tema di default
+          if (mountedRef.current) {
+            setThemes([defaultTheme])
+            setCurrentTheme(defaultTheme)
+            applyThemeStyles(defaultTheme)
+            setThemesLoaded(true)
+            updatePersistentState([defaultTheme], defaultTheme, true)
+          }
+          initializationRef.current = false
+          return
+        }
 
-        console.log(`${new Date().toISOString()} ThemeProvider: Tema applicato con successo`)
+        // Processa i temi da Supabase
+        const supabaseThemes = data
+          ? data.map((theme) => ({
+              ...theme,
+              carattere_colore: theme.carattere_colore || "#111827",
+              colore_header: theme.colore_header || "#F7FAFC",
+              colore_footer: theme.colore_footer || "#2D3748",
+              colore_titolo: theme.colore_titolo || "#1A202C",
+              colore_background: theme.colore_background || "#FFFFFF",
+              colore_card: theme.colore_card || "#E2E8F0",
+              carattere_tipo: theme.carattere_tipo || "Tahoma, sans-serif",
+              border_radius: theme.border_radius || "0.5rem",
+              css_variables:
+                typeof theme.css_variables === "string" ? JSON.parse(theme.css_variables) : theme.css_variables || {},
+              isDefault: false,
+            }))
+          : []
+
+        const allThemes = [defaultTheme, ...supabaseThemes]
+
+        if (mountedRef.current) {
+          setThemes(allThemes)
+          console.log("ThemeProvider: Temi caricati con successo:", allThemes.length)
+
+          // Applica il tema salvato o quello di default
+          const savedThemeId = localStorage.getItem("app-theme")
+          if (savedThemeId) {
+            const savedTheme = allThemes.find((t) => t.id.toString() === savedThemeId)
+            if (savedTheme) {
+              setCurrentTheme(savedTheme)
+              applyThemeStyles(savedTheme)
+              updatePersistentState(allThemes, savedTheme, true)
+            } else {
+              // Tema salvato non trovato, usa il default
+              setCurrentTheme(defaultTheme)
+              applyThemeStyles(defaultTheme)
+              updatePersistentState(allThemes, defaultTheme, true)
+            }
+          } else {
+            // Nessun tema salvato, usa il default
+            setCurrentTheme(defaultTheme)
+            applyThemeStyles(defaultTheme)
+            updatePersistentState(allThemes, defaultTheme, true)
+          }
+
+          setThemesLoaded(true)
+        }
+
+        // Cancella il timeout se il caricamento è completato con successo
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current)
+        }
       } catch (error) {
-        console.error(`${new Date().toISOString()} ThemeProvider: Errore applicazione tema:`, error)
+        console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
+        // Fallback al tema di default in caso di errore
+        if (mountedRef.current) {
+          setThemes([defaultTheme])
+          setCurrentTheme(defaultTheme)
+          applyThemeStyles(defaultTheme)
+          setThemesLoaded(true)
+          updatePersistentState([defaultTheme], defaultTheme, true)
+        }
+      } finally {
+        initializationRef.current = false
       }
-    },
-    [state.themes, updateThemeState],
-  )
+    }
 
-  const setCurrentTheme = useCallback(
-    (themeName: string) => {
-      applyTheme(themeName)
-    },
-    [applyTheme],
-  )
+    // Debouncing: aspetta 250ms prima di caricare i temi
+    if (mounted && !authLoading && supabase && isConnected && !themesLoaded) {
+      timeoutId = setTimeout(loadThemes, 250)
+    }
+
+    // Cleanup del timeout
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [supabase, isConnected, mounted, authLoading, themesLoaded, applyThemeStyles, updatePersistentState])
+
+  // Applica le dimensioni del font
+  const applyFontSize = useCallback((size: "small" | "normal" | "large") => {
+    if (typeof window === "undefined") return
+
+    const root = document.documentElement
+    const sizes = {
+      small: "14px",
+      normal: "16px",
+      large: "18px",
+    }
+
+    root.style.setProperty("--font-size-base", sizes[size])
+    root.classList.remove("font-small", "font-normal", "font-large")
+    root.classList.add(`font-${size}`)
+  }, [])
+
+  // Applica il dark mode
+  const applyDarkMode = useCallback((dark: boolean) => {
+    if (typeof window === "undefined") return
+
+    const root = document.documentElement
+    if (dark) {
+      root.classList.add("dark")
+    } else {
+      root.classList.remove("dark")
+    }
+  }, [])
+
+  // Effetti per applicare le impostazioni quando cambiano
+  useEffect(() => {
+    if (mounted) {
+      applyFontSize(fontSize)
+    }
+  }, [fontSize, mounted, applyFontSize])
 
   useEffect(() => {
-    updateThemeState({ mounted: true })
+    if (mounted) {
+      applyDarkMode(isDarkMode)
+    }
+  }, [isDarkMode, mounted, applyDarkMode])
 
+  // Funzioni per cambiare le impostazioni
+  const applyTheme = useCallback(
+    (themeId: number) => {
+      const theme = themes.find((t) => t.id === themeId)
+      if (theme && mountedRef.current) {
+        console.log("ThemeProvider: Applicando tema:", theme.nome_tema)
+        setCurrentTheme(theme)
+        applyThemeStyles(theme)
+        updatePersistentState(themes, theme, themesLoaded)
+        localStorage.setItem("app-theme", themeId.toString())
+      }
+    },
+    [themes, applyThemeStyles, themesLoaded, updatePersistentState],
+  )
+
+  const resetToDefault = useCallback(() => {
+    if (mountedRef.current) {
+      console.log("ThemeProvider: Reset al tema di default")
+      setCurrentTheme(defaultTheme)
+      applyThemeStyles(defaultTheme)
+      updatePersistentState(themes, defaultTheme, themesLoaded)
+      localStorage.setItem("app-theme", "0")
+    }
+  }, [applyThemeStyles, themes, themesLoaded, updatePersistentState])
+
+  const setLayout = useCallback((newLayout: "default" | "fullWidth" | "sidebar") => {
+    setLayoutState(newLayout)
+    localStorage.setItem("app-layout", newLayout)
+  }, [])
+
+  const toggleDarkMode = useCallback(() => {
+    const newDarkMode = !isDarkMode
+    setIsDarkMode(newDarkMode)
+    localStorage.setItem("app-dark-mode", newDarkMode.toString())
+  }, [isDarkMode])
+
+  const setFontSize = useCallback((size: "small" | "normal" | "large") => {
+    setFontSizeState(size)
+    localStorage.setItem("app-font-size", size)
+  }, [])
+
+  // Cleanup controllato
+  useEffect(() => {
     return () => {
       mountedRef.current = false
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+      console.log("ThemeProvider: Componente smontato")
+      // NON resettiamo lo stato persistente qui per mantenerlo tra i remount
     }
-  }, [updateThemeState])
+  }, [])
 
-  useEffect(() => {
-    if (!authLoading && supabaseConnected && !state.themesLoaded) {
-      // Timeout di sicurezza per prevenire caricamenti infiniti
-      timeoutRef.current = setTimeout(() => {
-        loadThemes()
-      }, 100)
-    }
-  }, [authLoading, supabaseConnected, state.themesLoaded, loadThemes])
-
-  useEffect(() => {
-    if (state.themesLoaded && state.themes.length > 0 && state.mounted) {
-      applyTheme(state.currentTheme)
-    }
-  }, [state.themesLoaded, state.themes.length, state.mounted, state.currentTheme, applyTheme])
-
-  const contextValue: ThemeContextType = {
-    themes: state.themes,
-    currentTheme: state.currentTheme,
-    setCurrentTheme,
-    mounted: state.mounted,
-    themesLoaded: state.themesLoaded,
+  const value: ThemeContextType = {
+    themes,
+    currentTheme,
+    applyTheme,
+    resetToDefault,
+    layout,
+    setLayout,
+    toggleDarkMode,
+    isDarkMode,
+    fontSize,
+    setFontSize,
+    mounted,
   }
 
-  return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
