@@ -62,14 +62,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isCheckingSessionRef = useRef(false)
   const redirectingRef = useRef(false)
   const initializationRef = useRef(false)
+  const renderCountRef = useRef(0)
+  const lastStateRef = useRef<string>("")
 
-  console.log("AuthProvider: Render", {
+  // Debouncing per evitare render multipli
+  const currentState = JSON.stringify({
     user: !!user,
     isLoading,
     supabaseConnected,
     supabaseInitializing,
-    sessionChecked
+    sessionChecked,
   })
+
+  if (currentState !== lastStateRef.current) {
+    renderCountRef.current++
+    lastStateRef.current = currentState
+
+    // Log solo ogni 3 render per ridurre spam
+    if (renderCountRef.current % 3 === 1) {
+      console.log("AuthProvider: Render", {
+        user: !!user,
+        isLoading,
+        supabaseConnected,
+        supabaseInitializing,
+        sessionChecked,
+        renderCount: renderCountRef.current,
+      })
+    }
+  }
 
   const hashPassword = useCallback(async (password: string): Promise<string> => {
     try {
@@ -102,24 +122,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = useCallback(
     async (userId: string) => {
       if (!supabase || !userId) {
-        console.log("AuthProvider: fetchUserData - Supabase non disponibile o userId mancante")
         return null
       }
-      
+
       try {
-        console.log("AuthProvider: Recupero dati utente per ID:", userId)
-        const { data, error } = await supabase
-          .from("utenti")
-          .select("*")
-          .eq("id", userId)
-          .single()
-          
+        const { data, error } = await supabase.from("utenti").select("*").eq("id", userId).single()
+
         if (error) {
           console.error("AuthProvider: Errore nel recupero dei dati utente:", error)
           return null
         }
-        
-        console.log("AuthProvider: Dati utente recuperati con successo")
+
         return data as AuthUser
       } catch (error) {
         console.error("AuthProvider: Errore nel recupero dei dati utente:", error)
@@ -171,20 +184,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Lista di tutti i possibili cookie da pulire
     const cookiesToClear = [
       AUTH_COOKIE_NAME,
-      'sb-access-token',
-      'sb-refresh-token',
-      'supabase-auth-token',
-      'supabase.auth.token'
+      "sb-access-token",
+      "sb-refresh-token",
+      "supabase-auth-token",
+      "supabase.auth.token",
     ]
 
-    cookiesToClear.forEach(cookieName => {
+    cookiesToClear.forEach((cookieName) => {
       // Pulisci per il dominio corrente
       document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
-      
+
       // Pulisci per domini alternativi
       const domains = [location.hostname, `.${location.hostname}`]
       const paths = ["/", "/auth"]
-      
+
       domains.forEach((domain) => {
         paths.forEach((path) => {
           document.cookie = `${cookieName}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`
@@ -194,14 +207,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Pulisci anche localStorage e sessionStorage
     try {
-      const keysToRemove = [
-        'supabase.auth.token',
-        'authToken',
-        'authUser',
-        'istudio_auth_session'
-      ]
-      
-      keysToRemove.forEach(key => {
+      const keysToRemove = ["supabase.auth.token", "authToken", "authUser", "istudio_auth_session"]
+
+      keysToRemove.forEach((key) => {
         localStorage.removeItem(key)
         sessionStorage.removeItem(key)
       })
@@ -236,8 +244,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const cookieValue = encodeURIComponent(JSON.stringify(session))
       const isSecure = window.location.protocol === "https:"
       document.cookie = `${AUTH_COOKIE_NAME}=${cookieValue}; path=/; max-age=${expiresInDays * 24 * 60 * 60}; SameSite=Lax${isSecure ? "; Secure" : ""}`
-      
-      console.log("AuthProvider: Sessione salvata nel cookie")
     } catch (error) {
       console.error("AuthProvider: Errore nel salvataggio del cookie di sessione:", error)
     }
@@ -245,21 +251,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkSession = useCallback(async (): Promise<boolean> => {
     if (isCheckingSessionRef.current) {
-      console.log("AuthProvider: checkSession già in corso, skip")
       return !!user
     }
-    
+
     isCheckingSessionRef.current = true
-    
+
     if (!supabase || supabaseInitializing) {
-      console.log("AuthProvider: checkSession - Supabase non pronto")
       isCheckingSessionRef.current = false
       return false
     }
-    
+
     try {
       console.log("AuthProvider: Verifica sessione...")
-      
+
       const session = getSessionFromCookie()
       if (!session || !session.user_id || new Date(session.expires_at) <= new Date()) {
         console.log("AuthProvider: Sessione non valida o scaduta")
@@ -276,7 +280,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Se abbiamo già l'utente con lo stesso ID, estendi solo la sessione
       if (user && user.id === session.user_id) {
-        console.log("AuthProvider: Utente già presente, estendo sessione")
         saveSessionToCookie(user.id)
         isCheckingSessionRef.current = false
         return true
@@ -296,17 +299,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       console.log("AuthProvider: Sessione valida, utente autenticato:", userData.username)
-      
+
       // Aggiorna ultimo accesso
       await updateLastAccess(userData.id)
-      
+
       // Imposta lo stato dell'utente
       setUser(userData)
       setIsAdmin(userData.ruolo === "admin")
-      
+
       // Estendi la sessione
       saveSessionToCookie(userData.id)
-      
+
       isCheckingSessionRef.current = false
       return true
     } catch (error) {
@@ -339,18 +342,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         return false
       }
-      
+
       if (isCheckingSessionRef.current || redirectingRef.current) {
-        console.log("AuthProvider: Login già in corso, skip")
         return false
       }
-      
+
       setIsLoading(true)
       isCheckingSessionRef.current = true
-      
+
       try {
         console.log("AuthProvider: Tentativo di login per:", usernameOrEmail)
-        
+
         const isEmail = usernameOrEmail.includes("@")
         let query = supabase.from("utenti").select("*")
         query = isEmail ? query.eq("email", usernameOrEmail) : query.eq("username", usernameOrEmail)
@@ -365,9 +367,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
-        
+
         if (!data) {
-          console.log("AuthProvider: Utente non trovato")
           toast({
             title: "Credenziali non valide",
             description: "Username/email o password non corretti.",
@@ -375,13 +376,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
           return false
         }
-        
+
         const fetchedUser = data as AuthUser
-        console.log("AuthProvider: Utente trovato, verifica password...")
-        
+
         const isPasswordValid = await verifyPassword(password, fetchedUser.password)
         if (!isPasswordValid) {
-          console.log("AuthProvider: Password non valida")
           toast({
             title: "Credenziali non valide",
             description: "Username/email o password non corretti.",
@@ -399,25 +398,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Aggiorna ultimo accesso
         await updateLastAccess(fetchedUser.id)
-        
+
         // Salva la sessione
         saveSessionToCookie(fetchedUser.id)
-        
+
         // Imposta lo stato dell'utente
         setUser(fetchedUser)
         setIsAdmin(fetchedUser.ruolo === "admin")
         setIsLoading(false)
-        
+
         // Redirect
         redirectingRef.current = true
         const destination = "/dashboard-utente"
         router.push(destination)
-        
-        toast({ 
-          title: "Login effettuato", 
-          description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!` 
+
+        toast({
+          title: "Login effettuato",
+          description: `Benvenuto, ${fetchedUser.nome || fetchedUser.username}!`,
         })
-        
+
         return true
       } catch (error: any) {
         console.error("AuthProvider: Errore durante il login:", error)
@@ -451,7 +450,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         console.log("AuthProvider: Tentativo di registrazione per:", email)
-        
+
         // Verifica se l'utente esiste già
         const { data: existingUser } = await supabase
           .from("utenti")
@@ -467,18 +466,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const hashedPassword = await hashPassword(password)
 
         // Inserisci il nuovo utente
-        const { error } = await supabase
-          .from("utenti")
-          .insert({
-            email,
-            username: metadata.username,
-            nome: metadata.nome,
-            cognome: metadata.cognome,
-            password: HASH_PREFIX + hashedPassword,
-            ruolo: "user",
-            attivo: true,
-            data_creazione: new Date().toISOString(),
-          })
+        const { error } = await supabase.from("utenti").insert({
+          email,
+          username: metadata.username,
+          nome: metadata.nome,
+          cognome: metadata.cognome,
+          password: HASH_PREFIX + hashedPassword,
+          ruolo: "user",
+          attivo: true,
+          data_creazione: new Date().toISOString(),
+        })
 
         if (error) {
           throw error
@@ -495,13 +492,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async (): Promise<void> => {
     if (redirectingRef.current) return
-    
+
     console.log("AuthProvider: Logout in corso...")
     redirectingRef.current = true
 
     // Pulisci tutti i cookie e lo storage
     clearAllAuthCookies()
-    
+
     // Reset dello stato
     setUser(null)
     setIsAdmin(false)
@@ -509,10 +506,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Redirect alla home
     router.push("/")
-    
-    toast({ 
-      title: "Logout effettuato", 
-      description: "Hai effettuato il logout con successo." 
+
+    toast({
+      title: "Logout effettuato",
+      description: "Hai effettuato il logout con successo.",
     })
 
     // Reset del flag dopo un breve delay
@@ -524,12 +521,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async (): Promise<void> => {
     if (!user?.id || !supabase) return
     try {
-      console.log("AuthProvider: Refresh dati utente...")
       const userData = await fetchUserData(user.id)
       if (userData) {
         setUser(userData)
         setIsAdmin(userData.ruolo === "admin")
-        console.log("AuthProvider: Dati utente aggiornati")
       }
     } catch (error) {
       console.error("AuthProvider: Errore nell'aggiornamento dei dati utente:", error)
@@ -539,29 +534,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Reset del flag di redirect quando cambia il pathname
   useEffect(() => {
     if (redirectingRef.current) {
-      console.log("AuthProvider: Reset redirecting flag per cambio pathname")
       redirectingRef.current = false
     }
   }, [pathname])
 
-  // Inizializzazione e verifica sessione
+  // Inizializzazione e verifica sessione - CON DEBOUNCING
   useEffect(() => {
     let isMounted = true
-    
+    let timeoutId: NodeJS.Timeout
+
     const initializeAuth = async () => {
       // Evita inizializzazioni multiple
       if (initializationRef.current || sessionChecked || isCheckingSessionRef.current) {
         return
       }
-      
+
       if (supabaseInitializing || !supabase) {
-        console.log("AuthProvider: In attesa di Supabase...")
         return
       }
-      
+
       initializationRef.current = true
       setIsLoading(true)
-      
+
       try {
         console.log("AuthProvider: Inizializzazione autenticazione...")
         await checkSession()
@@ -576,15 +570,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Debouncing: aspetta 100ms prima di inizializzare
     if (supabase && supabaseConnected && !supabaseInitializing) {
-      initializeAuth()
+      timeoutId = setTimeout(initializeAuth, 100)
     } else if (!supabaseInitializing && !supabaseConnected) {
-      // Se Supabase non è connesso e non si sta inizializzando, ferma il loading
       setIsLoading(false)
     }
 
     return () => {
       isMounted = false
+      if (timeoutId) clearTimeout(timeoutId)
     }
   }, [supabase, supabaseConnected, supabaseInitializing, checkSession, sessionChecked])
 

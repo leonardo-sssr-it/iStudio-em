@@ -86,8 +86,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [themesLoaded, setThemesLoaded] = useState(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout>()
   const initializationRef = useRef(false)
+  const renderCountRef = useRef(0)
+  const lastStateRef = useRef<string>("")
 
-  console.log("ThemeProvider: Render", {
+  // Debouncing per evitare render multipli
+  const currentState = JSON.stringify({
     themesCount: themes.length,
     currentTheme: currentTheme?.nome_tema,
     mounted,
@@ -95,6 +98,24 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     authLoading,
     supabaseConnected: !!supabase && isConnected,
   })
+
+  if (currentState !== lastStateRef.current) {
+    renderCountRef.current++
+    lastStateRef.current = currentState
+
+    // Log solo ogni 3 render per ridurre spam
+    if (renderCountRef.current % 3 === 1) {
+      console.log("ThemeProvider: Render", {
+        themesCount: themes.length,
+        currentTheme: currentTheme?.nome_tema,
+        mounted,
+        themesLoaded,
+        authLoading,
+        supabaseConnected: !!supabase && isConnected,
+        renderCount: renderCountRef.current,
+      })
+    }
+  }
 
   // Funzione per convertire colori hex in HSL
   const hexToHsl = useCallback((hex: string): string => {
@@ -108,7 +129,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     // Assicurati che sia un hex valido a 6 caratteri
     if (hex.length === 3) {
-      hex = hex.split('').map(char => char + char).join('')
+      hex = hex
+        .split("")
+        .map((char) => char + char)
+        .join("")
     }
     if (hex.length !== 6) return "0 0% 50%"
 
@@ -283,21 +307,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Carica i temi dal database - SOLO quando l'autenticazione è stabile
+  // Carica i temi dal database - CON DEBOUNCING E PREVENZIONE DUPLICATI
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+
     const loadThemes = async () => {
       // Evita caricamenti multipli
-      if (initializationRef.current || themesLoaded) return
-      
-      // Aspetta che l'autenticazione sia stabile
-      if (authLoading) {
-        console.log("ThemeProvider: In attesa che l'autenticazione si stabilizzi...")
+      if (initializationRef.current || themesLoaded) {
         return
       }
-      
+
+      // Aspetta che l'autenticazione sia stabile
+      if (authLoading) {
+        return
+      }
+
       // Verifica che Supabase sia disponibile
       if (!supabase || !isConnected) {
-        console.log("ThemeProvider: Supabase non disponibile")
         return
       }
 
@@ -321,12 +347,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
       try {
         console.log("ThemeProvider: Caricamento temi dal database...")
-        
+
         // Query semplice e sicura senza dipendenze dall'autenticazione
-        const { data, error } = await supabase
-          .from("temi")
-          .select("*")
-          .order("nome_tema")
+        const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
 
         if (error) {
           console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
@@ -352,9 +375,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
               carattere_tipo: theme.carattere_tipo || "Tahoma, sans-serif",
               border_radius: theme.border_radius || "0.5rem",
               css_variables:
-                typeof theme.css_variables === "string" 
-                  ? JSON.parse(theme.css_variables) 
-                  : theme.css_variables || {},
+                typeof theme.css_variables === "string" ? JSON.parse(theme.css_variables) : theme.css_variables || {},
               isDefault: false,
             }))
           : []
@@ -382,12 +403,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
 
         setThemesLoaded(true)
-        
+
         // Cancella il timeout se il caricamento è completato con successo
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current)
         }
-        
       } catch (error) {
         console.error("ThemeProvider: Errore nel caricamento dei temi:", error)
         // Fallback al tema di default in caso di errore
@@ -400,13 +420,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Carica i temi solo quando l'app è mounted, l'auth è stabile e Supabase è connesso
-    if (mounted && !authLoading && supabase && isConnected) {
-      loadThemes()
+    // Debouncing: aspetta 200ms prima di caricare i temi
+    if (mounted && !authLoading && supabase && isConnected && !themesLoaded) {
+      timeoutId = setTimeout(loadThemes, 200)
     }
 
     // Cleanup del timeout
     return () => {
+      if (timeoutId) clearTimeout(timeoutId)
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
