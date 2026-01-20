@@ -246,12 +246,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log(`AuthProvider: Tentativo di login per: ${identifier}`)
 
       // Cerca l'utente per username o email
-      const { data: userData, error } = await supabase
+      // Prima prova con username
+      let { data: userData, error } = await supabase
         .from("utenti")
         .select("id, username, email, password, nome, cognome, ruolo, attivo")
-        .or(`username.eq.${identifier},email.eq.${identifier}`)
+        .eq("username", identifier)
         .eq("attivo", true)
-        .single()
+        .maybeSingle()
+
+      // Se non trovato, prova con email
+      if (!userData && !error) {
+        const emailResult = await supabase
+          .from("utenti")
+          .select("id, username, email, password, nome, cognome, ruolo, attivo")
+          .eq("email", identifier)
+          .eq("attivo", true)
+          .maybeSingle()
+        
+        userData = emailResult.data
+        error = emailResult.error
+      }
 
       if (error || !userData) {
         console.log("AuthProvider: Utente non trovato o non attivo")
