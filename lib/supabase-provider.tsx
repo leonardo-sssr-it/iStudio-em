@@ -2,12 +2,13 @@
 
 import type React from "react"
 
-import { createContext, useContext, useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { createContext, useContext, useState, useEffect, useMemo } from "react"
+import { createBrowserClient } from "@supabase/ssr"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 
 type SupabaseContext = {
-  supabase: ReturnType<typeof createClient<Database>> | null
+  supabase: SupabaseClient<Database> | null
   isConnected: boolean
   isInitializing: boolean
 }
@@ -18,71 +19,67 @@ const Context = createContext<SupabaseContext>({
   isInitializing: true,
 })
 
-// Singleton per evitare istanze multiple
-let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null
-
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase, setSupabase] = useState<ReturnType<typeof createClient<Database>> | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isInitializing, setIsInitializing] = useState(true)
 
+  // Crea il client Supabase usando useMemo per evitare ricreazioni
+  const supabase = useMemo(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("Variabili d'ambiente Supabase mancanti")
+      return null
+    }
+
+    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
+  }, [])
+
   useEffect(() => {
-    const initializeSupabase = async () => {
+    const verifyConnection = async () => {
+      if (!supabase) {
+        setIsInitializing(false)
+        return
+      }
+
       try {
-        // Se abbiamo già un'istanza, riutilizzala
-        if (supabaseInstance) {
-          console.log("Riutilizzo istanza Supabase esistente")
-          setSupabase(supabaseInstance)
-          setIsConnected(true)
-          setIsInitializing(false)
-          return
+        // Test della connessione con retry
+        let retries = 3
+        let connected = false
+
+        while (retries > 0 && !connected) {
+          try {
+            const { error } = await supabase.from("configurazione").select("id").limit(1)
+            if (!error) {
+              connected = true
+              console.log("Connessione a Supabase stabilita con successo")
+            } else {
+              console.warn(`Tentativo di connessione fallito, riprovo... (${retries} tentativi rimasti)`)
+              retries--
+              if (retries > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 1000))
+              }
+            }
+          } catch {
+            retries--
+            if (retries > 0) {
+              await new Promise((resolve) => setTimeout(resolve, 1000))
+            }
+          }
         }
 
-        // Ottieni le variabili d'ambiente
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-
-        console.log("Tentativo di connessione a Supabase:", { url: supabaseUrl })
-
-        if (!supabaseUrl || !supabaseAnonKey) {
-          console.error("Variabili d'ambiente Supabase mancanti")
-          setIsInitializing(false)
-          return
-        }
-
-        // Crea il client Supabase
-        const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-          },
-        })
-
-        // Salva l'istanza nel singleton
-        supabaseInstance = client
-
-        // Verifica la connessione
-        console.log("Verifica della connessione...")
-        const { error } = await client.from("utenti").select("id").limit(1)
-
-        if (error) {
-          console.error("Errore nella connessione a Supabase:", error)
-          setIsConnected(false)
-        } else {
-          console.log("Connessione a Supabase stabilita con successo")
-          setSupabase(client)
-          setIsConnected(true)
-        }
+        setIsConnected(connected)
       } catch (error) {
-        console.error("Errore nell'inizializzazione di Supabase:", error)
+        console.error("Errore nella verifica connessione Supabase:", error)
         setIsConnected(false)
       } finally {
         setIsInitializing(false)
       }
     }
 
-    initializeSupabase()
-  }, [])
+    verifyConnection()
+  }, [supabase])
 
   return <Context.Provider value={{ supabase, isConnected, isInitializing }}>{children}</Context.Provider>
 }

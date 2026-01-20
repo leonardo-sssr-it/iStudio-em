@@ -288,7 +288,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await supabase.from("temi").select("*").order("nome_tema")
 
         if (error) {
-          console.error("Error loading themes:", error)
+          // Non loggare errori di schema cache come errori critici
+          if (error.message?.includes("schema cache")) {
+            console.log("Waiting for database connection to stabilize...")
+            return
+          }
+          console.error("Error loading themes:", error.message)
           return
         }
 
