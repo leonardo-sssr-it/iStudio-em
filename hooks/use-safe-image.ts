@@ -13,47 +13,67 @@ export function useSafeImage(url: string | undefined | null) {
     if (!url || url.startsWith("/placeholder.svg")) {
       setProcessedUrl(url || BlobUrlHandler.getPlaceholderImage())
       setIsLoading(false)
-      // Consider it an error if no URL was provided or it was already a placeholder from a previous failure.
       setHasError(!url || url.startsWith("/placeholder.svg"))
       return
     }
 
+    // Skip blob URLs that might be invalid
+    if (url.startsWith("blob:") && !url.includes("localhost") && !url.includes("127.0.0.1")) {
+      console.warn(`useSafeImage: Skipping potentially invalid blob URL ${url}`)
+      setProcessedUrl(BlobUrlHandler.getPlaceholderImage(undefined, undefined, "Invalid blob URL"))
+      setIsLoading(false)
+      setHasError(true)
+      return
+    }
+
     setIsLoading(true)
-    setHasError(false) // Reset error state for new URL
+    setHasError(false)
 
     const img = new window.Image()
-    img.src = url
+    img.crossOrigin = "anonymous" // Add CORS handling
+
+    const timeoutId = setTimeout(() => {
+      console.warn(`useSafeImage: Timeout loading image ${url}`)
+      img.onload = null
+      img.onerror = null
+      setProcessedUrl(BlobUrlHandler.getPlaceholderImage(undefined, undefined, "Timeout loading image"))
+      setIsLoading(false)
+      setHasError(true)
+    }, 10000) // 10 second timeout
 
     img.onload = () => {
+      clearTimeout(timeoutId)
       setProcessedUrl(url)
       setIsLoading(false)
       setHasError(false)
     }
 
     img.onerror = () => {
+      clearTimeout(timeoutId)
       console.warn(`useSafeImage: Failed to load image ${url}`)
-      // Extract a file name or a short part of the URL for the placeholder text
+
       let nameForPlaceholder = "source"
       try {
         const urlObj = new URL(url)
         const pathParts = urlObj.pathname.split("/")
-        nameForPlaceholder = pathParts.pop() || pathParts.pop() || "source" // Get last part
+        nameForPlaceholder = pathParts.pop() || pathParts.pop() || "source"
         if (nameForPlaceholder.length > 30) {
           nameForPlaceholder = "..." + nameForPlaceholder.slice(-27)
         }
       } catch (e) {
-        /* ignore if URL parsing fails */
+        nameForPlaceholder = "invalid-url"
       }
 
       setProcessedUrl(BlobUrlHandler.getPlaceholderImage(undefined, undefined, `Error loading: ${nameForPlaceholder}`))
       setIsLoading(false)
       setHasError(true)
-      // Optionally, you could add the failed URL to BlobUrlHandler's list
-      // BlobUrlHandler.addFailedUrl(url);
+      BlobUrlHandler.addFailedExternalUrl(url)
     }
 
-    // Cleanup function to prevent setting state on unmounted component
+    img.src = url
+
     return () => {
+      clearTimeout(timeoutId)
       img.onload = null
       img.onerror = null
     }

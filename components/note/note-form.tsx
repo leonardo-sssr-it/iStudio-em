@@ -124,10 +124,15 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
   // Ottieni le priorità dalla configurazione
   const priorityOptions = config?.priorita || []
 
+  // Debug info
+  console.log("NotaForm props:", { nota: nota ? { id: nota.id, titolo: nota.titolo } : null, isNew })
+
   // Inizializza il form con i dati della nota o valori predefiniti
   useEffect(() => {
+    console.log("NotaForm useEffect triggered:", { isNew, nota, userId: user?.id })
+
     if (isNew) {
-      setEditedItem({
+      const initialData = {
         id_utente: user?.id,
         titolo: "",
         contenuto: "",
@@ -135,14 +140,18 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
         priorita: "",
         notifica: "",
         synced: false,
-      })
+      }
+      console.log("Setting initial data for new nota:", initialData)
+      setEditedItem(initialData)
     } else if (nota) {
+      console.log("Setting data for existing nota:", nota)
       setEditedItem(nota)
     }
   }, [nota, isNew, user?.id])
 
   // Gestisce il cambio di un campo
   const handleFieldChange = (field: string, value: any) => {
+    console.log("Field changed:", field, value)
     setEditedItem((prev: any) => ({
       ...prev,
       [field]: value,
@@ -162,12 +171,18 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
       }
     })
 
+    console.log("Validation errors:", errors)
     return errors
   }
 
   // Salva la nota
   const handleSave = async () => {
-    if (!editedItem || !user?.id) return
+    if (!editedItem || !user?.id) {
+      console.error("Cannot save: missing data", { editedItem: !!editedItem, userId: user?.id })
+      return
+    }
+
+    console.log("Starting save process...")
 
     const errors = validateForm()
     if (errors.length > 0) {
@@ -195,10 +210,13 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
       if (!saveData.notifica) saveData.notifica = null
       if (!saveData.tags || saveData.tags.length === 0) saveData.tags = null
 
+      console.log("Saving data:", saveData)
+
       // Salva la nota
       const savedNota = await onSave(saveData)
 
       if (savedNota) {
+        console.log("Nota saved successfully:", savedNota)
         toast({
           title: "Salvato",
           description: "La nota è stata salvata con successo",
@@ -212,6 +230,7 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
         }
       }
     } catch (error: any) {
+      console.error("Error saving nota:", error)
       toast({
         title: "Errore",
         description: `Impossibile salvare la nota: ${error.message}`,
@@ -224,13 +243,19 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
 
   // Elimina la nota
   const handleDelete = async () => {
-    if (!nota?.id || !onDelete) return
+    if (!nota?.id || !onDelete) {
+      console.error("Cannot delete: missing data", { notaId: nota?.id, onDelete: !!onDelete })
+      return
+    }
+
+    console.log("Starting delete process for nota:", nota.id)
 
     setDeleting(true)
     try {
       const success = await onDelete(nota.id)
 
       if (success) {
+        console.log("Nota deleted successfully")
         toast({
           title: "Eliminato",
           description: "La nota è stata eliminata con successo",
@@ -238,6 +263,7 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
         router.push("/note")
       }
     } catch (error: any) {
+      console.error("Error deleting nota:", error)
       toast({
         title: "Errore",
         description: `Impossibile eliminare la nota: ${error.message}`,
@@ -259,10 +285,17 @@ export function NotaForm({ nota, onSave, onDelete, isNew = false }: NotaFormProp
     }
   }
 
+  console.log("NotaForm render state:", {
+    editedItem: editedItem ? { titolo: editedItem.titolo } : null,
+    saving,
+    deleting,
+    validationErrors,
+  })
+
   if (!editedItem) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p>Caricamento...</p>
+        <p>Caricamento form...</p>
       </div>
     )
   }

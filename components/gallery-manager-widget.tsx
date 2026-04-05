@@ -1,483 +1,228 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useCallback, useRef } from "react"
-import Image from "next/image"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { useToast } from "@/hooks/use-toast"
-import { Upload, Trash2, Edit, Save, X, Plus, ImageIcon, Loader2, Eye, Download } from "lucide-react"
-import { cn } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { RefreshCw, ImageIcon, Eye, AlertCircle, CheckCircle, Folder, FileImage } from "lucide-react"
+import { ImageGallery } from "@/components/image-gallery"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface GalleryImage {
-  id: string
   src: string
   alt: string
   title?: string
-  description?: string
-  uploadedAt: string
 }
 
-// Simulazione del database locale - in produzione useresti Supabase
-const INITIAL_GALLERY: GalleryImage[] = [
-  {
-    id: "1",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/x.jpg-XOiK6xtrpfrACfJ1tpOu7243XAV8Pr.jpeg",
-    alt: "Arte digitale creata da mani robotiche",
-    title: "Arte Digitale AI",
-    description: "Creazione artistica realizzata con intelligenza artificiale",
-    uploadedAt: "2024-01-15T10:30:00Z",
-  },
-  {
-    id: "2",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG3.jpg-in3EFYtEhe5JjvJ0KNkEZ0Yb4HjLJb.jpeg",
-    alt: "Professionista in ufficio moderno con grafici analitici",
-    title: "Business Analytics",
-    description: "Ambiente di lavoro moderno con analisi dati",
-    uploadedAt: "2024-01-14T15:45:00Z",
-  },
-  {
-    id: "3",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG1.jpg-H2DuXCHMM87aAIV3vz39CMfQB5O1gq.jpeg",
-    alt: "Illustrazione di multitasking e gestione dello stress lavorativo",
-    title: "Multitasking",
-    description: "Gestione efficace del carico di lavoro",
-    uploadedAt: "2024-01-13T09:20:00Z",
-  },
-  {
-    id: "4",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG4.jpg-VgxWj7w218JlNDMAhpLjrqA4ykPs3A.jpeg",
-    alt: "Team di lavoro collaborativo in ambiente moderno",
-    title: "Team Collaboration",
-    description: "Collaborazione efficace in team",
-    uploadedAt: "2024-01-12T14:10:00Z",
-  },
-  {
-    id: "5",
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG2.rAe.jpg-JO4CqjqquIJZQm7Jchtkv24VyJU4Yh.jpeg",
-    alt: "Pianista che si esibisce in un teatro vuoto",
-    title: "Performance Artistica",
-    description: "Momento di arte e creatività",
-    uploadedAt: "2024-01-11T20:30:00Z",
-  },
-]
+interface GalleryStats {
+  totalImages: number
+  lastUpdated: string
+  folderPath: string
+}
 
 export function GalleryManagerWidget() {
-  const [images, setImages] = useState<GalleryImage[]>(INITIAL_GALLERY)
-  const [isUploading, setIsUploading] = useState(false)
-  const [editingImage, setEditingImage] = useState<GalleryImage | null>(null)
-  const [previewImage, setPreviewImage] = useState<GalleryImage | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast()
+  const [images, setImages] = useState<GalleryImage[]>([])
+  const [stats, setStats] = useState<GalleryStats | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  // Simulazione upload - in produzione useresti Vercel Blob o Supabase Storage
-  const handleFileUpload = useCallback(
-    async (files: FileList) => {
-      if (!files.length) return
+  // Carica le immagini e le statistiche
+  const loadGalleryData = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-      setIsUploading(true)
+      const response = await fetch("/api/gallery-images")
 
-      try {
-        for (const file of Array.from(files)) {
-          // Validazione file
-          if (!file.type.startsWith("image/")) {
-            toast({
-              title: "Errore",
-              description: `${file.name} non è un'immagine valida`,
-              variant: "destructive",
-            })
-            continue
-          }
-
-          if (file.size > 5 * 1024 * 1024) {
-            // 5MB limit
-            toast({
-              title: "Errore",
-              description: `${file.name} è troppo grande (max 5MB)`,
-              variant: "destructive",
-            })
-            continue
-          }
-
-          // Simulazione upload (in produzione faresti una chiamata API)
-          const reader = new FileReader()
-          reader.onload = (e) => {
-            const newImage: GalleryImage = {
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              src: e.target?.result as string,
-              alt: file.name.replace(/\.[^/.]+$/, ""),
-              title: file.name.replace(/\.[^/.]+$/, ""),
-              description: `Caricata il ${new Date().toLocaleDateString()}`,
-              uploadedAt: new Date().toISOString(),
-            }
-
-            setImages((prev) => [newImage, ...prev])
-          }
-          reader.readAsDataURL(file)
-        }
-
-        toast({
-          title: "Successo",
-          description: `${files.length} immagine/i caricate con successo`,
-        })
-      } catch (error) {
-        toast({
-          title: "Errore",
-          description: "Errore durante il caricamento delle immagini",
-          variant: "destructive",
-        })
-      } finally {
-        setIsUploading(false)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-    },
-    [toast],
-  )
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      const files = e.dataTransfer.files
-      if (files.length > 0) {
-        handleFileUpload(files)
+      const data = await response.json()
+
+      if (data.success) {
+        setImages(data.images || [])
+        setStats({
+          totalImages: data.count || 0,
+          lastUpdated: new Date().toLocaleString("it-IT"),
+          folderPath: "/public/images/gallery",
+        })
+      } else {
+        throw new Error(data.message || "Errore nel caricamento")
       }
-    },
-    [handleFileUpload],
-  )
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
+      setLastRefresh(new Date())
+    } catch (err) {
+      console.error("Errore nel caricamento della galleria:", err)
+      setError(err instanceof Error ? err.message : "Errore sconosciuto")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Carica i dati al mount del componente
+  useEffect(() => {
+    loadGalleryData()
   }, [])
 
-  const deleteImage = useCallback(
-    (id: string) => {
-      setImages((prev) => prev.filter((img) => img.id !== id))
-      toast({
-        title: "Successo",
-        description: "Immagine eliminata",
-      })
-    },
-    [toast],
-  )
+  // Funzione per aggiornare manualmente
+  const handleRefresh = () => {
+    loadGalleryData()
+  }
 
-  const updateImage = useCallback(
-    (updatedImage: GalleryImage) => {
-      setImages((prev) => prev.map((img) => (img.id === updatedImage.id ? updatedImage : img)))
-      setEditingImage(null)
-      toast({
-        title: "Successo",
-        description: "Immagine aggiornata",
-      })
-    },
-    [toast],
-  )
-
-  const downloadImage = useCallback(
-    async (image: GalleryImage) => {
-      try {
-        const response = await fetch(image.src)
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `${image.title || "image"}.jpg`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-      } catch (error) {
-        toast({
-          title: "Errore",
-          description: "Impossibile scaricare l'immagine",
-          variant: "destructive",
-        })
-      }
-    },
-    [toast],
-  )
+  // Funzione per mostrare/nascondere l'anteprima
+  const togglePreview = () => {
+    setShowPreview(!showPreview)
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header con statistiche */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Totale Immagini</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{images.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Caricate Oggi</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {images.filter((img) => new Date(img.uploadedAt).toDateString() === new Date().toDateString()).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Spazio Utilizzato</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">~{Math.round(images.length * 2.5)}MB</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Area di upload */}
-      <Card>
-        <CardHeader>
+    <Card className="w-full">
+      <CardHeader>
+        <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            Carica Nuove Immagini
+            <ImageIcon className="h-5 w-5" />
+            Gestione Galleria
           </CardTitle>
-          <CardDescription>Trascina le immagini qui o clicca per selezionarle (max 5MB per file)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div
-            className={cn(
-              "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-              "hover:border-primary/50 hover:bg-primary/5",
-              isUploading && "border-primary bg-primary/10",
-            )}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-          >
-            {isUploading ? (
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Caricamento in corso...</p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={togglePreview}
+              className="flex items-center gap-1 bg-transparent"
+            >
+              <Eye className="h-4 w-4" />
+              {showPreview ? "Nascondi" : "Anteprima"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-1 bg-transparent"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              Aggiorna
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Statistiche */}
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+        ) : stats ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+              <FileImage className="h-5 w-5 text-blue-600" />
+              <div>
+                <div className="font-semibold text-blue-900">{stats.totalImages}</div>
+                <div className="text-xs text-blue-700">Immagini totali</div>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+              <Folder className="h-5 w-5 text-green-600" />
+              <div>
+                <div className="font-semibold text-green-900">Gallery</div>
+                <div className="text-xs text-green-700">Cartella attiva</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <RefreshCw className="h-5 w-5 text-gray-600" />
+              <div>
+                <div className="font-semibold text-gray-900 text-xs">{lastRefresh.toLocaleTimeString("it-IT")}</div>
+                <div className="text-xs text-gray-700">Ultimo aggiornamento</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Stato della galleria */}
+        {!isLoading && (
+          <div className="flex items-center gap-2">
+            {error ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Errore: {error}</AlertDescription>
+              </Alert>
+            ) : images.length > 0 ? (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>Galleria caricata correttamente con {images.length} immagini</AlertDescription>
+              </Alert>
             ) : (
-              <div className="flex flex-col items-center gap-4">
-                <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                <div>
-                  <p className="text-lg font-medium">Trascina le immagini qui</p>
-                  <p className="text-sm text-muted-foreground">oppure</p>
-                </div>
-                <Button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Seleziona File
-                </Button>
-              </div>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Nessuna immagine trovata nella cartella /public/images/gallery</AlertDescription>
+              </Alert>
             )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
-          />
-        </CardContent>
-      </Card>
+        )}
 
-      {/* Griglia delle immagini */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Galleria Immagini</CardTitle>
-          <CardDescription>Gestisci le tue immagini: visualizza, modifica o elimina</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[600px]">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {images.map((image) => (
-                <Card key={image.id} className="overflow-hidden group">
-                  <div className="relative aspect-square">
-                    <Image
-                      src={image.src || "/placeholder.svg"}
-                      alt={image.alt}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="flex gap-1">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              className="h-8 w-8"
-                              onClick={() => setPreviewImage(image)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                              <DialogTitle>{image.title}</DialogTitle>
-                              <DialogDescription>{image.description}</DialogDescription>
-                            </DialogHeader>
-                            <div className="relative aspect-video">
-                              <Image
-                                src={image.src || "/placeholder.svg"}
-                                alt={image.alt}
-                                fill
-                                className="object-contain"
-                                sizes="(max-width: 1200px) 100vw, 1200px"
-                              />
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-8 w-8"
-                          onClick={() => downloadImage(image)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="secondary"
-                          className="h-8 w-8"
-                          onClick={() => setEditingImage(image)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="destructive" className="h-8 w-8">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Elimina Immagine</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Sei sicuro di voler eliminare questa immagine? L'azione non può essere annullata.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Annulla</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => deleteImage(image.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Elimina
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
+        {/* Lista delle immagini */}
+        {!isLoading && images.length > 0 && (
+          <div>
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              <FileImage className="h-4 w-4" />
+              Immagini disponibili
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+              {images.map((image, index) => (
+                <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm">
+                  <img
+                    src={image.src || "/placeholder.svg"}
+                    alt={image.alt}
+                    className="w-8 h-8 object-cover rounded"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = "/placeholder.svg?height=32&width=32&text=?"
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate font-medium">{image.title}</div>
+                    <div className="text-xs text-gray-500 truncate">{image.src.split("/").pop()}</div>
                   </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-sm truncate">{image.title}</h3>
-                    <p className="text-xs text-muted-foreground truncate">{image.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(image.uploadedAt).toLocaleDateString()}
-                    </p>
-                  </CardContent>
-                </Card>
+                </div>
               ))}
             </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+          </div>
+        )}
 
-      {/* Dialog per modifica immagine */}
-      {editingImage && (
-        <Dialog open={!!editingImage} onOpenChange={() => setEditingImage(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Modifica Immagine</DialogTitle>
-              <DialogDescription>Aggiorna le informazioni dell'immagine</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="relative aspect-video rounded-lg overflow-hidden">
-                <Image
-                  src={editingImage.src || "/placeholder.svg"}
-                  alt={editingImage.alt}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 600px) 100vw, 600px"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Titolo</Label>
-                <Input
-                  id="title"
-                  value={editingImage.title || ""}
-                  onChange={(e) =>
-                    setEditingImage({
-                      ...editingImage,
-                      title: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="alt">Testo alternativo</Label>
-                <Input
-                  id="alt"
-                  value={editingImage.alt}
-                  onChange={(e) =>
-                    setEditingImage({
-                      ...editingImage,
-                      alt: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrizione</Label>
-                <Textarea
-                  id="description"
-                  value={editingImage.description || ""}
-                  onChange={(e) =>
-                    setEditingImage({
-                      ...editingImage,
-                      description: e.target.value,
-                    })
-                  }
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditingImage(null)}>
-                  <X className="h-4 w-4 mr-2" />
-                  Annulla
-                </Button>
-                <Button onClick={() => updateImage(editingImage)}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Salva
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+        {/* Anteprima della galleria */}
+        {showPreview && !isLoading && images.length > 0 && (
+          <div>
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Anteprima Slideshow
+            </h4>
+            <ImageGallery autoPlay={true} interval={3000} showControls={true} className="max-w-md mx-auto" />
+          </div>
+        )}
+
+        {/* Istruzioni per aggiungere immagini */}
+        {!isLoading && images.length === 0 && !error && (
+          <div className="text-center py-6 bg-gray-50 rounded-lg">
+            <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+            <h4 className="font-semibold text-gray-700 mb-2">Nessuna immagine trovata</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Per aggiungere immagini alla galleria, inseriscile nella cartella:
+            </p>
+            <Badge variant="outline" className="font-mono text-xs">
+              /public/images/gallery/
+            </Badge>
+            <p className="text-xs text-gray-500 mt-2">Formati supportati: JPG, PNG, GIF, WebP, SVG</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

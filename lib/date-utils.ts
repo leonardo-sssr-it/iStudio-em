@@ -21,7 +21,7 @@ export function normalizeDate(
     // Per evitare problemi di timezone, se la stringa è solo data (YYYY-MM-DD),
     // la interpretiamo come UTC per mantenere il giorno corretto.
     if (dateInput.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      date = new Date(dateInput + "T00:00:00.000Z")
+      date = new Date(dateInput + "T00:00:00.001")
     } else {
       date = parseISO(dateInput) // parseISO gestisce stringhe ISO complete
     }
@@ -35,7 +35,7 @@ export function normalizeDate(
   const normalized = new Date(date.valueOf())
 
   if (type === "start") {
-    return setMilliseconds(setSeconds(setMinutes(setHours(normalized, 0), 0), 0), 0)
+    return setMilliseconds(setSeconds(setMinutes(setHours(normalized, 0), 0), 0), 1)
   } else {
     // type === 'end'
     return setMilliseconds(setSeconds(setMinutes(setHours(normalized, 23), 59), 59), 999)

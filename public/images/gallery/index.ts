@@ -1,28 +1,53 @@
-// Questo file serve come indice per le immagini della galleria
-export const galleryImages = [
-  {
-    src: "/images/gallery/creative-ai.jpg",
-    alt: "Arte digitale creata da mani robotiche",
-    url: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/x.jpg-XOiK6xtrpfrACfJ1tpOu7243XAV8Pr.jpeg",
-  },
-  {
-    src: "/images/gallery/business-analytics.jpg",
-    alt: "Professionista in ufficio moderno con grafici analitici",
-    url: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG3.jpg-in3EFYtEhe5JjvJ0KNkEZ0Yb4HjLJb.jpeg",
-  },
-  {
-    src: "/images/gallery/multitasking.jpg",
-    alt: "Illustrazione di multitasking e gestione dello stress lavorativo",
-    url: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG1.jpg-H2DuXCHMM87aAIV3vz39CMfQB5O1gq.jpeg",
-  },
-  {
-    src: "/images/gallery/team-collaboration.jpg",
-    alt: "Team di lavoro collaborativo in ambiente moderno",
-    url: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG4.jpg-VgxWj7w218JlNDMAhpLjrqA4ykPs3A.jpeg",
-  },
-  {
-    src: "/images/gallery/pianist.jpg",
-    alt: "Pianista che si esibisce in un teatro vuoto",
-    url: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG2.rAe.jpg-JO4CqjqquIJZQm7Jchtkv24VyJU4Yh.jpeg",
-  },
-]
+// Configurazione per la galleria di immagini
+// Questo file può essere utilizzato per configurazioni avanzate della galleria
+
+export interface GalleryConfig {
+  // Cartella delle immagini (relativa a /public)
+  imagePath: string
+  // Estensioni supportate
+  supportedExtensions: string[]
+  // Immagini di fallback
+  fallbackImages: Array<{
+    src: string
+    alt: string
+    title: string
+  }>
+  // Configurazioni slideshow
+  defaultInterval: number
+  defaultAutoPlay: boolean
+}
+
+export const galleryConfig: GalleryConfig = {
+  imagePath: "/images/gallery",
+  supportedExtensions: [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+  fallbackImages: [
+    {
+      src: "/placeholder.svg?height=400&width=600&text=Galleria+Vuota",
+      alt: "Galleria vuota",
+      title: "Nessuna immagine disponibile",
+    },
+    {
+      src: "/placeholder.svg?height=400&width=600&text=Aggiungi+Immagini",
+      alt: "Aggiungi immagini",
+      title: "Aggiungi immagini alla galleria",
+    },
+  ],
+  defaultInterval: 5000, // 5 secondi
+  defaultAutoPlay: true,
+}
+
+// Utility per generare nomi di file friendly
+export const generateFriendlyName = (filename: string): string => {
+  return filename
+    .replace(/\.[^/.]+$/, "") // Rimuovi estensione
+    .split(/[-_]/) // Dividi su trattini e underscore
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalizza
+    .join(" ") // Unisci con spazi
+}
+
+// Utility per validare se un file è un'immagine
+export const isImageFile = (filename: string): boolean => {
+  return galleryConfig.supportedExtensions.some((ext) => filename.toLowerCase().endsWith(ext))
+}
+
+export default galleryConfig

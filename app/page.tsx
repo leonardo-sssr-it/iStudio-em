@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth-provider"
 import { useSafeCustomTheme } from "@/contexts/theme-context"
 import { BarChart, Database, Users, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { motion } from "framer-motion"
 
 // Migliorare il rendering condizionale nella landing page
 export default function Home() {
@@ -50,20 +49,6 @@ export default function Home() {
     )
   }
 
-  // Variante per l'animazione delle card
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: {
-        delay: i * 0.1,
-        duration: 0.5,
-        ease: "easeOut",
-      },
-    }),
-  }
-
   // Utilizziamo una chiave per forzare il re-render completo quando cambia lo stato dell'utente
   return (
     <div className="min-h-[calc(100vh-8rem)]" key={user ? "logged-in" : "logged-out"}>
@@ -99,7 +84,7 @@ export default function Home() {
           <div className={layout === "fullWidth" ? "w-full px-4 md:px-8" : "container mx-auto px-4 md:px-8"}>
             <h2 className="text-3xl font-bold text-center mb-12">Perché scegliere iStudio?</h2>
 
-            {/* Grid di card con animazioni */}
+            {/* Grid di card con animazioni CSS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 {
@@ -131,29 +116,35 @@ export default function Home() {
                   darkColor: "dark:from-amber-500/30 dark:to-orange-400/30",
                 },
               ].map((feature, i) => (
-                <motion.div
+                <div
                   key={feature.title}
-                  custom={i}
-                  initial="hidden"
-                  animate="visible"
-                  variants={cardVariants}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
                   className={cn(
-                    "rounded-xl p-6 shadow-lg transition-all",
+                    "rounded-xl p-6 shadow-lg transition-all duration-300 ease-out",
                     "bg-gradient-to-br",
                     feature.color,
                     feature.darkColor,
                     "border border-transparent",
                     "hover:border-primary/20 dark:hover:border-primary/30",
+                    "hover:scale-105 hover:shadow-xl",
+                    "animate-in fade-in slide-in-from-bottom-4",
+                    // Stagger animation delay
+                    i === 0 && "animation-delay-0",
+                    i === 1 && "animation-delay-100",
+                    i === 2 && "animation-delay-200",
+                    i === 3 && "animation-delay-300",
                   )}
+                  style={{
+                    animationDelay: `${i * 100}ms`,
+                    animationDuration: "500ms",
+                    animationFillMode: "both",
+                  }}
                 >
                   <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center mb-4 shadow-md">
                     {feature.icon}
                   </div>
                   <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
                   <p className="text-muted-foreground">{feature.description}</p>
-                </motion.div>
+                </div>
               ))}
             </div>
           </div>

@@ -1,1479 +1,700 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAgendaItems } from "@/hooks/use-agenda-items"
+import { useAuth } from "@/lib/auth-provider"
+import { cn } from "@/lib/utils"
 import {
   format,
-  addDays,
   startOfWeek,
   endOfWeek,
-  startOfMonth,
-  endOfMonth,
   eachDayOfInterval,
   isSameDay,
-  isWithinInterval,
-  addWeeks,
+  addDays,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  eachWeekOfInterval,
+  isSameMonth,
   addMonths,
-  subWeeks,
   subMonths,
-  isToday,
 } from "date-fns"
 import { it } from "date-fns/locale"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Clock,
-  Info,
-  Search,
-  Filter,
-  Download,
-  AlertCircle,
-  Globe,
   User,
-  HelpCircle,
-  Bug,
+  FileText,
+  CheckSquare,
+  AlertTriangle,
+  Briefcase,
+  Plus,
+  Eye,
+  CalendarDays,
+  CalendarRange,
+  Grid3X3,
 } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useAgendaItems, type AgendaItem } from "@/hooks/use-agenda-items"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useAuth } from "@/lib/auth-provider" // Ensure this path is correct
-import { useDebugConfig } from "@/hooks/use-debug-config"
-import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 
-// Funzioni di utilità per il debug
-const formatDateForDebug = (date: Date | undefined): string => {
-  if (!date) return "UNDEFINED"
-  if (!(date instanceof Date)) return "NOT_DATE"
-  if (isNaN(date.getTime())) return "INVALID_DATE"
-  return date.toISOString()
-}
-
-const checkInvalidDates = (items: AgendaItem[]): AgendaItem[] => {
-  return items.filter((item) => {
-    const hasInvalidStartDate =
-      !item.data_inizio || !(item.data_inizio instanceof Date) || isNaN(item.data_inizio.getTime())
-    const hasInvalidEndDate = item.data_fine && (!(item.data_fine instanceof Date) || isNaN(item.data_fine.getTime()))
-    const hasInvalidScadenzaDate =
-      item.data_scadenza && (!(item.data_scadenza instanceof Date) || isNaN(item.data_scadenza.getTime()))
-
-    return hasInvalidStartDate || hasInvalidEndDate || hasInvalidScadenzaDate
-  })
-}
-
-// Definizione dei colori per i diversi tipi di elementi
-const COLORS = {
-  attivita: "#ffcdd2", // Rosso pastello
-  progetto: "#bbdefb", // Blu pastello
-  appuntamento: "#c8e6c9", // Verde pastello
-  scadenza: "#ffecb3", // Giallo pastello
-  scadenza_generale: "#FFC107", // Giallo ambra
-  todolist: "#e1bee7", // Viola pastello
-}
-
-// Abbreviazioni per i tipi di elementi
-const TYPE_ABBR = {
-  attivita: "ATT",
-  progetto: "PRO",
-  appuntamento: "APP",
-  scadenza: "SCA",
-  todolist: "TDL",
-}
-
-// Funzione per formattare l'ora
-const formatTime = (date: Date) => {
-  return format(date, "HH:mm")
-}
-
-// Funzione per il logging condizionale
-const conditionalLog = (message: string, data?: any, isDebugEnabled = false) => {
-  if (isDebugEnabled) {
-    if (data) {
-      console.log(message, data)
-    } else {
-      console.log(message)
-    }
-  }
-}
-
-// Componente per visualizzare un singolo elemento dell'agenda
-const AgendaItemComponent = ({ item }: { item: AgendaItem }) => {
-  // Ottieni l'abbreviazione del tipo
-  const typeAbbr = TYPE_ABBR[item.tipo] || item.tipo.substring(0, 3).toUpperCase()
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <div
-          className="flex items-stretch p-0 rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity overflow-hidden"
-          style={{ backgroundColor: item.colore }}
-        >
-          {/* Tipo in verticale */}
-          <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 vertical-text">
-            {typeAbbr}
-          </div>
-
-          {/* Contenuto principale */}
-          <div className="flex-1 p-1.5">
-            <div className="font-medium text-gray-800 truncate flex items-center text-xs">
-              {item.generale && <Globe className="h-2.5 w-2.5 mr-0.5 text-gray-700 flex-shrink-0" />}
-              {item.titolo}
-            </div>
-            <div className="text-xs text-gray-700 flex items-center">
-              <Clock className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-              {formatTime(item.data_inizio)}
-              {item.data_fine &&
-                item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                ` - ${formatTime(item.data_fine)}`}
-            </div>
-          </div>
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-80">
-        <div className="space-y-2">
-          <div className="flex items-center">
-            <h4 className="font-bold flex-1">{item.titolo}</h4>
-            {item.generale ? (
-              <Badge variant="outline" className="ml-2 bg-amber-100">
-                <Globe className="h-3 w-3 mr-1" />
-                Generale
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="ml-2 bg-blue-100">
-                <User className="h-3 w-3 mr-1" />
-                Personale
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex items-center text-sm">
-            <Clock className="h-4 w-4 mr-1" />
-            <span>
-              {format(item.data_inizio, "PPP", { locale: it })} {formatTime(item.data_inizio)}
-              {item.data_fine &&
-                item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                ` - ${formatTime(item.data_fine)}`}
-            </span>
-          </div>
-
-          {item.cliente && (
-            <div className="text-sm">
-              <span className="font-semibold">Cliente:</span> {item.cliente}
-            </div>
-          )}
-
-          {item.stato && (
-            <div className="text-sm">
-              <span className="font-semibold">Stato:</span> {item.stato}
-            </div>
-          )}
-
-          {item.priorita && (
-            <div className="text-sm">
-              <span className="font-semibold">Priorità:</span> {item.priorita}
-            </div>
-          )}
-
-          {item.descrizione && (
-            <div className="text-sm mt-2">
-              <span className="font-semibold">Descrizione:</span>
-              <p className="mt-1">{item.descrizione}</p>
-            </div>
-          )}
-
-          <div className="text-xs text-gray-500 mt-2">
-            Origine: {item.tabella_origine} (ID: {item.id_origine})
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-// Componente per la legenda dei colori
-const ColorLegend = () => {
-  return (
-    <div className="flex flex-wrap gap-2 mt-2">
-      <div className="flex items-center">
-        <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.attivita }}></div>
-        <span className="text-xs">Attività</span>
-      </div>
-      <div className="flex items-center">
-        <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.progetto }}></div>
-        <span className="text-xs">Progetti</span>
-      </div>
-      <div className="flex items-center">
-        <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.appuntamento }}></div>
-        <span className="text-xs">Appuntamenti</span>
-      </div>
-      <div className="flex items-center">
-        <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.scadenza }}></div>
-        <span className="text-xs">Scadenze</span>
-      </div>
-      <div className="flex items-center">
-        <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.scadenza_generale }}></div>
-        <span className="text-xs flex items-center">
-          <Globe className="h-2.5 w-2.5 mr-0.5" />
-          Scadenze generali
-        </span>
-      </div>
-      <div className="flex items-center">
-        <div className="w-3 h-3 rounded-sm mr-1" style={{ backgroundColor: COLORS.todolist }}></div>
-        <span className="text-xs">Todo</span>
-      </div>
-    </div>
-  )
-}
-
-// Componente per la visualizzazione giornaliera
-const DailyView = ({
-  items,
-  currentDate,
-  filters,
-  isDebugEnabled,
-}: {
-  items: AgendaItem[]
-  currentDate: Date
-  filters: any
-  isDebugEnabled: boolean
-}) => {
-  // Debug: Verifica la validità di currentDate
-  conditionalLog(
-    "DailyView - currentDate:",
-    {
-      value: currentDate,
-      isDate: currentDate instanceof Date,
-      isValid: !isNaN(currentDate.getTime()),
-      iso: currentDate.toISOString(),
-      local: currentDate.toLocaleString(),
-    },
-    isDebugEnabled,
-  )
-
-  // Filtra gli elementi per il giorno corrente
-  const dailyItems = useMemo(() => {
-    conditionalLog("DailyView - Filtraggio elementi per la data:", currentDate.toISOString(), isDebugEnabled)
-    conditionalLog("DailyView - Numero totale elementi disponibili:", items.length, isDebugEnabled)
-
-    // Debug: Verifica elementi con date non valide
-    const invalidItems = checkInvalidDates(items)
-    if (invalidItems.length > 0 && isDebugEnabled) {
-      console.warn("DailyView - Elementi con date non valide:", invalidItems)
-    }
-
-    const filteredItems = items
-      .filter((item) => {
-        try {
-          // Validazione migliorata delle date
-          const isValidStartDate = item.data_inizio instanceof Date && !isNaN(item.data_inizio.getTime())
-          const isValidScadenzaDate = item.data_scadenza instanceof Date && !isNaN(item.data_scadenza?.getTime())
-          const isValidEndDate = item.data_fine instanceof Date && !isNaN(item.data_fine?.getTime())
-
-          // Debug: Log dettagliato per ogni elemento
-          if (isDebugEnabled) {
-            const debugInfo = {
-              id: item.id,
-              titolo: item.titolo,
-              tipo: item.tipo,
-              data_inizio: isValidStartDate ? item.data_inizio.toISOString() : "INVALID",
-              data_fine: isValidEndDate ? item.data_fine?.toISOString() : "INVALID",
-              data_scadenza: isValidScadenzaDate ? item.data_scadenza?.toISOString() : "INVALID",
-              currentDate: currentDate.toISOString(),
-            }
-
-            // Per scadenze e todolist, confrontiamo solo la data ignorando l'ora
-            if (item.tipo === "scadenza" || item.tipo === "todolist") {
-              const matchesStartDate =
-                isValidStartDate &&
-                currentDate.getFullYear() === item.data_inizio.getFullYear() &&
-                currentDate.getMonth() === item.data_inizio.getMonth() &&
-                currentDate.getDate() === item.data_inizio.getDate()
-
-              const matchesScadenzaDate =
-                isValidScadenzaDate &&
-                currentDate.getFullYear() === item.data_scadenza!.getFullYear() &&
-                currentDate.getMonth() === item.data_scadenza!.getMonth() &&
-                currentDate.getDate() === item.data_scadenza!.getDate()
-
-              // Debug: Aggiungi risultati del confronto
-              debugInfo.matchesStartDate = matchesStartDate
-              debugInfo.matchesScadenzaDate = matchesScadenzaDate
-              debugInfo.included = matchesStartDate || matchesScadenzaDate
-
-              // Log solo per scadenze e todolist
-              if (item.tipo === "scadenza" || item.tipo === "todolist") {
-                conditionalLog("DailyView - Debug scadenza/todolist:", debugInfo, isDebugEnabled)
-              }
-            } else {
-              // Per gli altri tipi (attività, progetti, appuntamenti), usiamo la logica esistente
-              const matchesStartDate = isValidStartDate && isSameDay(item.data_inizio, currentDate)
-              const matchesScadenzaDate = isValidScadenzaDate && isSameDay(item.data_scadenza!, currentDate)
-              const isWithinDateRange =
-                isValidStartDate &&
-                isValidEndDate &&
-                isWithinInterval(currentDate, {
-                  start: item.data_inizio,
-                  end: item.data_fine!,
-                })
-
-              // Debug: Aggiungi risultati del confronto
-              debugInfo.matchesStartDate = matchesStartDate
-              debugInfo.matchesScadenzaDate = matchesScadenzaDate
-              debugInfo.isWithinDateRange = isWithinDateRange
-              debugInfo.included = matchesStartDate || matchesScadenzaDate || isWithinDateRange
-
-              // Log per altri tipi di elementi
-              conditionalLog("DailyView - Debug altro tipo:", debugInfo, isDebugEnabled)
-            }
-          }
-
-          // Per scadenze e todolist, confrontiamo solo la data ignorando l'ora
-          if (item.tipo === "scadenza" || item.tipo === "todolist") {
-            const matchesStartDate =
-              isValidStartDate &&
-              currentDate.getFullYear() === item.data_inizio.getFullYear() &&
-              currentDate.getMonth() === item.data_inizio.getMonth() &&
-              currentDate.getDate() === item.data_inizio.getDate()
-
-            const matchesScadenzaDate =
-              isValidScadenzaDate &&
-              currentDate.getFullYear() === item.data_scadenza!.getFullYear() &&
-              currentDate.getMonth() === item.data_scadenza!.getMonth() &&
-              currentDate.getDate() === item.data_scadenza!.getDate()
-
-            return matchesStartDate || matchesScadenzaDate
-          }
-
-          // Per gli altri tipi (attività, progetti, appuntamenti), usiamo la logica esistente
-          const matchesStartDate = isValidStartDate && isSameDay(item.data_inizio, currentDate)
-          const matchesScadenzaDate = isValidScadenzaDate && isSameDay(item.data_scadenza!, currentDate)
-          const isWithinDateRange =
-            isValidStartDate &&
-            isValidEndDate &&
-            isWithinInterval(currentDate, {
-              start: item.data_inizio,
-              end: item.data_fine!,
-            })
-
-          return matchesStartDate || matchesScadenzaDate || isWithinDateRange
-        } catch (error) {
-          if (isDebugEnabled) {
-            console.error("Errore nel filtraggio degli elementi giornalieri:", error, item)
-          }
-          return false
-        }
-      })
-      .sort((a, b) => a.data_inizio.getTime() - b.data_inizio.getTime())
-
-    conditionalLog("DailyView - Elementi filtrati:", filteredItems.length, isDebugEnabled)
-    return filteredItems
-  }, [items, currentDate, isDebugEnabled])
-
-  // Aggiungiamo log di debug specifici per le scadenze generali
-  if (isDebugEnabled) {
-    const scadenzeGenerali = items.filter((item) => item.tipo === "scadenza" && item.generale === true)
-    conditionalLog("DailyView - Scadenze generali disponibili:", scadenzeGenerali.length, isDebugEnabled)
-    if (scadenzeGenerali.length > 0) {
-      conditionalLog(
-        "DailyView - Dettagli scadenze generali:",
-        scadenzeGenerali.map((item) => ({
-          id: item.id,
-          titolo: item.titolo,
-          data_inizio: formatDateForDebug(item.data_inizio),
-          data_scadenza: formatDateForDebug(item.data_scadenza),
-          inclusa: dailyItems.some(
-            (di) => di.id === item.id && di.tabella_origine === item.tabella_origine && di.generale === true,
-          ),
-        })),
-        isDebugEnabled,
-      )
-    }
-
-    // Aggiungi un log per verificare i filtri attivi
-    conditionalLog("DailyView - Filtri attivi:", filters, isDebugEnabled)
-
-    // Aggiungiamo log di debug
-    conditionalLog("DailyView - Elementi filtrati per la vista giornaliera:", dailyItems.length, isDebugEnabled)
-    conditionalLog(
-      "DailyView - Elementi per tipo nella vista giornaliera:",
-      {
-        attivita: dailyItems.filter((item) => item.tipo === "attivita").length,
-        progetto: dailyItems.filter((item) => item.tipo === "progetto").length,
-        appuntamento: dailyItems.filter((item) => item.tipo === "appuntamento").length,
-        scadenza: dailyItems.filter((item) => item.tipo === "scadenza" && !item.generale).length,
-        scadenza_generale: dailyItems.filter((item) => item.tipo === "scadenza" && item.generale).length,
-        todolist: dailyItems.filter((item) => item.tipo === "todolist").length,
-      },
-      isDebugEnabled,
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">
-        {format(currentDate, "EEEE d MMMM yyyy", { locale: it })}
-        {isToday(currentDate) && <Badge className="ml-2">Oggi</Badge>}
-      </h3>
-
-      {dailyItems.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">Nessun elemento in agenda per questa giornata</div>
-      ) : (
-        <div className="space-y-1">
-          {dailyItems.map((item) => (
-            <AgendaItemComponent
-              key={`${item.tabella_origine}-${item.id}-${item.generale ? "gen" : "pers"}`}
-              item={item}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Componente per la visualizzazione settimanale
-const WeeklyView = ({
-  items,
-  currentDate,
-  filters,
-  isDebugEnabled,
-}: {
-  items: AgendaItem[]
-  currentDate: Date
-  filters: any
-  isDebugEnabled: boolean
-}) => {
-  // Calcola l'inizio e la fine della settimana
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }) // Inizia da lunedì
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
-
-  // Debug: Verifica la validità delle date
-  conditionalLog(
-    "WeeklyView - Date:",
-    {
-      currentDate: currentDate.toISOString(),
-      weekStart: weekStart.toISOString(),
-      weekEnd: weekEnd.toISOString(),
-    },
-    isDebugEnabled,
-  )
-
-  // Ottieni tutti i giorni della settimana
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">
-        Settimana dal {format(weekStart, "d MMMM", { locale: it })} al {format(weekEnd, "d MMMM yyyy", { locale: it })}
-      </h3>
-
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
-        {weekDays.map((day) => {
-          // Filtra gli elementi per questo giorno
-          const dayItems = items
-            .filter((item) => {
-              try {
-                // Validazione migliorata delle date
-                const isValidStartDate = item.data_inizio instanceof Date && !isNaN(item.data_inizio.getTime())
-                const isValidScadenzaDate = item.data_scadenza instanceof Date && !isNaN(item.data_scadenza?.getTime())
-                const isValidEndDate = item.data_fine instanceof Date && !isNaN(item.data_fine?.getTime())
-
-                // Per scadenze e todolist, confrontiamo solo la data ignorando l'ora
-                if (item.tipo === "scadenza" || item.tipo === "todolist") {
-                  const matchesStartDate =
-                    isValidStartDate &&
-                    day.getFullYear() === item.data_inizio.getFullYear() &&
-                    day.getMonth() === item.data_inizio.getMonth() &&
-                    day.getDate() === item.data_inizio.getDate()
-
-                  const matchesScadenzaDate =
-                    isValidScadenzaDate &&
-                    day.getFullYear() === item.data_scadenza!.getFullYear() &&
-                    day.getMonth() === item.data_scadenza!.getMonth() &&
-                    day.getDate() === item.data_scadenza!.getDate()
-
-                  return matchesStartDate || matchesScadenzaDate
-                }
-
-                // Per gli altri tipi (attività, progetti, appuntamenti), usiamo la logica esistente
-                return (
-                  (isValidStartDate && isSameDay(item.data_inizio, day)) ||
-                  (isValidScadenzaDate && isSameDay(item.data_scadenza!, day)) ||
-                  (isValidStartDate &&
-                    isValidEndDate &&
-                    isWithinInterval(day, {
-                      start: item.data_inizio,
-                      end: item.data_fine!,
-                    }))
-                )
-              } catch (error) {
-                if (isDebugEnabled) {
-                  console.error("Errore nel filtraggio degli elementi settimanali:", error)
-                }
-                return false
-              }
-            })
-            .sort((a, b) => a.data_inizio.getTime() - b.data_inizio.getTime())
-
-          return (
-            <div
-              key={day.toString()}
-              className={`p-2 rounded-md ${isToday(day) ? "bg-blue-50 border border-blue-200" : "bg-gray-50"}`}
-            >
-              <div className="text-center font-medium mb-2 text-sm">{format(day, "EEEE d", { locale: it })}</div>
-
-              {dayItems.length === 0 ? (
-                <div className="text-center py-2 text-xs text-gray-500">Nessun elemento</div>
-              ) : (
-                <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                  {dayItems.map((item) => (
-                    <AgendaItemComponent
-                      key={`${item.tabella_origine}-${item.id}-${item.generale ? "gen" : "pers"}`}
-                      item={item}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// Componente per la visualizzazione mensile
-const MonthlyView = ({
-  items,
-  currentDate,
-  filters,
-  isDebugEnabled,
-}: {
-  items: AgendaItem[]
-  currentDate: Date
-  filters: any
-  isDebugEnabled: boolean
-}) => {
-  // Calcola l'inizio e la fine del mese
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
-
-  // Debug: Verifica la validità delle date
-  conditionalLog(
-    "MonthlyView - Date:",
-    {
-      currentDate: currentDate.toISOString(),
-      monthStart: monthStart.toISOString(),
-      monthEnd: monthEnd.toISOString(),
-    },
-    isDebugEnabled,
-  )
-
-  // Ottieni tutti i giorni del mese, estendendo per includere l'inizio e la fine della settimana
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
-
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
-
-  // Raggruppa i giorni in settimane
-  const calendarWeeks = []
-  let week = []
-
-  for (const day of calendarDays) {
-    week.push(day)
-    if (week.length === 7) {
-      calendarWeeks.push(week)
-      week = []
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">{format(currentDate, "MMMM yyyy", { locale: it })}</h3>
-
-      <div className="grid grid-cols-7 gap-1 text-center font-medium text-xs">
-        <div>Lun</div>
-        <div>Mar</div>
-        <div>Mer</div>
-        <div>Gio</div>
-        <div>Ven</div>
-        <div>Sab</div>
-        <div>Dom</div>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1">
-        {calendarWeeks.flat().map((day) => {
-          // Filtra gli elementi per questo giorno
-          const dayItems = items.filter((item) => {
-            try {
-              // Validazione migliorata delle date
-              const isValidStartDate = item.data_inizio instanceof Date && !isNaN(item.data_inizio.getTime())
-              const isValidScadenzaDate = item.data_scadenza instanceof Date && !isNaN(item.data_scadenza?.getTime())
-              const isValidEndDate = item.data_fine instanceof Date && !isNaN(item.data_fine?.getTime())
-
-              // Per scadenze e todolist, confrontiamo solo la data ignorando l'ora
-              if (item.tipo === "scadenza" || item.tipo === "todolist") {
-                const matchesStartDate =
-                  isValidStartDate &&
-                  day.getFullYear() === item.data_inizio.getFullYear() &&
-                  day.getMonth() === item.data_inizio.getMonth() &&
-                  day.getDate() === item.data_inizio.getDate()
-
-                const matchesScadenzaDate =
-                  isValidScadenzaDate &&
-                  day.getFullYear() === item.data_scadenza!.getFullYear() &&
-                  day.getMonth() === item.data_scadenza!.getMonth() &&
-                  day.getDate() === item.data_scadenza!.getDate()
-
-                return matchesStartDate || matchesScadenzaDate
-              }
-
-              // Per gli altri tipi (attività, progetti, appuntamenti), usiamo la logica esistente
-              return (
-                (isValidStartDate && isSameDay(item.data_inizio, day)) ||
-                (isValidScadenzaDate && isSameDay(item.data_scadenza!, day)) ||
-                (isValidStartDate &&
-                  isValidEndDate &&
-                  isWithinInterval(day, {
-                    start: item.data_inizio,
-                    end: item.data_fine!,
-                  }))
-              )
-            } catch (error) {
-              if (isDebugEnabled) {
-                console.error("Errore nel filtraggio degli elementi mensili:", error)
-              }
-              return false
-            }
-          })
-
-          const isCurrentMonth = day.getMonth() === currentDate.getMonth()
-
-          return (
-            <div
-              key={day.toString()}
-              className={`
-                p-1 min-h-[80px] rounded-md border text-sm
-                ${isToday(day) ? "bg-blue-50 border-blue-200" : ""}
-                ${!isCurrentMonth ? "bg-gray-100 text-gray-400" : ""}
-              `}
-            >
-              <div className="text-right font-medium mb-1 text-xs">{format(day, "d")}</div>
-
-              <div className="space-y-0.5 max-h-[60px] overflow-y-auto">
-                {dayItems.length > 0
-                  ? dayItems.slice(0, 3).map((item) => {
-                      // Ottieni l'abbreviazione del tipo
-                      const typeAbbr = TYPE_ABBR[item.tipo] || item.tipo.substring(0, 3).toUpperCase()
-
-                      return (
-                        <Popover key={`${item.tabella_origine}-${item.id}-${item.generale ? "gen" : "pers"}`}>
-                          <PopoverTrigger asChild>
-                            <div
-                              className="text-[10px] rounded truncate flex items-stretch overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                              style={{ backgroundColor: item.colore }}
-                            >
-                              {/* Tipo in verticale */}
-                              <div className="bg-black text-white text-[6px] font-bold flex items-center justify-center px-0.5 writing-vertical-rl">
-                                {typeAbbr}
-                              </div>
-
-                              {/* Contenuto principale */}
-                              <div className="flex-1 p-0.5 truncate flex items-center">
-                                {item.generale && <Globe className="h-2 w-2 mr-0.5 text-gray-700 flex-shrink-0" />}
-                                {item.titolo}
-                              </div>
-                            </div>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80">
-                            <div className="space-y-2">
-                              <div className="flex items-center">
-                                <h4 className="font-bold flex-1">{item.titolo}</h4>
-                                {item.generale ? (
-                                  <Badge variant="outline" className="ml-2 bg-amber-100">
-                                    <Globe className="h-3 w-3 mr-1" />
-                                    Generale
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="ml-2 bg-blue-100">
-                                    <User className="h-3 w-3 mr-1" />
-                                    Personale
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="flex items-center text-sm">
-                                <Clock className="h-4 w-4 mr-1" />
-                                <span>
-                                  {format(item.data_inizio, "PPP", { locale: it })} {formatTime(item.data_inizio)}
-                                  {item.data_fine &&
-                                    item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                                    ` - ${formatTime(item.data_fine)}`}
-                                </span>
-                              </div>
-
-                              {item.cliente && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Cliente:</span> {item.cliente}
-                                </div>
-                              )}
-
-                              {item.stato && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Stato:</span> {item.stato}
-                                </div>
-                              )}
-
-                              {item.priorita && (
-                                <div className="text-sm">
-                                  <span className="font-semibold">Priorità:</span> {item.priorita}
-                                </div>
-                              )}
-
-                              {item.descrizione && (
-                                <div className="text-sm mt-2">
-                                  <span className="font-semibold">Descrizione:</span>
-                                  <p className="mt-1">{item.descrizione}</p>
-                                </div>
-                              )}
-
-                              <div className="text-xs text-gray-500 mt-2">
-                                Origine: {item.tabella_origine} (ID: {item.id_origine})
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      )
-                    })
-                  : null}
-
-                {dayItems.length > 3 && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <div className="text-[10px] text-center cursor-pointer text-blue-600 hover:underline">
-                        +{dayItems.length - 3} altri
-                      </div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64">
-                      <div className="space-y-2">
-                        <h4 className="font-bold">{format(day, "EEEE d MMMM", { locale: it })}</h4>
-                        <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                          {dayItems.map((item) => {
-                            // Ottieni l'abbreviazione del tipo
-                            const typeAbbr = TYPE_ABBR[item.tipo] || item.tipo.substring(0, 3).toUpperCase()
-
-                            return (
-                              <Popover
-                                key={`popup-${item.tabella_origine}-${item.id}-${item.generale ? "gen" : "pers"}`}
-                              >
-                                <PopoverTrigger asChild>
-                                  <div
-                                    className="text-xs rounded overflow-hidden flex items-stretch cursor-pointer hover:opacity-90 transition-opacity"
-                                    style={{ backgroundColor: item.colore }}
-                                  >
-                                    {/* Tipo in verticale */}
-                                    <div className="bg-black text-white text-[8px] font-bold flex items-center justify-center px-0.5 writing-vertical-rl">
-                                      {typeAbbr}
-                                    </div>
-
-                                    {/* Contenuto principale */}
-                                    <div className="flex-1 p-1.5">
-                                      <div className="font-medium flex items-center">
-                                        {item.generale && <Globe className="h-2.5 w-2.5 mr-0.5 text-gray-700" />}
-                                        {item.titolo}
-                                      </div>
-                                      <div className="text-xs">
-                                        {formatTime(item.data_inizio)}
-                                        {item.data_fine &&
-                                          item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                                          ` - ${formatTime(item.data_fine)}`}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                  <div className="space-y-2">
-                                    <div className="flex items-center">
-                                      <h4 className="font-bold flex-1">{item.titolo}</h4>
-                                      {item.generale ? (
-                                        <Badge variant="outline" className="ml-2 bg-amber-100">
-                                          <Globe className="h-3 w-3 mr-1" />
-                                          Generale
-                                        </Badge>
-                                      ) : (
-                                        <Badge variant="outline" className="ml-2 bg-blue-100">
-                                          <User className="h-3 w-3 mr-1" />
-                                          Personale
-                                        </Badge>
-                                      )}
-                                    </div>
-
-                                    <div className="flex items-center text-sm">
-                                      <Clock className="h-4 w-4 mr-1" />
-                                      <span>
-                                        {format(item.data_inizio, "PPP", { locale: it })} {formatTime(item.data_inizio)}
-                                        {item.data_fine &&
-                                          item.data_fine.getTime() !== item.data_inizio.getTime() &&
-                                          ` - ${formatTime(item.data_fine)}`}
-                                      </span>
-                                    </div>
-
-                                    {item.cliente && (
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Cliente:</span> {item.cliente}
-                                      </div>
-                                    )}
-
-                                    {item.stato && (
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Stato:</span> {item.stato}
-                                      </div>
-                                    )}
-
-                                    {item.priorita && (
-                                      <div className="text-sm">
-                                        <span className="font-semibold">Priorità:</span> {item.priorita}
-                                      </div>
-                                    )}
-
-                                    {item.descrizione && (
-                                      <div className="text-sm mt-2">
-                                        <span className="font-semibold">Descrizione:</span>
-                                        <p className="mt-1">{item.descrizione}</p>
-                                      </div>
-                                    )}
-
-                                    <div className="text-xs text-gray-500 mt-2">
-                                      Origine: {item.tabella_origine} (ID: {item.id_origine})
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-export interface AgendaWidgetProps {
-  initialDate?: Date
+interface AgendaWidgetProps {
+  className?: string
   mode?: "desktop" | "mobile"
 }
 
-export function AgendaWidget({ initialDate, mode = "desktop" }: AgendaWidgetProps) {
-  const { user, isAdmin, isLoading: authIsLoading } = useAuth() // user can be null
-  const { isDebugEnabled, isLoading: isDebugConfigLoading } = useDebugConfig()
+// Costanti per la memorizzazione delle preferenze
+const AGENDA_VIEW_PREFERENCE_KEY = "agenda-view-preference"
 
-  const [currentDate, setCurrentDate] = useState(initialDate || new Date())
-  const [view, setView] = useState<"daily" | "weekly" | "monthly">(mode === "mobile" ? "daily" : "daily")
-  const [filters, setFilters] = useState({
-    attivita: true,
-    progetti: true,
-    appuntamenti: true,
-    scadenze: true,
-    scadenze_generali: true,
-    todo: true,
+// Funzioni per gestire le preferenze di visualizzazione
+const saveViewPreference = (view: "daily" | "weekly" | "monthly") => {
+  try {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(AGENDA_VIEW_PREFERENCE_KEY, view)
+      console.log(`📅 AgendaWidget: View preference saved: ${view}`)
+    }
+  } catch (error) {
+    console.error("❌ AgendaWidget: Error saving view preference:", error)
+  }
+}
+
+const getViewPreference = (): "daily" | "weekly" | "monthly" => {
+  try {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(AGENDA_VIEW_PREFERENCE_KEY)
+      if (saved && ["daily", "weekly", "monthly"].includes(saved)) {
+        console.log(`📅 AgendaWidget: View preference loaded: ${saved}`)
+        return saved as "daily" | "weekly" | "monthly"
+      }
+    }
+  } catch (error) {
+    console.error("❌ AgendaWidget: Error loading view preference:", error)
+  }
+
+  return "daily" // Default
+}
+
+// Funzione per calcolare le date in base alla vista
+const calculateDateRange = (selectedDate: Date, view: "daily" | "weekly" | "monthly") => {
+  let startDate: Date
+  let endDate: Date
+
+  switch (view) {
+    case "daily":
+      startDate = new Date(selectedDate)
+      startDate.setHours(0, 0, 0, 1)
+      endDate = new Date(selectedDate)
+      endDate.setHours(23, 59, 59, 999)
+      break
+
+    case "weekly":
+      startDate = startOfWeek(selectedDate, { weekStartsOn: 1 })
+      startDate.setHours(0, 0, 0, 1)
+      endDate = endOfWeek(selectedDate, { weekStartsOn: 1 })
+      endDate.setHours(23, 59, 59, 999)
+      break
+
+    case "monthly":
+      startDate = startOfMonth(selectedDate)
+      startDate.setHours(0, 0, 0, 1)
+      endDate = endOfMonth(selectedDate)
+      endDate.setHours(23, 59, 59, 999)
+      break
+
+    default:
+      startDate = new Date(selectedDate)
+      startDate.setHours(0, 0, 0, 1)
+      endDate = new Date(selectedDate)
+      endDate.setHours(23, 59, 59, 999)
+  }
+
+  console.log(`📅 AgendaWidget: Date range for ${view} view:`, {
+    selectedDate: selectedDate.toISOString(),
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
   })
-  const [searchTerm, setSearchTerm] = useState("")
-  const [clienteFilter, setClienteFilter] = useState<string | null>(null)
-  const [clientiList, setClientiList] = useState<string[]>([])
-  const [showDebug, setShowDebug] = useState(false)
-  const [logs, setLogs] = useState<string[]>([])
-  const [debugItems, setDebugItems] = useState<any[]>([])
 
-  const isDebugAllowed = isAdmin && isDebugEnabled && !isDebugConfigLoading
+  return { startDate, endDate }
+}
 
-  const { startDate, endDate } = useMemo(() => {
-    // Crea date stabili usando solo i valori numerici
-    const currentDateKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`
-
-    let start: Date, end: Date
-
-    switch (view) {
-      case "daily":
-        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
-        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
-        break
-      case "weekly":
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 })
-        start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate(), 0, 0, 0, 1)
-        const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 })
-        end = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate(), 23, 59, 59, 999)
-        break
-      case "monthly":
-        const monthStart = startOfMonth(currentDate)
-        start = new Date(monthStart.getFullYear(), monthStart.getMonth(), monthStart.getDate(), 0, 0, 0, 1)
-        const monthEnd = endOfMonth(currentDate)
-        end = new Date(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 23, 59, 59, 999)
-        break
-      default:
-        start = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 1)
-        end = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999)
-    }
-
-    return { startDate: start, endDate: end }
-  }, [currentDate.getTime(), view]) // Usa getTime() per dipendenza stabile
-
-  const addLog = useCallback(
-    (message: string) => {
-      if (isDebugAllowed) setLogs((prev) => [...prev, `${new Date().toISOString()}: ${message}`])
-    },
-    [isDebugAllowed],
-  )
-
-  const { items, isLoading, error, tableStats } = useAgendaItems(startDate, endDate)
-
-  useEffect(() => {
-    if (items && items.length > 0 && isDebugAllowed) {
-      // Aggiungi un debounce per evitare loop
-      const timeoutId = setTimeout(() => {
-        const invalidItems = checkInvalidDates(items)
-        if (invalidItems.length > 0) {
-          console.warn("AgendaWidget - Elementi con date non valide:", invalidItems)
-          addLog(`Trovati ${invalidItems.length} elementi con date non valide`)
-        }
-        const debugData = items.map((item) => ({
-          id: item.id,
-          titolo: item.titolo,
-          tipo: item.tipo,
-          generale: item.generale,
-          data_inizio: formatDateForDebug(item.data_inizio),
-          data_fine: formatDateForDebug(item.data_fine),
-          data_scadenza: formatDateForDebug(item.data_scadenza),
-          tabella_origine: item.tabella_origine,
-          matchesCurrentDate: item.data_inizio instanceof Date && isSameDay(item.data_inizio, currentDate),
-        }))
-        setDebugItems(debugData)
-        conditionalLog("AgendaWidget - Dettagli elementi:", debugData, isDebugAllowed)
-        addLog(
-          `Caricati ${items.length} elementi, di cui ${debugData.filter((i) => i.matchesCurrentDate).length} corrispondono alla data corrente`,
-        )
-      }, 100)
-
-      return () => clearTimeout(timeoutId)
-    }
-  }, [items, isDebugAllowed, addLog]) // Rimuovere currentDate dalle dipendenze!
-
-  useEffect(() => {
-    if (isDebugAllowed) {
-      addLog(`Selected date: ${currentDate.toISOString()}`)
-      addLog(`View: ${view}`)
-      if (items) {
-        addLog(`Items count: ${items.length}`)
-        if (items.length > 0)
-          addLog(
-            `First item: ${JSON.stringify({ id: items[0].id, titolo: items[0].titolo, tipo: items[0].tipo, data_inizio: formatDateForDebug(items[0].data_inizio) })}`,
-          )
-      }
-    }
-  }, [currentDate, view, items, isDebugAllowed, addLog])
-
-  useMemo(() => {
-    if (items.length > 0) {
-      const clienti = [...new Set(items.map((item) => item.cliente).filter(Boolean))] as string[]
-      setClientiList(clienti)
-    }
-  }, [items])
-
-  const filteredItems = useMemo(() => {
-    // Guard against user being null during auth loading or if not authenticated
-    if (authIsLoading || !user) {
-      return [] // Return empty array if user is not available yet
-    }
-    return items.filter((item) => {
-      let passesTypeFilter = false
-      switch (item.tipo) {
-        case "attivita":
-          passesTypeFilter = filters.attivita
-          break
-        case "progetto":
-          passesTypeFilter = filters.progetti
-          break
-        case "appuntamento":
-          passesTypeFilter = filters.appuntamenti
-          break
-        case "scadenza":
-          if (item.generale) {
-            // user is guaranteed to be non-null here due to the guard above
-            if (user.id === 1) {
-              // Check user.id directly
-              if (isDebugAllowed)
-                console.log("Filtro: utente 1 non dovrebbe vedere scadenze generali qui (già filtrate)")
-              passesTypeFilter = false
-            } else {
-              passesTypeFilter = filters.scadenze_generali
-            }
-          } else {
-            passesTypeFilter = filters.scadenze
-          }
-          break
-        case "todolist":
-          passesTypeFilter = filters.todo
-          break
-        default:
-          passesTypeFilter = true
-      }
-      const passesSearchFilter =
-        searchTerm === "" ||
-        (item.titolo && item.titolo.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (item.descrizione && item.descrizione.toLowerCase().includes(searchTerm.toLowerCase()))
-      const passesClienteFilter = !clienteFilter || item.cliente === clienteFilter
-      return passesTypeFilter && passesSearchFilter && passesClienteFilter
-    })
-  }, [items, filters, searchTerm, clienteFilter, user, authIsLoading, isDebugAllowed]) // Added authIsLoading and user
-
-  const navigatePrevious = () => {
-    switch (view) {
-      case "daily":
-        setCurrentDate((prev) => addDays(prev, -1))
-        break
-      case "weekly":
-        setCurrentDate((prev) => subWeeks(prev, 1))
-        break
-      case "monthly":
-        setCurrentDate((prev) => subMonths(prev, 1))
-        break
-    }
+// Funzione per ottenere l'abbreviazione della tabella
+const getTableAbbreviation = (tableName: string): string => {
+  const abbreviations: Record<string, string> = {
+    appuntamenti: "APP",
+    attivita: "ATT",
+    progetti: "PRO",
+    scadenze: "SCA",
+    todolist: "TDL",
+    todo: "TDL",
   }
-  const navigateNext = () => {
-    switch (view) {
-      case "daily":
-        setCurrentDate((prev) => addDays(prev, 1))
-        break
-      case "weekly":
-        setCurrentDate((prev) => addWeeks(prev, 1))
-        break
-      case "monthly":
-        setCurrentDate((prev) => addMonths(prev, 1))
-        break
-    }
-  }
-  const navigateToday = () => {
-    setCurrentDate(new Date())
-  }
-  const exportAgenda = () => {
-    alert("Funzionalità di esportazione in fase di sviluppo")
-  }
+  return abbreviations[tableName] || tableName.substring(0, 3).toUpperCase()
+}
 
-  useEffect(() => {
-    conditionalLog(
-      "Periodo selezionato:",
-      { view, startDate: startDate.toISOString(), endDate: endDate.toISOString() },
-      isDebugAllowed,
-    )
-  }, [view, startDate, endDate, isDebugAllowed])
+// Funzione per ottenere il colore del bordo del tag verticale
+const getTableBorderColor = (tableName: string): string => {
+  const colors: Record<string, string> = {
+    appuntamenti: "border-l-blue-500",
+    attivita: "border-l-green-500",
+    progetti: "border-l-orange-500",
+    scadenze: "border-l-red-500",
+    todolist: "border-l-purple-500",
+  }
+  return colors[tableName] || "border-l-gray-500"
+}
 
-  useEffect(() => {
-    conditionalLog(
-      "Elementi filtrati:",
-      {
-        total: filteredItems.length,
-        byType: {
-          attivita: filteredItems.filter((item) => item.tipo === "attivita").length,
-          progetto: filteredItems.filter((item) => item.tipo === "progetto").length,
-          appuntamento: filteredItems.filter((item) => item.tipo === "appuntamento").length,
-          scadenza: filteredItems.filter((item) => item.tipo === "scadenza" && !item.generale).length,
-          scadenza_generale: filteredItems.filter((item) => item.tipo === "scadenza" && item.generale).length,
-          todolist: filteredItems.filter((item) => item.tipo === "todolist").length,
-        },
-      },
-      isDebugAllowed,
-    )
-  }, [filteredItems, isDebugAllowed])
-
-  useEffect(() => {
-    return () => {
-      if (isDebugAllowed) console.log("AgendaWidget unmounted - cleaning up")
-    }
-  }, [isDebugAllowed])
+// Componente per il tag verticale con abbreviazione ruotata
+const VerticalTag = ({ tableName }: { tableName: string }) => {
+  const abbreviation = getTableAbbreviation(tableName)
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
-          <CardTitle className="text-xl whitespace-nowrap">Agenda</CardTitle>
-          <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap justify-center">
-            <Button variant="outline" size="sm" onClick={navigatePrevious}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={navigateToday}>
-              {" "}
-              Oggi{" "}
-            </Button>
-            <Button variant="outline" size="sm" onClick={navigateNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            {isDebugAllowed && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDebug(!showDebug)}
-                className={showDebug ? "bg-blue-100" : ""}
-              >
-                <Bug className="h-4 w-4 mr-1 sm:mr-1" />
-                <span className={mode === "mobile" ? "hidden sm:inline" : ""}>Debug</span>
-              </Button>
-            )}
-          </div>
+    <div className="relative w-6 h-full flex items-center justify-center bg-black dark:bg-white">
+      <div
+        className="text-white dark:text-black text-xs font-bold leading-none select-none"
+        style={{
+          transform: "rotate(90deg)",
+          transformOrigin: "center",
+          whiteSpace: "nowrap",
+        }}
+        title={tableName}
+      >
+        {abbreviation}
+      </div>
+    </div>
+  )
+}
+
+// Componente per il menu di creazione nuovo elemento
+const NewItemMenu = ({ date }: { date: Date }) => {
+  const router = useRouter()
+  const dateParam = format(date, "yyyy-MM-dd")
+
+  // Mappa dei tipi di elemento alle tabelle corrispondenti
+  const tableMap = {
+    appuntamento: "appuntamenti",
+    attivita: "attivita",
+    todolist: "todolist",
+    scadenza: "scadenze",
+    progetto: "progetti",
+  }
+
+  const handleNewItem = (type: keyof typeof tableMap) => {
+    const tableName = tableMap[type]
+    if (tableName) {
+      const url = `/data-explorer/${tableName}/new?date=${dateParam}`
+      console.log(`🔗 AgendaWidget: Navigating to: ${url}`)
+      router.push(url)
+    } else {
+      console.error(`❌ AgendaWidget: Unknown item type: ${type}`)
+    }
+  }
+
+  const menuItems = [
+    { type: "appuntamento" as const, label: "Appuntamento", icon: CalendarIcon, color: "text-blue-600" },
+    { type: "attivita" as const, label: "Attività", icon: CheckSquare, color: "text-green-600" },
+    { type: "todolist" as const, label: "Todo", icon: FileText, color: "text-purple-600" },
+    { type: "scadenza" as const, label: "Scadenza", icon: AlertTriangle, color: "text-red-600" },
+    { type: "progetto" as const, label: "Progetto", icon: Briefcase, color: "text-orange-600" },
+  ]
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-primary/10">
+          <Plus className="h-3 w-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        {menuItems.map((item) => (
+          <DropdownMenuItem
+            key={item.type}
+            onClick={() => handleNewItem(item.type)}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <item.icon className={cn("h-4 w-4", item.color)} />
+            <span>Nuovo {item.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+export function AgendaWidget({ className, mode = "desktop" }: AgendaWidgetProps) {
+  const { user, isLoading: authLoading } = useAuth()
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [view, setView] = useState<"daily" | "weekly" | "monthly">("daily")
+  const [mounted, setMounted] = useState(false)
+  const router = useRouter()
+
+  // Funzione per gestire il click su un elemento
+  const handleItemClick = (item: any) => {
+    // Correzione: usa il percorso corretto per i dettagli dell'elemento
+    const url = `/data-explorer/${item.tabella_origine}/${item.id_origine}`
+    console.log(`🔗 AgendaWidget: Navigating to item details: ${url}`)
+    router.push(url)
+  }
+
+  // Calcola le date corrette in base alla vista selezionata
+  const { startDate, endDate } = useMemo(() => {
+    return calculateDateRange(selectedDate, view)
+  }, [selectedDate, view])
+
+  // Ora passiamo le date corrette al hook invece di selectedDate e view
+  const { items, isLoading, error } = useAgendaItems(startDate, endDate)
+
+  // Carica la preferenza di visualizzazione dopo il mount del componente
+  useEffect(() => {
+    setMounted(true)
+    if (mode === "desktop") {
+      const savedView = getViewPreference()
+      setView(savedView)
+    }
+  }, [mode])
+
+  const handleViewChange = (newView: "daily" | "weekly" | "monthly") => {
+    console.log(`📅 AgendaWidget: Changing view from ${view} to ${newView}`)
+    setView(newView)
+    if (mode === "desktop") {
+      saveViewPreference(newView)
+    }
+  }
+
+  const navigateDate = (direction: "prev" | "next") => {
+    if (view === "daily") {
+      setSelectedDate(direction === "next" ? addDays(selectedDate, 1) : subDays(selectedDate, 1))
+    } else if (view === "weekly") {
+      setSelectedDate(direction === "next" ? addDays(selectedDate, 7) : subDays(selectedDate, 7))
+    } else {
+      setSelectedDate(direction === "next" ? addMonths(selectedDate, 1) : subMonths(selectedDate, 1))
+    }
+  }
+
+  const getDateRangeText = () => {
+    if (view === "daily") {
+      return format(selectedDate, "EEEE d MMMM yyyy", { locale: it })
+    } else if (view === "weekly") {
+      const start = startOfWeek(selectedDate, { weekStartsOn: 1 })
+      const end = endOfWeek(selectedDate, { weekStartsOn: 1 })
+      return `${format(start, "d MMM", { locale: it })} - ${format(end, "d MMM yyyy", { locale: it })}`
+    } else {
+      return format(selectedDate, "MMMM yyyy", { locale: it })
+    }
+  }
+
+  const getItemIcon = (type: string) => {
+    switch (type) {
+      case "appuntamento":
+        return <CalendarIcon className="h-4 w-4 text-blue-600" />
+      case "attivita":
+        return <CheckSquare className="h-4 w-4 text-green-600" />
+      case "todolist":
+        return <FileText className="h-4 w-4 text-purple-600" />
+      case "scadenza":
+        return <AlertTriangle className="h-4 w-4 text-red-600" />
+      case "progetto":
+        return <Briefcase className="h-4 w-4 text-orange-600" />
+      default:
+        return <Clock className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const getItemColor = (type: string) => {
+    switch (type) {
+      case "appuntamento":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "attivita":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "todolist":
+        return "bg-purple-100 text-purple-800 border-purple-200"
+      case "scadenza":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "progetto":
+        return "bg-orange-100 text-orange-800 border-orange-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
+  // Vista giornaliera
+  const renderDailyView = () => (
+    <div className="space-y-4">
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
+          ))}
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row flex-wrap items-center justify-between gap-2">
-            <Tabs
-              defaultValue={mode === "mobile" ? "daily" : "daily"}
-              value={view}
-              onValueChange={(v) => setView(v as any)}
-            >
-              <TabsList
+      ) : items.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>Nessun elemento per oggi</p>
+          <NewItemMenu date={selectedDate} />
+        </div>
+      ) : (
+        <ScrollArea className="h-[400px]">
+          <div className="space-y-3">
+            {items.map((item) => (
+              <Card
+                key={`${item.tipo}-${item.id}`}
                 className={cn(
-                  mode === "mobile"
-                    ? "grid w-full grid-cols-2"
-                    : "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-                  // For desktop, we use the default shadcn/ui classes for TabsList or simply 'inline-flex' if you want minimal styling.
-                  // The default classes provide the standard look and feel.
+                  "hover:shadow-md transition-shadow cursor-pointer border-l-4",
+                  getTableBorderColor(item.tabella_origine),
                 )}
+                onClick={() => handleItemClick(item)}
               >
-                <TabsTrigger value="daily" className="flex items-center gap-1 text-xs sm:text-sm">
-                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Giorno
-                </TabsTrigger>
-                <TabsTrigger value="weekly" className="flex items-center gap-1 text-xs sm:text-sm">
-                  <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Settimana
-                </TabsTrigger>
-                {mode === "desktop" && (
-                  <TabsTrigger value="monthly" className="flex items-center gap-1 text-xs sm:text-sm">
-                    <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" /> Mese
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </Tabs>
-            <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
-              <div className="relative w-full sm:w-48">
-                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                <Input
-                  placeholder="Cerca..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 text-sm"
-                  aria-label="Cerca nell'agenda"
-                />
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-1 text-xs sm:text-sm">
-                    <Filter className="h-3 w-3 sm:h-4 sm:w-4" /> Filtri
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="p-2">
-                    <div className="font-medium mb-2">Tipi di elementi</div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-attivita"
-                          checked={filters.attivita}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, attivita: !!checked }))}
-                        />
-                        <Label htmlFor="filter-attivita" className="text-sm">
-                          Attività
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-progetti"
-                          checked={filters.progetti}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, progetti: !!checked }))}
-                        />
-                        <Label htmlFor="filter-progetti" className="text-sm">
-                          Progetti
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-appuntamenti"
-                          checked={filters.appuntamenti}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, appuntamenti: !!checked }))}
-                        />
-                        <Label htmlFor="filter-appuntamenti" className="text-sm">
-                          Appuntamenti
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-scadenze"
-                          checked={filters.scadenze}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, scadenze: !!checked }))}
-                        />
-                        <Label htmlFor="filter-scadenze" className="text-sm flex items-center">
-                          <User className="h-3 w-3 mr-1" />
-                          Scadenze personali
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-scadenze-generali"
-                          checked={filters.scadenze_generali}
-                          onCheckedChange={(checked) =>
-                            setFilters((prev) => ({ ...prev, scadenze_generali: !!checked }))
-                          }
-                        />
-                        <Label htmlFor="filter-scadenze-generali" className="text-sm flex items-center">
-                          <Globe className="h-3 w-3 mr-1" />
-                          Scadenze generali
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="filter-todo"
-                          checked={filters.todo}
-                          onCheckedChange={(checked) => setFilters((prev) => ({ ...prev, todo: !!checked }))}
-                        />
-                        <Label htmlFor="filter-todo" className="text-sm">
-                          Todo
-                        </Label>
+                <CardContent className="p-0">
+                  <div className="flex">
+                    <VerticalTag tableName={item.tabella_origine} />
+                    <div className="flex-1 p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getItemIcon(item.tipo)}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium truncate">{item.titolo}</h4>
+                            {item.descrizione && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.descrizione}</p>
+                            )}
+                            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                              {item.data_inizio && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {format(new Date(item.data_inizio), "HH:mm")}
+                                </div>
+                              )}
+                              {item.cliente && (
+                                <div className="flex items-center gap-1">
+                                  <User className="h-3 w-3" />
+                                  {item.cliente}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2">
+                          <Badge variant="outline" className={cn("text-xs", getItemColor(item.tipo))}>
+                            {item.tipo}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleItemClick(item)
+                            }}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    {clientiList.length > 0 && (
-                      <>
-                        <div className="font-medium mt-4 mb-2">Cliente</div>
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="filter-cliente-tutti"
-                              checked={clienteFilter === null}
-                              onCheckedChange={() => setClienteFilter(null)}
-                            />
-                            <Label htmlFor="filter-cliente-tutti" className="text-sm">
-                              Tutti i clienti
-                            </Label>
-                          </div>
-                          {clientiList.map((cliente) => (
-                            <div key={cliente} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`filter-cliente-${cliente}`}
-                                checked={clienteFilter === cliente}
-                                onCheckedChange={() => setClienteFilter(cliente)}
-                              />
-                              <Label htmlFor={`filter-cliente-${cliente}`} className="text-sm">
-                                {cliente}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
                   </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {mode === "desktop" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={exportAgenda}
-                  className="flex items-center gap-1 text-xs sm:text-sm"
-                >
-                  <Download className="h-3 w-3 sm:h-4 sm:w-4" /> Esporta
-                </Button>
-              )}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
-                      <HelpCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="sr-only">Legenda</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="end" className="w-auto">
-                    <div className="text-sm font-medium mb-1">Legenda colori</div>
-                    <ColorLegend />
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <ColorLegend />
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Errore</AlertTitle>
-              <AlertDescription>
-                Si è verificato un errore nel caricamento degli elementi: {error.message}
-              </AlertDescription>
-            </Alert>
-          )}
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-64" />
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              {view === "daily" && (
-                <DailyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
-              {view === "weekly" && (
-                <WeeklyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
-              {mode === "desktop" && view === "monthly" && (
-                <MonthlyView
-                  items={filteredItems}
-                  currentDate={currentDate}
-                  filters={filters}
-                  isDebugEnabled={isDebugAllowed}
-                />
-              )}
-              <div className="text-xs text-gray-500 flex items-center mt-4 justify-between">
-                <div className="flex items-center">
-                  <Info className="h-3 w-3 mr-1" /> Elementi visualizzati: {filteredItems.length} di {items.length}{" "}
-                  totali
+        </ScrollArea>
+      )}
+    </div>
+  )
+
+  // Vista settimanale con altezza dinamica
+  const renderWeeklyView = () => {
+    const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 })
+    const weekDays = eachDayOfInterval({
+      start: weekStart,
+      end: endOfWeek(selectedDate, { weekStartsOn: 1 }),
+    })
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-7 gap-2">
+          {weekDays.map((day) => {
+            const dayItems = items.filter((item) => item.data_inizio && isSameDay(new Date(item.data_inizio), day))
+            const isToday = isSameDay(day, new Date())
+            const isSelected = isSameDay(day, selectedDate)
+
+            // Calcola altezza dinamica basata sul numero di elementi
+            const minHeight = 120
+            const itemHeight = 24 // Altezza approssimativa per elemento
+            const dynamicHeight = Math.max(minHeight, dayItems.length * itemHeight + 60)
+
+            return (
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "border rounded-lg p-2 cursor-pointer transition-colors",
+                  isToday && "bg-primary/5 border-primary/20",
+                  isSelected && "ring-2 ring-primary/50",
+                  "hover:bg-muted/50",
+                )}
+                style={{ minHeight: `${dynamicHeight}px` }}
+                onClick={() => setSelectedDate(day)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className={cn("text-sm font-medium", isToday && "text-primary")}>
+                    {format(day, "d", { locale: it })}
+                  </span>
+                  <NewItemMenu date={day} />
                 </div>
-                <div className="flex gap-2">
-                  {Object.entries(tableStats).map(([tipo, count]) => (
-                    <Badge key={tipo} variant="outline" className="text-xs">
-                      {tipo === "scadenze_generali" ? (
-                        <span className="flex items-center">
-                          <Globe className="h-3 w-3 mr-1" />
-                          Scadenze generali: {count}
-                        </span>
-                      ) : (
-                        `${tipo}: ${count}`
+                <div className="space-y-1">
+                  {dayItems.map((item, index) => (
+                    <div
+                      key={`${item.tipo}-${item.id}`}
+                      className={cn(
+                        "text-xs p-1 rounded border truncate cursor-pointer hover:opacity-80 flex items-center gap-1",
+                        getItemColor(item.tipo),
                       )}
-                    </Badge>
+                      title={item.titolo}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleItemClick(item)
+                      }}
+                    >
+                      <div className="w-2 h-3 bg-black dark:bg-white rounded-sm flex items-center justify-center">
+                        <span
+                          className="text-white dark:text-black text-[8px] font-bold leading-none"
+                          style={{
+                            transform: "rotate(90deg)",
+                            transformOrigin: "center",
+                          }}
+                        >
+                          {getTableAbbreviation(item.tabella_origine)}
+                        </span>
+                      </div>
+                      <span className="truncate">{item.titolo}</span>
+                    </div>
                   ))}
                 </div>
               </div>
-            </>
-          )}
+            )
+          })}
         </div>
-        {isDebugAllowed && showDebug && (
-          <div className="mt-4 p-2 border rounded bg-gray-50">
-            <h4 className="font-bold mb-2">Debug Info</h4>
-            <div className="mb-4">
-              <h5 className="font-semibold text-sm">Date di Sistema</h5>
-              <div className="text-xs">
-                <div>
-                  <strong>Current Date (ISO):</strong> {currentDate.toISOString()}
-                </div>
-                <div>
-                  <strong>Current Date (Local):</strong> {currentDate.toLocaleString()}
-                </div>
-                <div>
-                  <strong>Start Date:</strong> {startDate.toISOString()}
-                </div>
-                <div>
-                  <strong>End Date:</strong> {endDate.toISOString()}
-                </div>
-                <div>
-                  <strong>Timezone Offset:</strong> {new Date().getTimezoneOffset()} minutes
-                </div>
+      </div>
+    )
+  }
+
+  // Vista mensile con altezza dinamica
+  const renderMonthlyView = () => {
+    const monthStart = startOfMonth(selectedDate)
+    const monthEnd = endOfMonth(selectedDate)
+    const weeks = eachWeekOfInterval({ start: monthStart, end: monthEnd }, { weekStartsOn: 1 })
+
+    return (
+      <div className="space-y-4">
+        {/* Header giorni della settimana */}
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"].map((day) => (
+            <div key={day} className="text-center text-sm font-medium text-muted-foreground p-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Griglia del calendario */}
+        <div className="space-y-2">
+          {weeks.map((weekStart) => {
+            const weekDays = eachDayOfInterval({
+              start: weekStart,
+              end: endOfWeek(weekStart, { weekStartsOn: 1 }),
+            })
+
+            return (
+              <div key={weekStart.toISOString()} className="grid grid-cols-7 gap-2">
+                {weekDays.map((day) => {
+                  const dayItems = items.filter(
+                    (item) => item.data_inizio && isSameDay(new Date(item.data_inizio), day),
+                  )
+                  const isToday = isSameDay(day, new Date())
+                  const isCurrentMonth = isSameMonth(day, selectedDate)
+                  const isSelected = isSameDay(day, selectedDate)
+
+                  // Calcola altezza dinamica basata sul numero di elementi
+                  const minHeight = 80
+                  const itemHeight = 20
+                  const dynamicHeight = Math.max(minHeight, dayItems.length * itemHeight + 40)
+
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={cn(
+                        "border rounded-lg p-2 cursor-pointer transition-colors",
+                        !isCurrentMonth && "opacity-50 bg-muted/20",
+                        isToday && "bg-primary/5 border-primary/20",
+                        isSelected && "ring-2 ring-primary/50",
+                        "hover:bg-muted/50",
+                      )}
+                      style={{ minHeight: `${dynamicHeight}px` }}
+                      onClick={() => setSelectedDate(day)}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span
+                          className={cn(
+                            "text-sm font-medium",
+                            isToday && "text-primary",
+                            !isCurrentMonth && "text-muted-foreground",
+                          )}
+                        >
+                          {format(day, "d")}
+                        </span>
+                        {isCurrentMonth && <NewItemMenu date={day} />}
+                      </div>
+                      <div className="space-y-1">
+                        {dayItems.map((item) => (
+                          <div
+                            key={`${item.tipo}-${item.id}`}
+                            className={cn(
+                              "text-xs p-1 rounded border truncate cursor-pointer hover:opacity-80 flex items-center gap-1",
+                              getItemColor(item.tipo),
+                            )}
+                            title={item.titolo}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleItemClick(item)
+                            }}
+                          >
+                            <div className="w-2 h-3 bg-black dark:bg-white rounded-sm flex items-center justify-center">
+                              <span
+                                className="text-white dark:text-black text-[8px] font-bold leading-none"
+                                style={{
+                                  transform: "rotate(90deg)",
+                                  transformOrigin: "center",
+                                }}
+                              >
+                                {getTableAbbreviation(item.tabella_origine)}
+                              </span>
+                            </div>
+                            <span className="truncate">{item.titolo}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-            <div className="mb-4">
-              <h5 className="font-semibold text-sm">Statistiche Elementi</h5>
-              <div className="text-xs">
-                <div>
-                  <strong>Totale elementi:</strong> {items.length}
-                </div>
-                <div>
-                  <strong>Elementi filtrati:</strong> {filteredItems.length}
-                </div>
-                <div>
-                  <strong>Elementi per tipo:</strong>
-                </div>
-                <ul className="list-disc pl-5">
-                  <li>Attività: {items.filter((i) => i.tipo === "attivita").length}</li>
-                  <li>Progetti: {items.filter((i) => i.tipo === "progetto").length}</li>
-                  <li>Appuntamenti: {items.filter((i) => i.tipo === "appuntamento").length}</li>
-                  <li>Scadenze personali: {items.filter((i) => i.tipo === "scadenza" && !i.generale).length}</li>
-                  <li>Scadenze generali: {items.filter((i) => i.tipo === "scadenza" && i.generale).length}</li>
-                  <li>Todo: {items.filter((i) => i.tipo === "todolist").length}</li>
-                </ul>
-              </div>
-            </div>
-            <div className="mb-4">
-              <h5 className="font-semibold text-sm">Elementi per la Data Corrente</h5>
-              <div className="text-xs">
-                <div>
-                  <strong>Data corrente:</strong> {currentDate.toLocaleDateString()}
-                </div>
-                <div>
-                  <strong>Elementi che corrispondono:</strong> {debugItems.filter((i) => i.matchesCurrentDate).length}
-                </div>
-                {debugItems.filter((i) => i.matchesCurrentDate).length > 0 ? (
-                  <div className="mt-2 max-h-40 overflow-y-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="p-1 border">ID</th>
-                          <th className="p-1 border">Titolo</th>
-                          <th className="p-1 border">Tipo</th>
-                          <th className="p-1 border">Data Inizio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {debugItems
-                          .filter((i) => i.matchesCurrentDate)
-                          .map((item, idx) => (
-                            <tr key={idx} className="border-t">
-                              <td className="p-1 border">{item.id}</td>
-                              <td className="p-1 border">{item.titolo}</td>
-                              <td className="p-1 border">
-                                {item.tipo}
-                                {item.generale ? " (gen)" : ""}
-                              </td>
-                              <td className="p-1 border">{item.data_inizio}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="italic">Nessun elemento corrisponde alla data corrente</div>
-                )}
-              </div>
-            </div>
-            <div className="max-h-60 overflow-y-auto">
-              <h5 className="font-semibold text-sm">Log</h5>
-              {logs.map((log, index) => (
-                <div key={index} className="text-xs mb-1">
-                  {log}
-                </div>
-              ))}
-            </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Non renderizzare fino a quando il componente non è montato (per evitare hydration mismatch)
+  if (!mounted || authLoading) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            Agenda
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px] bg-muted rounded animate-pulse" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Se l'utente non è autenticato, mostra un messaggio
+  if (!user) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            Agenda
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Accesso richiesto per visualizzare l'agenda</p>
           </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            Agenda
+          </CardTitle>
+
+          {/* Controlli di navigazione */}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigateDate("prev")}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="min-w-[200px] justify-center bg-transparent">
+                  {getDateRangeText()}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="center">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  locale={it}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Button variant="outline" size="sm" onClick={() => navigateDate("next")}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Tabs per la selezione della vista - solo su desktop */}
+        {mode === "desktop" && (
+          <Tabs value={view} onValueChange={(value) => handleViewChange(value as "daily" | "weekly" | "monthly")}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="daily" className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" />
+                Giornaliera
+              </TabsTrigger>
+              <TabsTrigger value="weekly" className="flex items-center gap-2">
+                <CalendarRange className="h-4 w-4" />
+                Settimanale
+              </TabsTrigger>
+              <TabsTrigger value="monthly" className="flex items-center gap-2">
+                <Grid3X3 className="h-4 w-4" />
+                Mensile
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+      </CardHeader>
+
+      <CardContent>
+        {error ? (
+          <div className="text-center py-8 text-destructive">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
+            <p>Errore nel caricamento dell'agenda</p>
+            <p className="text-sm text-muted-foreground mt-2">{error.message}</p>
+          </div>
+        ) : (
+          <>
+            {view === "daily" && renderDailyView()}
+            {view === "weekly" && renderWeeklyView()}
+            {view === "monthly" && renderMonthlyView()}
+          </>
         )}
       </CardContent>
     </Card>

@@ -8,7 +8,7 @@ import { usePathname, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useAuth } from "@/lib/auth-provider"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { useSidebarState } from "@/contexts/sidebar-state-context"
@@ -29,6 +29,8 @@ import {
   Wifi,
   WifiOff,
   StickyNote,
+  Filter,
+  List,
 } from "lucide-react"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -60,24 +62,34 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   // Versione mobile della sidebar
   if (isMobile) {
     return (
-      <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="md:hidden fixed left-4 top-3 z-40" aria-label="Toggle Menu">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle Menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-[240px] sm:w-[300px] p-0">
-          <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
-        </SheetContent>
-      </Sheet>
+      <>
+        <Button
+          variant="outline"
+          size="icon"
+          className="md:hidden fixed left-4 top-3 z-50 bg-background border shadow-md"
+          onClick={toggleSidebar}
+          aria-label="Toggle Menu"
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
+
+        <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
+          <SheetContent side="left" className="w-[220px] p-0 bg-background border-r z-50">
+            <ScrollArea className="h-full">
+              <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+      </>
     )
   }
 
   // Versione desktop della sidebar
   return (
-    <div className={cn("pb-12 w-[240px] flex-shrink-0", className)} {...props}>
-      <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
+    <div className={cn("pb-12 w-[200px] flex-shrink-0 sidebar-container", className)} {...props}>
+      <ScrollArea className="h-full">
+        <SidebarContent pathname={pathname} user={user} isAdmin={isAdmin} isOnline={isOnline} />
+      </ScrollArea>
     </div>
   )
 }
@@ -95,257 +107,266 @@ function SidebarContent({
   isOnline: boolean
 }) {
   const searchParams = useSearchParams()
+
   return (
-    <div className="space-y-4 py-4 h-full flex flex-col">
-      <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">
-          iStudio
-          <span className="text-xs text-muted-foreground ml-1">v0.4</span>
-        </h2>
-        <div className="space-y-1">
-          <Button asChild variant={pathname === "/dashboard" ? "secondary" : "ghost"} className="w-full justify-start">
-            <Link href="/dashboard">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname === "/dashboard-u" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+    <div className="space-y-3 py-3 h-full flex flex-col sidebar-content">
+      <div className="sidebar-section">
+        <div className="bg-primary text-primary-foreground px-3 py-2 mx-2 rounded-md text-center font-bold text-sm">
+          MENU
+        </div>
+        <div className="space-y-0.5 mt-3">
+          <Link
+            href="/dashboard"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard" && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
           >
-            <Link href="/dashboard-u">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard U
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname === "/dashboard-utente" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Link>
+          <Link
+            href="/dashboard-u"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard-u" && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
           >
-            <Link href="/dashboard-utente">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard Utente
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant={pathname === "/dashboard-mobile" ? "secondary" : "ghost"}
-            className="w-full justify-start"
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard U
+          </Link>
+          <Link
+            href="/dashboard-utente"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard-utente" && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
           >
-            <Link href="/dashboard-mobile">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Dashboard Mobile
-            </Link>
-          </Button>
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard Utente
+          </Link>
+          <Link
+            href="/dashboard-mobile"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/dashboard-mobile" && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard Mobile
+          </Link>
         </div>
       </div>
-      <div className="px-4 py-2">
-        <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Gestione</h2>
-        <ScrollArea className="h-[300px] px-1">
-          <div className="space-y-1">
-            <Button
-              asChild
-              variant={pathname?.includes("/pagine") ? "secondary" : "ghost"}
-              className="w-full justify-start"
-            >
-              <Link href="/pagine">
-                <FileText className="mr-2 h-4 w-4" />
-                Pagine
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/note") ? "secondary" : "ghost"}
-              className="w-full justify-start"
-            >
-              <Link href="/note">
-                <StickyNote className="mr-2 h-4 w-4" />
-                Note
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "appuntamenti"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=appuntamenti">
-                <Calendar className="mr-2 h-4 w-4" />
-                Appuntamenti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "attivita"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=attivita">
-                <ClipboardList className="mr-2 h-4 w-4" />
-                Attività
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "scadenze"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=scadenze">
-                <Clock className="mr-2 h-4 w-4" />
-                Scadenze
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "todolist"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=todolist">
-                <CheckSquare className="mr-2 h-4 w-4" />
-                To-Do List
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "progetti"
-                  ? "secondary"
-                  : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=progetti">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Progetti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "clienti" ? "secondary" : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=clienti">
-                <Users className="mr-2 h-4 w-4" />
-                Clienti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={
-                pathname?.includes("/data-explorer") && searchParams?.get("table") === "pagine" ? "secondary" : "ghost"
-              }
-              className="w-full justify-start"
-            >
-              <Link href="/data-explorer?table=pagine">
-                <FileText className="mr-2 h-4 w-4" />
-                Pagine
-              </Link>
-            </Button>
-          </div>
-        </ScrollArea>
+
+      <div className="sidebar-section">
+        <h2 className="sidebar-section-title">Gestione</h2>
+        <div className="space-y-0.5">
+          <Link
+            href="/pagine"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/pagine") && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <FileText className="h-4 w-4" />
+            Pagine
+          </Link>
+          <Link
+            href="/note"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/note") && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <StickyNote className="h-4 w-4" />
+            Note
+          </Link>
+          <Link
+            href="/data-explorer?table=appuntamenti"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "appuntamenti" &&
+                "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <Calendar className="h-4 w-4" />
+            Appuntamenti
+          </Link>
+          <Link
+            href="/data-explorer?table=attivita"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "attivita" &&
+                "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Attività
+          </Link>
+          <Link
+            href="/data-explorer?table=scadenze"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "scadenze" &&
+                "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <Clock className="h-4 w-4" />
+            Scadenze
+          </Link>
+          <Link
+            href="/data-explorer?table=todolist"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "todolist" &&
+                "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <CheckSquare className="h-4 w-4" />
+            To-Do List
+          </Link>
+          <Link
+            href="/data-explorer?table=progetti"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "progetti" &&
+                "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Progetti
+          </Link>
+          <Link
+            href="/data-explorer?table=clienti"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname?.includes("/data-explorer") &&
+                searchParams?.get("table") === "clienti" &&
+                "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <Users className="h-4 w-4" />
+            Clienti
+          </Link>
+        </div>
       </div>
 
       {/* Sezione Admin */}
       {isAdmin && (
-        <div className="px-4 py-2">
-          <h2 className="mb-2 px-2 text-lg font-semibold tracking-tight">Amministrazione</h2>
-          <div className="space-y-1">
-            <Button asChild variant={pathname === "/admin" ? "secondary" : "ghost"} className="w-full justify-start">
-              <Link href="/admin">
-                <Settings className="mr-2 h-4 w-4" />
-                Admin Panel
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/admin/users") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+        <div className="sidebar-section">
+          <h2 className="sidebar-section-title">Amministrazione</h2>
+          <div className="space-y-0.5">
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname === "/admin" && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
             >
-              <Link href="/admin/users">
-                <Users className="mr-2 h-4 w-4" />
-                Gestione Utenti
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/data-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              <Settings className="h-4 w-4" />
+              Admin Panel
+            </Link>
+            <Link
+              href="/admin/users"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/admin/users") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
             >
-              <Link href="/data-explorer">
-                <Database className="mr-2 h-4 w-4" />
-                Data Explorer
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/table-explorer") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              <Users className="h-4 w-4" />
+              Gestione Utenti
+            </Link>
+            <Link
+              href="/user-filter"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/user-filter") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
             >
-              <Link href="/table-explorer">
-                <Layers className="mr-2 h-4 w-4" />
-                Table Explorer
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant={pathname?.includes("/debug-scadenze") ? "secondary" : "ghost"}
-              className="w-full justify-start"
+              <Filter className="h-4 w-4" />
+              User Filter
+            </Link>
+            <Link
+              href="/show-list"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/show-list") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
             >
-              <Link href="/debug-scadenze">
-                <AlertTriangle className="mr-2 h-4 w-4" />
-                Debug Scadenze
-              </Link>
-            </Button>
+              <List className="h-4 w-4" />
+              Show List
+            </Link>
+            <Link
+              href="/data-explorer"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/data-explorer") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
+            >
+              <Database className="h-4 w-4" />
+              Data Explorer
+            </Link>
+            <Link
+              href="/table-explorer"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/table-explorer") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
+            >
+              <Layers className="h-4 w-4" />
+              Table Explorer
+            </Link>
+            <Link
+              href="/debug-scadenze"
+              className={cn(
+                "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+                pathname?.includes("/debug-scadenze") && "bg-primary text-primary-foreground font-medium shadow-sm",
+              )}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Debug Scadenze
+            </Link>
           </div>
         </div>
       )}
 
       {/* Sezione Profilo */}
-      <div className="px-4 py-2 mt-auto">
-        <div className="space-y-1">
-          <Button asChild variant={pathname === "/profile" ? "secondary" : "ghost"} className="w-full justify-start">
-            <Link href="/profile">
-              <Users className="mr-2 h-4 w-4" />
-              Profilo
-            </Link>
-          </Button>
+      <div className="sidebar-section mt-auto">
+        <div className="space-y-0.5">
+          <Link
+            href="/profile"
+            className={cn(
+              "flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors hover:bg-accent/80 hover:text-accent-foreground",
+              pathname === "/profile" && "bg-primary text-primary-foreground font-medium shadow-sm",
+            )}
+          >
+            <Users className="h-4 w-4" />
+            Profilo
+          </Link>
         </div>
 
         {/* Indicatore di stato connessione */}
-        <div className="mt-4 px-2 py-1 text-xs text-muted-foreground flex items-center">
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
           {isOnline ? (
             <>
-              <Wifi className="mr-1 h-3 w-3 text-green-500" />
-              Online
+              <Wifi className="h-4 w-4 text-green-500" />
+              <span>Online</span>
             </>
           ) : (
             <>
-              <WifiOff className="mr-1 h-3 w-3 text-red-500" />
-              Offline
+              <WifiOff className="h-4 w-4 text-red-500" />
+              <span>Offline</span>
             </>
           )}
         </div>
 
         {/* Info utente */}
-        {user && <div className="mt-2 px-2 py-1 text-xs text-muted-foreground">{user.username || user.email}</div>}
+        {user && <div className="px-2 py-1 text-xs text-muted-foreground truncate">{user.username || user.email}</div>}
       </div>
     </div>
   )

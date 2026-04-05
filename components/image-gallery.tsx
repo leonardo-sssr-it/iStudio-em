@@ -1,183 +1,226 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef, memo } from "react"
-import Image from "next/image"
-import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { useState, useEffect } from "react"
+import { ChevronLeft, ChevronRight, Play, Pause } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
-// Array di immagini personalizzate
-const GALLERY_IMAGES = [
-  {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/x.jpg-XOiK6xtrpfrACfJ1tpOu7243XAV8Pr.jpeg",
-    alt: "Arte digitale creata da mani robotiche",
-  },
-  {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG3.jpg-in3EFYtEhe5JjvJ0KNkEZ0Yb4HjLJb.jpeg",
-    alt: "Professionista in ufficio moderno con grafici analitici",
-  },
-  {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG1.jpg-H2DuXCHMM87aAIV3vz39CMfQB5O1gq.jpeg",
-    alt: "Illustrazione di multitasking e gestione dello stress lavorativo",
-  },
-  {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG4.jpg-VgxWj7w218JlNDMAhpLjrqA4ykPs3A.jpeg",
-    alt: "Team di lavoro collaborativo in ambiente moderno",
-  },
-  {
-    src: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/OIG2.rAe.jpg-JO4CqjqquIJZQm7Jchtkv24VyJU4Yh.jpeg",
-    alt: "Pianista che si esibisce in un teatro vuoto",
-  },
-]
-
-interface ImageGalleryProps {
-  className?: string
-  autoplayInterval?: number
+interface GalleryImage {
+  src: string
+  alt: string
+  title?: string
 }
 
-export const ImageGallery = memo(function ImageGallery({ className, autoplayInterval = 5000 }: ImageGalleryProps) {
+interface ImageGalleryProps {
+  autoPlay?: boolean
+  interval?: number
+  showControls?: boolean
+  className?: string
+}
+
+export function ImageGallery({
+  autoPlay = true,
+  interval = 5000,
+  showControls = true,
+  className = "",
+}: ImageGalleryProps) {
+  const [images, setImages] = useState<GalleryImage[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
-  const autoplayTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const [isLoaded, setIsLoaded] = useState<boolean[]>(Array(GALLERY_IMAGES.length).fill(false))
+  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Funzione per passare all'immagine successiva
-  const nextSlide = useCallback(() => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % GALLERY_IMAGES.length)
-  }, [])
-
-  // Funzione per passare all'immagine precedente
-  const prevSlide = useCallback(() => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + GALLERY_IMAGES.length) % GALLERY_IMAGES.length)
-  }, [])
-
-  // Funzione per impostare un'immagine specifica
-  const goToSlide = useCallback((index: number) => {
-    setCurrentIndex(index)
-    // Quando l'utente cambia manualmente l'immagine, interrompiamo l'autoplay
-    setIsAutoPlaying(false)
-    if (autoplayTimerRef.current) {
-      clearInterval(autoplayTimerRef.current)
-      autoplayTimerRef.current = null
-    }
-  }, [])
-
-  // Gestione dell'autoplay
+  // Carica le immagini dall'API
   useEffect(() => {
-    if (isAutoPlaying) {
-      autoplayTimerRef.current = setInterval(nextSlide, autoplayInterval)
-    }
+    const loadImages = async () => {
+      try {
+        setIsLoading(true)
+        const response = await fetch("/api/gallery-images")
 
-    return () => {
-      if (autoplayTimerRef.current) {
-        clearInterval(autoplayTimerRef.current)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        if (data.success && data.images && data.images.length > 0) {
+          setImages(data.images)
+          setError(null)
+        } else {
+          // Fallback a immagini placeholder se non ci sono immagini
+          setImages([
+            {
+              src: "/placeholder.svg?height=400&width=600&text=Galleria+Vuota",
+              alt: "Galleria vuota",
+              title: "Nessuna immagine disponibile",
+            },
+          ])
+        }
+      } catch (err) {
+        console.error("Errore nel caricamento delle immagini:", err)
+        setError("Errore nel caricamento delle immagini")
+        // Fallback in caso di errore
+        setImages([
+          {
+            src: "/placeholder.svg?height=400&width=600&text=Errore+Caricamento",
+            alt: "Errore caricamento",
+            title: "Errore nel caricamento delle immagini",
+          },
+        ])
+      } finally {
+        setIsLoading(false)
       }
     }
-  }, [isAutoPlaying, nextSlide, autoplayInterval])
 
-  // Ripristina l'autoplay dopo un periodo di inattività
-  useEffect(() => {
-    const resumeAutoplay = () => {
-      setIsAutoPlaying(true)
-    }
-
-    const timeoutId = setTimeout(resumeAutoplay, autoplayInterval * 2)
-
-    return () => {
-      clearTimeout(timeoutId)
-    }
-  }, [currentIndex, autoplayInterval])
-
-  // Funzione per gestire il caricamento delle immagini
-  const handleImageLoad = useCallback((index: number) => {
-    setIsLoaded((prev) => {
-      const newState = [...prev]
-      newState[index] = true
-      return newState
-    })
+    loadImages()
   }, [])
 
-  return (
-    <div className={cn("relative w-full h-full overflow-hidden rounded-xl", className)}>
-      {/* Immagini */}
-      <div className="relative w-full h-full">
-        {GALLERY_IMAGES.map((image, index) => (
-          <div
-            key={index}
-            className={cn(
-              "absolute inset-0 transition-opacity duration-1000",
-              currentIndex === index ? "opacity-100 z-10" : "opacity-0 z-0",
-            )}
-          >
-            <div className={cn("absolute inset-0 bg-gray-200", isLoaded[index] ? "hidden" : "block")} />
-            <Image
-              src={image.src || "/placeholder.svg"}
-              alt={image.alt}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              priority={index === 0}
-              className="object-cover"
-              onLoad={() => handleImageLoad(index)}
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 text-sm">{image.alt}</div>
+  // Gestione autoplay
+  useEffect(() => {
+    if (!isPlaying || images.length <= 1) return
+
+    const timer = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex === images.length - 1 ? 0 : prevIndex + 1))
+    }, interval)
+
+    return () => clearInterval(timer)
+  }, [isPlaying, images.length, interval])
+
+  const goToPrevious = () => {
+    setCurrentIndex(currentIndex === 0 ? images.length - 1 : currentIndex - 1)
+  }
+
+  const goToNext = () => {
+    setCurrentIndex(currentIndex === images.length - 1 ? 0 : currentIndex + 1)
+  }
+
+  const togglePlayPause = () => {
+    setIsPlaying(!isPlaying)
+  }
+
+  if (isLoading) {
+    return (
+      <Card className={className}>
+        <CardContent className="p-0">
+          <div className="relative w-full h-[400px] bg-gray-100 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ))}
-      </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
-      {/* Controlli di navigazione */}
-      <div className="absolute bottom-10 left-0 right-0 z-20 flex justify-center space-x-2">
-        {GALLERY_IMAGES.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={cn(
-              "w-2 h-2 rounded-full transition-all",
-              currentIndex === index ? "bg-white w-4" : "bg-white/50 hover:bg-white/80",
-            )}
-            aria-label={`Vai all'immagine ${index + 1}`}
-          />
-        ))}
-      </div>
-
-      {/* Frecce di navigazione */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/20 hover:bg-black/40 text-white rounded-full h-8 w-8 hidden sm:flex"
-        onClick={prevSlide}
-        aria-label="Immagine precedente"
-      >
-        <ChevronLeft className="h-5 w-5" />
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/20 hover:bg-black/40 text-white rounded-full h-8 w-8 hidden sm:flex"
-        onClick={nextSlide}
-        aria-label="Immagine successiva"
-      >
-        <ChevronRight className="h-5 w-5" />
-      </Button>
-
-      {/* Thumbnails - solo su desktop */}
-      <div className="absolute bottom-4 right-4 z-20 hidden lg:flex space-x-2">
-        {GALLERY_IMAGES.map((image, index) => (
-          <button
-            key={index}
-            onClick={() => goToSlide(index)}
-            className={cn(
-              "w-12 h-8 rounded overflow-hidden border-2 transition-all",
-              currentIndex === index ? "border-white" : "border-transparent hover:border-white/50",
-            )}
-            aria-label={`Vai all'immagine ${index + 1}`}
-          >
-            <div className="relative w-full h-full">
-              <Image src={image.src || "/placeholder.svg"} alt={image.alt} fill sizes="48px" className="object-cover" />
+  if (error) {
+    return (
+      <Card className={className}>
+        <CardContent className="p-0">
+          <div className="relative w-full h-[400px] bg-gray-100 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-red-500 mb-2">{error}</p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Riprova
+              </Button>
             </div>
-          </button>
-        ))}
-      </div>
-    </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const currentImage = images[currentIndex]
+
+  return (
+    <Card className={className}>
+      <CardContent className="p-0">
+        <div className="relative w-full h-[400px] overflow-hidden rounded-lg">
+          {/* Immagine principale */}
+          <img
+            src={currentImage.src || "/placeholder.svg"}
+            alt={currentImage.alt}
+            className="w-full h-full object-cover transition-opacity duration-500"
+            onError={(e) => {
+              // Fallback se l'immagine non si carica
+              const target = e.target as HTMLImageElement
+              target.src = "/placeholder.svg?height=400&width=600&text=Immagine+Non+Disponibile"
+            }}
+          />
+
+          {/* Overlay con titolo se presente */}
+          {currentImage.title && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-4">
+              <h3 className="text-lg font-semibold">{currentImage.title}</h3>
+            </div>
+          )}
+
+          {/* Controlli di navigazione */}
+          {showControls && images.length > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white"
+                onClick={goToPrevious}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white"
+                onClick={goToNext}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+
+              {/* Controllo play/pause */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white"
+                onClick={togglePlayPause}
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+            </>
+          )}
+
+          {/* Indicatori di posizione */}
+          {images.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+              {images.map((_, index) => (
+                <button
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    index === currentIndex ? "bg-white" : "bg-white bg-opacity-50"
+                  }`}
+                  onClick={() => setCurrentIndex(index)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Badge con numero immagine */}
+          {images.length > 1 && (
+            <Badge className="absolute top-2 left-2 bg-black bg-opacity-50 text-white">
+              {currentIndex + 1} / {images.length}
+            </Badge>
+          )}
+
+          {/* Barra di progresso per autoplay */}
+          {isPlaying && images.length > 1 && (
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-black bg-opacity-30">
+              <div
+                className="h-full bg-white transition-all duration-100 ease-linear"
+                style={{
+                  width: `${((Date.now() % interval) / interval) * 100}%`,
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
-})
+}

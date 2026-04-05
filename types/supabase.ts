@@ -3,6 +3,57 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      configurazione: {
+        Row: {
+          id: string
+          versione: string | null
+          nome_app: string | null
+          tema_default: string | null
+          lingua_default: string | null
+          fuso_orario: string | null
+          debug: boolean | null
+          priorita: Json | null
+          stati: Json | null
+          categorie: Json | null
+          tags_predefiniti: Json | null
+          impostazioni_notifiche: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          versione?: string | null
+          nome_app?: string | null
+          tema_default?: string | null
+          lingua_default?: string | null
+          fuso_orario?: string | null
+          debug?: boolean | null
+          priorita?: Json | null
+          stati?: Json | null
+          categorie?: Json | null
+          tags_predefiniti?: Json | null
+          impostazioni_notifiche?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          versione?: string | null
+          nome_app?: string | null
+          tema_default?: string | null
+          lingua_default?: string | null
+          fuso_orario?: string | null
+          debug?: boolean | null
+          priorita?: Json | null
+          stati?: Json | null
+          categorie?: Json | null
+          tags_predefiniti?: Json | null
+          impostazioni_notifiche?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       utenti: {
         Row: {
           id: string

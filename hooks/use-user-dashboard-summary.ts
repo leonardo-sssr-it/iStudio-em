@@ -9,6 +9,7 @@ import {
   Clock,
   CheckSquare,
   BarChart3,
+  Users,
   FileText,
   StickyNote,
   type LucideIcon,
@@ -84,7 +85,15 @@ const TABLE_CONFIGS = [
     dateField: "data_fine",
     titleField: "titolo", // CORRETTO: era "nome"
   },
-  // RIMOSSO: clienti (come richiesto)
+  {
+    table: "clienti",
+    label: "Clienti",
+    icon: Users,
+    color: "bg-indigo-50 border-indigo-200",
+    textColor: "text-indigo-700",
+    dateField: "data_creazione",
+    titleField: "nome",
+  },
   {
     table: "pagine",
     label: "Pagine",

@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/components/ui/use-toast"
 import { ArrowLeft, Save, XCircle } from "lucide-react"
 import Link from "next/link"
-import { NoteForm } from "@/components/note/note-form"
+import { NotaForm } from "@/components/note/note-form"
 import type { Nota } from "@/lib/services/note-service"
 
 export default function EditNotaPage() {
@@ -22,15 +22,18 @@ export default function EditNotaPage() {
   const [loading, setLoading] = useState(true)
   const [nota, setNota] = useState<Nota | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
 
   const id = Array.isArray(params.id) ? params.id[0] : params.id
 
   // Carica la nota
   useEffect(() => {
     async function loadNota() {
-      if (!supabase || !id || !user?.id) return
+      if (!supabase || !id || !user?.id) {
+        console.log("Missing dependencies:", { supabase: !!supabase, id, userId: user?.id })
+        return
+      }
 
+      console.log("Loading nota with ID:", id)
       setLoading(true)
       setError(null)
 
@@ -42,18 +45,22 @@ export default function EditNotaPage() {
           .eq("id_utente", user.id)
           .single()
 
+        console.log("Nota query result:", { data: notaData, error: notaError })
+
         if (notaError) {
           if (notaError.code === "PGRST116") {
             // Nota non trovata
+            console.log("Nota not found, redirecting to not-found")
             router.push("/note/not-found")
             return
           }
           throw notaError
         }
 
+        console.log("Nota loaded successfully:", notaData)
         setNota(notaData)
       } catch (err: any) {
-        console.error("Errore nel caricamento della nota:", err)
+        console.error("Error loading nota:", err)
         setError(err.message)
         toast({
           title: "Errore",
@@ -68,13 +75,17 @@ export default function EditNotaPage() {
     loadNota()
   }, [supabase, id, user?.id, router])
 
-  // Salva le modifiche
+  // Funzione per salvare la nota
   const handleSave = async (formData: Partial<Nota>) => {
-    if (!nota?.id || !user?.id) return
+    if (!nota?.id || !user?.id || !supabase) {
+      console.error("Missing data for save:", { notaId: nota?.id, userId: user?.id, supabase: !!supabase })
+      return null
+    }
 
-    setSaving(true)
+    console.log("Saving nota with data:", formData)
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("note")
         .update({
           ...formData,
@@ -82,26 +93,72 @@ export default function EditNotaPage() {
         })
         .eq("id", nota.id)
         .eq("id_utente", user.id)
+        .select()
+        .single()
 
       if (error) throw error
+
+      console.log("Nota saved successfully:", data)
 
       toast({
         title: "Successo",
         description: "Nota aggiornata con successo",
       })
 
-      router.push(`/note/${nota.id}`)
+      return data
     } catch (err: any) {
-      console.error("Errore nel salvataggio della nota:", err)
+      console.error("Error saving nota:", err)
       toast({
         title: "Errore",
         description: `Impossibile salvare la nota: ${err.message}`,
         variant: "destructive",
       })
-    } finally {
-      setSaving(false)
+      throw err
     }
   }
+
+  // Funzione per eliminare la nota
+  const handleDelete = async (id: number) => {
+    if (!user?.id || !supabase) {
+      console.error("Missing data for delete:", { userId: user?.id, supabase: !!supabase })
+      return false
+    }
+
+    console.log("Deleting nota with ID:", id)
+
+    try {
+      const { error } = await supabase.from("note").delete().eq("id", id).eq("id_utente", user.id)
+
+      if (error) throw error
+
+      console.log("Nota deleted successfully")
+
+      toast({
+        title: "Successo",
+        description: "Nota eliminata con successo",
+      })
+
+      return true
+    } catch (err: any) {
+      console.error("Error deleting nota:", err)
+      toast({
+        title: "Errore",
+        description: `Impossibile eliminare la nota: ${err.message}`,
+        variant: "destructive",
+      })
+      return false
+    }
+  }
+
+  // Debug info
+  console.log("EditNotaPage state:", {
+    loading,
+    nota: nota ? { id: nota.id, titolo: nota.titolo } : null,
+    error,
+    id,
+    userId: user?.id,
+    supabaseReady: !!supabase,
+  })
 
   if (loading) {
     return (
@@ -177,12 +234,7 @@ export default function EditNotaPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <NoteForm
-            initialData={nota}
-            onSubmit={handleSave}
-            submitLabel={saving ? "Salvando..." : "Salva Modifiche"}
-            isSubmitting={saving}
-          />
+          <NotaForm nota={nota} onSave={handleSave} onDelete={handleDelete} isNew={false} />
         </CardContent>
       </Card>
     </div>
