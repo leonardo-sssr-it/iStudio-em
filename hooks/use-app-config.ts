@@ -1,26 +1,26 @@
 "use client"
 
 import { useState, useEffect } from "react"
-// L'import ora dovrebbe funzionare correttamente
-import { createClient } from "@/lib/supabase/client"
+import { useSupabase } from "@/lib/supabase-provider"
 import type { Database } from "@/types/supabase"
 
 export type AppConfig = Database["public"]["Tables"]["configurazione"]["Row"]
 
 export function useAppConfig() {
+  const { supabase, isInitializing } = useSupabase()
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Definisci la funzione di fetch all'interno dell'useEffect
+    // Aspetta che Supabase sia inizializzato
+    if (isInitializing || !supabase) return
+
     const fetchConfig = async () => {
       setIsLoading(true)
       setError(null)
 
       try {
-        // Crea il client solo quando la funzione viene eseguita nel browser
-        const supabase = createClient()
         const { data, error: supabaseError } = await supabase.from("configurazione").select("*").limit(1).maybeSingle()
 
         if (supabaseError) {
@@ -43,20 +43,22 @@ export function useAppConfig() {
     }
 
     fetchConfig()
-  }, []) // L'array di dipendenze è vuoto perché createClient è stabile
+  }, [supabase, isInitializing])
 
   return { config, isLoading, error }
 }
 
 // Hook specifico per recuperare solo la versione (più leggero)
 export function useAppVersion() {
+  const { supabase, isInitializing } = useSupabase()
   const [version, setVersion] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    if (isInitializing || !supabase) return
+
     const fetchVersion = async () => {
       try {
-        const supabase = createClient()
         const { data, error } = await supabase.from("configurazione").select("versione").limit(1).maybeSingle()
 
         if (error && error.code !== "PGRST116") {
@@ -73,7 +75,7 @@ export function useAppVersion() {
     }
 
     fetchVersion()
-  }, [])
+  }, [supabase, isInitializing])
 
   return { version, isLoading }
 }

@@ -120,10 +120,14 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     try {
       console.log("SupabaseProvider: Test connessione...")
 
-      // Test semplice sulla tabella utenti
-      const { error } = await supabase.from("utenti").select("id").limit(1).single()
+      // Test connessione usando rpc o una query che non richiede auth
+      // maybeSingle() non lancia errore se non ci sono righe (a differenza di single())
+      const { error } = await supabase.from("utenti").select("id").limit(1).maybeSingle()
 
-      const isConnected = !error || error.code === "PGRST116" // PGRST116 = no rows returned (ma connessione OK)
+      // Connesso se: nessun errore, oppure errore RLS/no-rows (che indicano comunque connessione OK)
+      const networkErrors = ["Failed to fetch", "NetworkError", "ERR_NETWORK", "ECONNREFUSED"]
+      const isNetworkError = error && networkErrors.some((e) => error.message?.includes(e))
+      const isConnected = !isNetworkError
 
       // Salva in cache
       globalSupabaseState.connectionCache.set(cacheKey, {
